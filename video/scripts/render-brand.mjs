@@ -1,0 +1,11 @@
+import {bundle} from '@remotion/bundler';
+import {openBrowser,renderStill,selectComposition} from '@remotion/renderer';
+import {dirname,join} from 'node:path';
+import {fileURLToPath} from 'node:url';
+const root=join(dirname(fileURLToPath(import.meta.url)),'..');
+const serveUrl=await bundle({entryPoint:join(root,'src/index.ts'),publicDir:join(root,'..','assets')});
+const chromiumOptions={gl:'angle'};
+const browser=await openBrowser('chrome',{chromiumOptions,browserExecutable:process.env.REMOTION_BROWSER??null});
+const composition=await selectComposition({serveUrl,id:'CueXSymbol',puppeteerInstance:browser,chromiumOptions});
+await renderStill({composition,serveUrl,frame:120,output:join(root,'..','assets/brand/x-dimensional.png'),imageFormat:'png',puppeteerInstance:browser,chromiumOptions});
+await browser.close({silent:true});

@@ -26,12 +26,9 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onSelectView, class
           className="flex items-center gap-2 text-ink hover:opacity-80 transition-opacity"
           aria-label="CueX 首页"
         >
-          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" className="shrink-0">
-            <rect x="1" y="1" width="22" height="22" rx="2" fill="#141716" />
-            <path d="M6 9.5h12M6 14.5h6.5M15 14.5h3" stroke="#ecede8" strokeWidth="2" />
-          </svg>
+          <img src="/brand/cuex-symbol-dimensional.svg" width="28" height="28" alt="" className="cuex-nav-mark shrink-0" />
           <span className="font-bold tracking-tight text-lg font-ui" translate="no">CueX</span>
-          <span className="text-[10px] text-ink-3 uppercase tracking-widest hidden sm:inline ml-1">Training Platform</span>
+          <span className="text-xs text-ink-3 hidden sm:inline ml-2">临场应对训练</span>
         </button>
 
         <nav className="flex items-center gap-1.5" aria-label="主导航">

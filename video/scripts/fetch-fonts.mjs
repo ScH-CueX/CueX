@@ -6,7 +6,7 @@ import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const outRoot = process.env.FONT_ROOT ?? join(root, 'public');
+const outRoot = process.env.FONT_ROOT ?? join(root, '..', 'assets');
 const force = process.argv.includes('--force');
 const manifest = JSON.parse(readFileSync(join(root, 'src/assets/manifest.json'), 'utf8'));
 

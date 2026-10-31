@@ -9,7 +9,7 @@ const rows = [];
 for (const [group, entries] of Object.entries(manifest)) {
   if (group.startsWith('$')) continue;
   for (const [id, entry] of Object.entries(entries)) {
-    const path = entry.file ? join(root, 'public', entry.file) : join(root, entry.component);
+    const path = entry.file ? join(root, '..', 'assets', entry.file) : join(root, entry.component);
     rows.push({group, id, status: entry.status, exists: existsSync(path) ? 'yes' : 'MISSING', path: entry.file ?? entry.component});
   }
 }

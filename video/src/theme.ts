@@ -17,12 +17,19 @@ export const C = {
   ok: '#7FE3C3',
 };
 
+// Same semantic roles as the original film: ink is the stage, paper is foreground.
+export const LIGHT_C = {
+  ...C, ink:'#ECEDE7', ink2:'#E3E7DF', paper:'#1A211E', soft:'#526056',
+  dim:'#68716B', faint:'#9BA69A', line:'rgba(26,33,30,0.12)',
+  cue:'#AA4C23', deep:'#685397', ok:'#2F7058',
+};
+
 export const FONT = {
-  sans: '"CueX Sans SC", "PingFang SC", sans-serif',
+  sans: '"CueX Serif SC", "Songti SC", serif',
   serif: '"CueX Serif SC", "Songti SC", serif',
   display: '"CueX Display", "CueX Serif SC", serif',
-  mono: '"CueX Mono", "CueX Sans SC", ui-monospace, monospace',
-  latin: '"CueX Latin", "CueX Sans SC", sans-serif',
+  mono: '"CueX Display", "CueX Serif SC", serif',
+  latin: '"CueX Display", "CueX Serif SC", serif',
 };
 
 export const rgba = (hex: string, a: number) => {

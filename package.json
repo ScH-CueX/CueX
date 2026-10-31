@@ -3,13 +3,17 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "demo": "node scripts/demo.mjs",
+    "demo": "node scripts/demo-remote-tts.mjs",
+    "tts:connect": "node scripts/tts-tunnel.mjs",
     "dev:web": "pnpm --filter @cuex/web dev",
     "dev:server": "pnpm --filter @cuex/server dev",
     "build": "pnpm --filter @cuex/web build",
     "typecheck": "pnpm -r run typecheck",
     "video:studio": "pnpm --filter cuex-promo studio",
-    "video:render": "pnpm --filter cuex-promo render"
+    "video:render": "pnpm --filter cuex-promo render",
+    "video:demo": "pnpm --filter cuex-promo render:demo",
+    "ppt:dev": "npm --prefix ppt run dev",
+    "ppt:build": "npm --prefix ppt run build"
   },
   "pnpm": {
     "overrides": {
@@ -19,5 +23,8 @@
       "@types/three": "^0.170.0"
     }
   },
-  "packageManager": "pnpm@9.15.9"
+  "packageManager": "pnpm@9.15.9",
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
 }

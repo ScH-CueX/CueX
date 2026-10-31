@@ -1,16 +1,18 @@
 import React from 'react';
 import {AbsoluteFill, random, useCurrentFrame} from 'remotion';
 import {noise2D} from '@remotion/noise';
-import {C, H, W, rgba} from '../theme';
+import {C, LIGHT_C, H, W, rgba} from '../theme';
 
 // Ink background with two slow light fields, a dot grid and a vignette.
-export const Backdrop: React.FC<{intensity?: number}> = ({intensity = 1}) => {
-  const frame = useCurrentFrame();
+export const Backdrop: React.FC<{intensity?: number; frame?: number; light?:boolean}> = ({intensity = 1, frame: frameOverride, light=false}) => {
+  const localFrame = useCurrentFrame();
+  const frame = frameOverride ?? localFrame;
   const t = frame / 30;
   const ax = 30 + noise2D('ax', t * 0.03, 0) * 14;
   const ay = 30 + noise2D('ay', 0, t * 0.03) * 12;
   const bx = 72 + noise2D('bx', t * 0.025, 4) * 14;
   const by = 74 + noise2D('by', 4, t * 0.025) * 10;
+  if(light)return <AbsoluteFill style={{backgroundColor:LIGHT_C.ink}}><AbsoluteFill style={{background:`radial-gradient(70% 65% at ${ax}% ${ay}%, ${rgba(LIGHT_C.cue,.024*intensity)}, transparent 75%), radial-gradient(65% 70% at ${bx}% ${by}%, ${rgba(LIGHT_C.deep,.028*intensity)}, transparent 75%)`}}/></AbsoluteFill>;
   return (
     <AbsoluteFill style={{backgroundColor: C.ink}}>
       <AbsoluteFill
@@ -35,11 +37,12 @@ export const Backdrop: React.FC<{intensity?: number}> = ({intensity = 1}) => {
 };
 
 // Animated film grain. The seed changes every frame so the texture never freezes.
-export const Grain: React.FC<{opacity?: number}> = ({opacity = 0.13}) => {
-  const frame = useCurrentFrame();
+export const Grain: React.FC<{opacity?: number; frame?: number; blendMode?:React.CSSProperties['mixBlendMode']}> = ({opacity = 0.13, frame: frameOverride, blendMode='screen'}) => {
+  const localFrame = useCurrentFrame();
+  const frame = frameOverride ?? localFrame;
   const seed = Math.floor(random(`grain-${frame}`) * 1000);
   return (
-    <AbsoluteFill style={{pointerEvents: 'none', mixBlendMode: 'screen', opacity}}>
+    <AbsoluteFill style={{pointerEvents: 'none', mixBlendMode: blendMode, opacity}}>
       <svg width={W} height={H}>
         <filter id={`grain-${frame}`}>
           <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves={2} seed={seed} stitchTiles="stitch" />

@@ -36,9 +36,12 @@ interface ReviewViewProps {
 }
 
 export const ReviewView: React.FC<ReviewViewProps> = ({ onNavigate }) => {
-  const [t, setT] = useState<number>(29.4);
+  const [t, setT] = useState<number>(() => {
+    const value = Number(new URLSearchParams(window.location.search).get('t') ?? 29.4);
+    return Number.isFinite(value) ? Math.max(0, Math.min(DUR, value)) : 29.4;
+  });
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [selectedMomentId, setSelectedMomentId] = useState<string>('m2');
+  const [selectedMomentId, setSelectedMomentId] = useState<string>(() => MOMENTS.find(moment => t >= moment.at && t < moment.to)?.id ?? 'm2');
   const [practiceMode, setPracticeMode] = useState<'learning' | 'performance'>('learning');
 
   const currentDoctorState = useMemo(() => stateAt(t), [t]);
@@ -184,7 +187,7 @@ export const ReviewView: React.FC<ReviewViewProps> = ({ onNavigate }) => {
                 seek(pos * DUR);
               }}
             >
-              <svg className="w-full h-full" viewBox="0 0 800 80" preserveAspectRatio="none">
+              <svg data-capture="timeline" className="w-full h-full" viewBox="0 0 800 80" preserveAspectRatio="none">
                 {/* Moment highlight spans */}
                 {MOMENTS.map((m) => {
                   const x1 = (m.at / DUR) * 800;
@@ -284,7 +287,7 @@ export const ReviewView: React.FC<ReviewViewProps> = ({ onNavigate }) => {
             <div className="border-b border-line pb-3">
               <h2 className="text-xl font-bold text-ink">对谈稿（Score）</h2>
               <p className="text-xs text-ink-2 mt-1">
-                宋体为医生，黑体为你。<span className="text-held-ink font-semibold">朱砂色</span>表示医生想好、尚未说出口的追问。页边为 System One 当时的研判。
+                <span className="text-held-ink font-semibold">朱砂色</span>表示医生想好、尚未说出口的追问。页边为当时的判断。
               </p>
             </div>
 

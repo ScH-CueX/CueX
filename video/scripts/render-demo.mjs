@@ -1,0 +1,20 @@
+import {bundle} from '@remotion/bundler';
+import {openBrowser, renderMedia, selectComposition} from '@remotion/renderer';
+import {mkdirSync,readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {dirname, join} from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+const root=join(dirname(fileURLToPath(import.meta.url)),'..');
+const out=join(root,'out');mkdirSync(out,{recursive:true});
+const voiceManifest=JSON.parse(readFileSync(join(root,'../assets/audio/narration/manifest.json'),'utf8'));
+if(voiceManifest.length!==6||voiceManifest.some(clip=>clip.model!=='Ming-3.0-tts-0.5b'||createHash('sha256').update(readFileSync(join(root,'../assets',clip.file))).digest('hex')!==clip.sha256))throw new Error('Generate and verify all six Windows Ming narration clips before rendering.');
+const serveUrl=await bundle({entryPoint:join(root,'src/index.ts'),publicDir:join(root,'..','assets')});
+const chromiumOptions={gl:'angle'};
+const browser=await openBrowser('chrome',{chromiumOptions,browserExecutable:process.env.REMOTION_BROWSER??null});
+const inputProps={bgm:!process.argv.includes('--no-bgm'),voice:true};
+const composition=await selectComposition({serveUrl,id:'CueXCinematic45',inputProps,puppeteerInstance:browser,chromiumOptions});
+let last=-1;
+const outputLocation=join(out,inputProps.bgm?'AI+医疗健康-记性好了一点-视频.mp4':'AI+医疗健康-记性好了一点-视频-无配乐.mp4');
+await renderMedia({composition,serveUrl,inputProps,outputLocation,codec:'h264',crf:18,pixelFormat:'yuv420p',audioCodec:'aac',audioBitrate:'192k',concurrency:8,puppeteerInstance:browser,chromiumOptions,onProgress:p=>{const n=Math.floor(p.progress*10);if(n!==last){last=n;console.log(`render ${n*10}%`);}}});
+await browser.close({silent:true});console.log(outputLocation);

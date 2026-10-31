@@ -1,0 +1,268 @@
+{
+  "capturedFrom": "CueX working tree",
+  "viewport": {
+    "width": 1920,
+    "height": 1080,
+    "scale": 2
+  },
+  "states": {
+    "home": {
+      "pageH": 2573,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=home",
+      "elements": {}
+    },
+    "live-holding": {
+      "pageH": 1488,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=live&t=28&jury=1&paused=1",
+      "elements": {
+        "doctor": {
+          "x": 618,
+          "y": 140,
+          "width": 566,
+          "height": 764.75
+        },
+        "transcript": {
+          "x": 1208,
+          "y": 140,
+          "width": 448,
+          "height": 764.75
+        },
+        "decisions": {
+          "x": 240,
+          "y": 928.75,
+          "width": 1440,
+          "height": 194
+        }
+      }
+    },
+    "live-asked": {
+      "pageH": 1488,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=live&t=33&jury=1&paused=1",
+      "elements": {
+        "doctor": {
+          "x": 618,
+          "y": 140,
+          "width": 566,
+          "height": 764.75
+        },
+        "transcript": {
+          "x": 1208,
+          "y": 140,
+          "width": 448,
+          "height": 764.75
+        },
+        "decisions": {
+          "x": 240,
+          "y": 928.75,
+          "width": 1440,
+          "height": 194
+        }
+      }
+    },
+    "live-withdrawn": {
+      "pageH": 1389,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=live&t=55.8&jury=1&paused=1",
+      "elements": {
+        "doctor": {
+          "x": 618,
+          "y": 140,
+          "width": 566,
+          "height": 665.75
+        },
+        "transcript": {
+          "x": 1208,
+          "y": 140,
+          "width": 448,
+          "height": 665.75
+        },
+        "decisions": {
+          "x": 240,
+          "y": 829.75,
+          "width": 1440,
+          "height": 194
+        }
+      }
+    },
+    "review": {
+      "pageH": 1979,
+      "width": 1920,
+      "fullImageScale": 1,
+      "cutoutScale": 2,
+      "url": "http://127.0.0.1:5173/?view=review&t=55.8",
+      "elements": {
+        "timeline": {
+          "x": 294,
+          "y": 525.5,
+          "width": 1332,
+          "height": 78
+        }
+      }
+    },
+    "live-listening": {
+      "pageH": 1374,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=live&t=12.2&jury=1&paused=1",
+      "elements": {
+        "doctor": {
+          "x": 618,
+          "y": 140,
+          "width": 566,
+          "height": 710
+        },
+        "transcript": {
+          "x": 1208,
+          "y": 140,
+          "width": 448,
+          "height": 710
+        },
+        "decisions": {
+          "x": 240,
+          "y": 874,
+          "width": 1440,
+          "height": 135
+        }
+      }
+    },
+    "live-ready": {
+      "pageH": 1389,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=live&t=53.5&jury=1&paused=1",
+      "elements": {
+        "doctor": {
+          "x": 618,
+          "y": 140,
+          "width": 566,
+          "height": 665.75
+        },
+        "transcript": {
+          "x": 1208,
+          "y": 140,
+          "width": 448,
+          "height": 665.75
+        },
+        "decisions": {
+          "x": 240,
+          "y": 829.75,
+          "width": 1440,
+          "height": 194
+        },
+        "active-utterance": {
+          "x": 1229,
+          "y": 346.5,
+          "width": 406,
+          "height": 61
+        },
+        "candidate-quote": {
+          "x": 990,
+          "y": 964.75,
+          "width": 276.609375,
+          "height": 20
+        },
+        "assist-controls": {
+          "x": 277,
+          "y": 508,
+          "width": 200,
+          "height": 42
+        }
+      }
+    },
+    "live-cue-amber": {
+      "pageH": 1374,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=live&t=28&assist=minimal&paused=1",
+      "elements": {
+        "doctor": {
+          "x": 618,
+          "y": 140,
+          "width": 566,
+          "height": 861
+        },
+        "transcript": {
+          "x": 1208,
+          "y": 140,
+          "width": 448,
+          "height": 861
+        }
+      }
+    },
+    "live-cue-green": {
+      "pageH": 1374,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=live&t=55.8&assist=minimal&paused=1",
+      "elements": {
+        "doctor": {
+          "x": 618,
+          "y": 140,
+          "width": 566,
+          "height": 861
+        },
+        "transcript": {
+          "x": 1208,
+          "y": 140,
+          "width": 448,
+          "height": 861
+        },
+        "active-utterance": {
+          "x": 1229,
+          "y": 346.5,
+          "width": 406,
+          "height": 61
+        },
+        "assist-controls": {
+          "x": 381,
+          "y": 945,
+          "width": 200,
+          "height": 42
+        }
+      }
+    },
+    "live-answered": {
+      "pageH": 1389,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=live&t=61.2&jury=1&paused=1",
+      "elements": {
+        "doctor": {
+          "x": 618,
+          "y": 140,
+          "width": 566,
+          "height": 665.75
+        },
+        "transcript": {
+          "x": 1208,
+          "y": 140,
+          "width": 448,
+          "height": 665.75
+        },
+        "decisions": {
+          "x": 240,
+          "y": 829.75,
+          "width": 1440,
+          "height": 194
+        },
+        "active-utterance": {
+          "x": 1229,
+          "y": 346.5,
+          "width": 406,
+          "height": 61
+        },
+        "candidate-quote": {
+          "x": 990,
+          "y": 964.75,
+          "width": 276.609375,
+          "height": 20
+        },
+        "assist-controls": {
+          "x": 277,
+          "y": 508,
+          "width": 200,
+          "height": 42
+        }
+      }
+    }
+  },
+  "errors": []
+}

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" fill="none">
+  <title>CueX</title>
+  <defs>
+    <linearGradient id="amber" x1="22" y1="12" x2="139" y2="144" gradientUnits="userSpaceOnUse"><stop stop-color="#FFD6A1"/><stop offset=".22" stop-color="#FF9A4A"/><stop offset=".56" stop-color="#FF7A2F"/><stop offset="1" stop-color="#BF3F14"/></linearGradient>
+    <linearGradient id="violet" x1="136" y1="14" x2="20" y2="146" gradientUnits="userSpaceOnUse"><stop stop-color="#E0DFFF"/><stop offset=".24" stop-color="#B5B3FF"/><stop offset=".6" stop-color="#8E8CFF"/><stop offset="1" stop-color="#5754BA"/></linearGradient>
+  </defs>
+  <path d="M27 21 142 143" stroke="#8D3817" stroke-width="17" stroke-linecap="round"/>
+  <path d="M20 13 135 135" stroke="url(#amber)" stroke-width="17" stroke-linecap="round"/>
+  <path d="M19 9 132 129" stroke="#FFE3B9" stroke-opacity=".66" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M142 21 27 143" stroke="#494687" stroke-width="17" stroke-linecap="round"/>
+  <path d="M135 13 20 135" stroke="url(#violet)" stroke-width="17" stroke-linecap="round"/>
+  <path d="M132 9 17 131" stroke="#ECEAFF" stroke-opacity=".72" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

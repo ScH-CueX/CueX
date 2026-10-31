@@ -79,8 +79,11 @@ export const DoctorCanvas: React.FC<DoctorCanvasProps> = ({
   lookAt = { x: 0, y: 0 },
   className = '',
   fallbackText,
+  onLoaded,
 }) => {
   const [hasError, setHasError] = React.useState(false);
+  const [modelReady, setModelReady] = React.useState(false);
+  const handleLoaded = React.useCallback(() => { setModelReady(true); onLoaded?.(); }, [onLoaded]);
 
   if (hasError) {
     return (
@@ -100,7 +103,7 @@ export const DoctorCanvas: React.FC<DoctorCanvasProps> = ({
   }
 
   return (
-    <div className={`relative w-full h-full overflow-hidden ${className}`}>
+    <div data-doctor-ready={modelReady ? 'true' : 'false'} className={`relative w-full h-full overflow-hidden ${className}`}>
       <Canvas
         camera={{ fov: 24, near: 0.01, far: 50 }}
         gl={{
@@ -109,15 +112,15 @@ export const DoctorCanvas: React.FC<DoctorCanvasProps> = ({
           powerPreference: 'high-performance',
           outputColorSpace: THREE.SRGBColorSpace,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.05,
+          toneMappingExposure: 0.85,
         }}
         dpr={[1, 1.75]}
         onError={() => setHasError(true)}
       >
         <Suspense fallback={null}>
-          <Environment preset="apartment" />
-          <directionalLight position={[-2.6, 2.0, 2.2]} intensity={2.4} color="#fff4e6" />
-          <hemisphereLight args={['#f1f3ee', '#878580', 0.55]} />
+          <Environment files="/env/lebombo_1k.hdr" environmentIntensity={0.32} />
+          <directionalLight position={[-3.5, 2.7, 1.6]} intensity={1.5} color="#fff4e6" />
+          <hemisphereLight args={['#f1f3ee', '#535c58', 0.3]} />
 
           <DoctorBust
             state={state}
@@ -127,6 +130,7 @@ export const DoctorCanvas: React.FC<DoctorCanvasProps> = ({
             heldLight={heldLight}
             nodTrigger={nodTrigger}
             lookAt={lookAt}
+            onLoaded={handleLoaded}
           />
 
           <CameraRig

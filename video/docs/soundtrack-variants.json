@@ -1,0 +1,11 @@
+{
+  "date": "2026-11-01",
+  "variant": "cinematic-light-1",
+  "method": "Both soundtracks rendered from the same composition; the dry variant copies the master H264 stream and keeps its independently rendered narration/SFX audio.",
+  "videoSha256": {
+    "AI+医疗健康-记性好了一点-视频.mp4": "bc0a4f550f0fd939abdd6ed0da69aead5b1d2d211d5a35bcfaeb7cab0e769920",
+    "AI+医疗健康-记性好了一点-视频-无配乐.mp4": "bc0a4f550f0fd939abdd6ed0da69aead5b1d2d211d5a35bcfaeb7cab0e769920"
+  },
+  "dryAudioBefore": "4ba12e89372ea9a612c0e6fe5eeff24074cf969bfa3c0e7542c92735dfdb5fc6",
+  "dryAudioAfter": "4ba12e89372ea9a612c0e6fe5eeff24074cf969bfa3c0e7542c92735dfdb5fc6"
+}

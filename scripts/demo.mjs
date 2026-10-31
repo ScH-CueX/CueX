@@ -83,7 +83,7 @@ try {
   }
   if (!await http(`${env.CUEX_S1_URL.replace(/\/$/, '')}/health`)) {
     console.log('[demo] Starting the JEV model tunnel.');
-    start('tunnel', '/bin/bash', ['scripts/s1-tunnel.sh']);
+    start('tunnel', '/bin/bash', ['apps/server/scripts/s1-tunnel.sh']);
     await waitFor('JEV forward', () => http(`${env.CUEX_S1_URL.replace(/\/$/, '')}/health`));
   } else console.log('[demo] Reusing the existing JEV forward.');
   await runProbe();

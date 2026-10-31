@@ -24,6 +24,16 @@ dist-ssr
 *.sln
 *.sw?
 
+# local pnpm store created when the global store is not writable
+.pnpm-store/
+
+# Derived presentation/video artifacts and local review output
+video/out/
+ppt/out/
+assets/qa/
+assets/captures/raw/
+.firecrawl/
+.taste-skill/
 # Local secrets
 .env
 .env.*
@@ -31,3 +41,6 @@ dist-ssr
 
 # TypeScript incremental build info
 *.tsbuildinfo
+__pycache__/
+*.py[cod]
+deliverables/

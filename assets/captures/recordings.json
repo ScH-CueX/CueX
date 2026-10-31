@@ -1,0 +1,20 @@
+[
+  {
+    "id": "live-interrupt",
+    "t": 26.5,
+    "seconds": 8,
+    "source": "real browser recording of the web replay",
+    "url": "http://127.0.0.1:5173/?view=live&t=26.5&jury=1&paused=1",
+    "trimOffsetSeconds": 8.084414542000001,
+    "errors": []
+  },
+  {
+    "id": "live-withdraw",
+    "t": 50.5,
+    "seconds": 9,
+    "source": "real browser recording of the web replay",
+    "url": "http://127.0.0.1:5173/?view=live&t=50.5&jury=1&paused=1",
+    "trimOffsetSeconds": 4.4462959589999995,
+    "errors": []
+  }
+]

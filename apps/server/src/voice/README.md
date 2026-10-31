@@ -31,12 +31,12 @@ Replace the `....` with the real file names in the model folder. Then set `CUEX_
 
 ## TTS (doctor voice)
 
-`CUEX_TTS_BACKEND` picks the first engine. If it fails, the next one speaks. Order after the first: `http`, `sherpa`, `edge`, as far as each is configured.
+Default: Windows Ming through `http://127.0.0.1:18766/tts`, with `CUEX_TTS_FALLBACK=none`. Start `pnpm tts:connect` or `pnpm demo` at the repo root. Deployment, voices and measured latency: `infra/windows/tts/README.md`. A service failure is reported; no other voice is substituted. Legacy fallback requires explicit `CUEX_TTS_FALLBACK=auto`.
 
 | Engine | Setting | Notes |
 | --- | --- | --- |
-| `edge` (default) | `CUEX_EDGE_VOICE` (default `zh-CN-YunyangNeural`), `CUEX_EDGE_RATE` (default `+8%`), `CUEX_EDGE_PITCH` | Needs internet. Unofficial Microsoft endpoint through `msedge-tts`, so it can break. Output is MP3. |
-| `http` | `CUEX_TTS_URL=http://host:8790/tts` | POST `{"text"}`, answer is one WAV or MP3 file. |
+| `edge` (explicit legacy option) | `CUEX_EDGE_VOICE` (default `zh-CN-YunyangNeural`), `CUEX_EDGE_RATE` (default `+8%`), `CUEX_EDGE_PITCH` | Needs internet. Unofficial Microsoft endpoint through `msedge-tts`, so it can break. Output is MP3. |
+| `http` (default) | `CUEX_TTS_URL=http://127.0.0.1:18766/tts` | POST `{"text"}`, answer is one WAV or MP3 file. |
 | `sherpa` | `CUEX_TTS_MODEL_DIR=<dir>` | VITS model in the server process. Checked with `vits-icefall-zh-aishell3`. |
 
 Every call to `synthesize()` yields exactly one complete audio file for the text it gets, so the browser can decode each chunk alone. Split long text into clauses before calling.

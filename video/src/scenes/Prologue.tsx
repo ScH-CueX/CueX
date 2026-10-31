@@ -9,7 +9,7 @@ const BASE_Y = 760;
 
 // A live conversation line. It kinks when the doctor's question arrives off-script,
 // then splits into two strands that foreshadow System 1 and System 2.
-const ConversationLine: React.FC<{frame: number}> = ({frame}) => {
+export const ConversationLine: React.FC<{frame: number; palette?:typeof C; light?:boolean}> = ({frame,palette=C,light=false}) => {
   const kink = 46;
   const split = ramp(frame, 118, 160, EASE.inOut);
   const draw = ramp(frame, 0, 34, EASE.out);
@@ -51,14 +51,14 @@ const ConversationLine: React.FC<{frame: number}> = ({frame}) => {
         </mask>
       </defs>
       <g mask="url(#edgemask)">
-        <polyline points={main} fill="none" stroke={rgba(C.paper, 0.5 * (1 - split))} strokeWidth={6} filter="url(#lineglow)" />
-        <polyline points={main} fill="none" stroke={rgba(C.paper, 0.9 * (1 - split))} strokeWidth={2} />
+        <polyline points={main} fill="none" stroke={rgba(palette.paper, 0.5 * (1 - split) * (light?.2:1))} strokeWidth={6} filter="url(#lineglow)" />
+        <polyline points={main} fill="none" stroke={rgba(palette.paper, 0.9 * (1 - split))} strokeWidth={2} />
         {split > 0 ? (
           <>
-            <polyline points={strand(-1, 'a')} fill="none" stroke={rgba(C.cue, 0.55 * split)} strokeWidth={6} filter="url(#lineglow)" />
-            <polyline points={strand(-1, 'a')} fill="none" stroke={rgba(C.cue, 0.95 * split)} strokeWidth={2} />
-            <polyline points={strand(1, 'b')} fill="none" stroke={rgba(C.deep, 0.55 * split)} strokeWidth={6} filter="url(#lineglow)" />
-            <polyline points={strand(1, 'b')} fill="none" stroke={rgba(C.deep, 0.95 * split)} strokeWidth={2} />
+            <polyline points={strand(-1, 'a')} fill="none" stroke={rgba(palette.cue, 0.55 * split * (light?.2:1))} strokeWidth={6} filter="url(#lineglow)" />
+            <polyline points={strand(-1, 'a')} fill="none" stroke={rgba(palette.cue, 0.95 * split)} strokeWidth={2} />
+            <polyline points={strand(1, 'b')} fill="none" stroke={rgba(palette.deep, 0.55 * split * (light?.2:1))} strokeWidth={6} filter="url(#lineglow)" />
+            <polyline points={strand(1, 'b')} fill="none" stroke={rgba(palette.deep, 0.95 * split)} strokeWidth={2} />
           </>
         ) : null}
       </g>

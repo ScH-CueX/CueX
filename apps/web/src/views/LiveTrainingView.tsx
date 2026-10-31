@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { ViewKey } from '@/components/layout/Navbar';
 import { DoctorCanvas } from '@/components/r3f/DoctorCanvas';
 import { ClinicalScaffoldingHUD, type ScaffoldingLevel } from '@/components/ClinicalScaffoldingHUD';
+import { CueEdgeLight, type EdgeCuePhase } from '@/components/CueEdgeLight';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -32,8 +33,11 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
   onNavigate,
 }) => {
   const [t, setT] = useState<number>(initialTime);
-  const [playing, setPlaying] = useState<boolean>(true);
-  const [scaffoldingLevel, setScaffoldingLevel] = useState<ScaffoldingLevel>('full');
+  const [playing, setPlaying] = useState<boolean>(() => new URLSearchParams(window.location.search).get('paused') !== '1');
+  const [scaffoldingLevel, setScaffoldingLevel] = useState<ScaffoldingLevel>(() => {
+    const value=new URLSearchParams(window.location.search).get('assist');
+    return value === 'minimal' || value === 'faded' ? value : 'full';
+  });
   const [jury, setJury] = useState<boolean>(initialJury);
   const [nodTrigger, setNodTrigger] = useState<number>(0);
   const [driverType, setDriverType] = useState<'replay' | 'live'>('replay');
@@ -107,8 +111,16 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
     setT(Math.min(D, Math.max(0, targetTime)));
   }, []);
 
+  const edgePhase: EdgeCuePhase = scaffoldingLevel !== 'minimal' || (driverType === 'live' && !connected)
+    ? 'quiet'
+    : currentStateName === 'withdrawing' ? 'resolved'
+    : currentStateName === 'asking' || currentStateName === 'holding' ? 'focus'
+    : latestJudgment?.verdict === 'drift' && activeUtterance?.who === 'rep' ? 'drift'
+    : 'quiet';
+
   return (
-    <div className="flex flex-col min-h-[calc(100vh-3.5rem)] bg-ground text-ink select-none">
+    <div data-ui="training" className="flex flex-col min-h-[calc(100vh-3.5rem)] bg-ground text-ink select-none">
+      <CueEdgeLight phase={edgePhase} paused={driverType === 'replay' && !playing} />
       {/* 极简顶栏 */}
       <div className="w-full border-b border-line bg-surface/80 px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2 text-ink-2">
@@ -123,7 +135,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 max-w-full">
           {/* Driver 模式快速切换 */}
           <div className="seg" role="group" aria-label="驱动模式">
             <button
@@ -231,7 +243,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
         </div>
 
         {/* 中列：3D 石膏舞台 (前倾/点头/朱砂 Fresnel 侧光) */}
-        <div className="lg:col-span-5 flex flex-col items-center justify-center min-h-[460px] bg-ground-2/20 border border-line rounded-[2px] relative overflow-hidden">
+        <div data-capture="doctor" className="lg:col-span-5 flex flex-col items-center justify-center min-h-[460px] bg-ground-2/20 border border-line rounded-[2px] relative overflow-hidden">
           <DoctorCanvas
             state={currentStateName}
             readiness={readiness}
@@ -260,8 +272,8 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
           )}
         </div>
 
-        {/* 右列：双声部排版对谈现场 (宋体为医生，黑体为代表) */}
-        <div className="lg:col-span-4 flex flex-col justify-between border border-line bg-surface rounded-[2px] p-5 shadow-sm">
+        {/* 右列：双声部对谈现场，以字号和字重区别角色 */}
+        <div data-capture="transcript" className="lg:col-span-4 flex flex-col justify-between border border-line bg-surface rounded-[2px] p-5 shadow-sm">
           <div className="space-y-5" role="log" aria-label="对谈现场" aria-live="polite" aria-relevant="additions text" data-testid="transcript">
             <div className="flex items-center justify-between border-b border-line pb-2">
               <span className="text-xs font-bold text-ink-3 uppercase tracking-widest">对谈现场</span>
@@ -289,7 +301,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
             {!activeUtterance && driverType === 'live' && <p className="text-sm text-ink-3">{connected ? '等待医生开场，你也可以直接回应。' : '连接后开始对谈。'}</p>}
             {/* 当前正在进行的语句 */}
             {activeUtterance && (
-              <div className="pt-3 border-t border-line space-y-1">
+              <div data-capture="active-utterance" className="pt-3 border-t border-line space-y-1">
                 {(() => {
                   const body = activeUtterance.text;
                   const len = Math.round(body.length * activeUtteranceProgress);
@@ -319,7 +331,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
           </div>
 
           <div className="pt-4 border-t border-line/60 flex items-center justify-between text-[11px] text-ink-3">
-            <span>宋体：医生 · 黑体：代表</span>
+            <span>{frame.doctor.name} / 医药代表</span>
             <span className="font-mono">{fmtD(clock)}</span>
           </div>
         </div>
@@ -327,7 +339,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
 
       {/* 评审视界：脑电波脉冲与悬珠 */}
       {jury && (
-        <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 mb-4">
+        <div data-capture="decisions" className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 mb-4">
           <div className="border border-line bg-surface/90 rounded-[2px] p-4 space-y-3 shadow-sm">
             <div className="flex items-center justify-between border-b border-line pb-1.5 text-xs">
               <span className="font-bold text-ink">系统双层决策时序</span>
@@ -369,7 +381,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
                       {phaseLabels[candidate.phase]}
                     </Badge>
                     {candidate.text && <p className="font-doctor text-sm text-ink-2 bg-surface p-2 rounded-[2px] border border-line">
-                      {candidate.phase === 'withdrawn' ? <del className="text-ink-3">{candidate.text}</del> : candidate.text}
+                      <span data-capture="candidate-quote">{candidate.phase === 'withdrawn' ? <del className="text-ink-3">{candidate.text}</del> : candidate.text}</span>
                     </p>}
                     {driverType === 'live' && <p className="text-ink-3 leading-relaxed">{candidate.basis}</p>}
                   </div>

@@ -4,6 +4,7 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  publicDir: path.resolve(__dirname, '../../assets'),
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -12,6 +13,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    watch: { ignored: ['**/assets/captures/**', '**/assets/qa/**', '**/assets/audio/**'] },
     // Dev proxy to apps/server, so LiveWSDriver's same-host /ws/session URL reaches the backend.
     proxy: {
       '/ws': { target: process.env.CUEX_SERVER_ORIGIN ?? 'http://127.0.0.1:8765', ws: true },

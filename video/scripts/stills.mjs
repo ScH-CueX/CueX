@@ -12,9 +12,10 @@ const compId = process.env.COMP ?? 'CueXPromo';
 const outDir = join(root, 'out/stills');
 mkdirSync(outDir, {recursive: true});
 
-const serveUrl = await bundle({entryPoint: join(root, 'src/index.ts')});
+const serveUrl = await bundle({entryPoint: join(root, 'src/index.ts'), publicDir: join(root, '..', 'assets')});
 const chromiumOptions = {gl: 'angle'};
-const browser = await openBrowser('chrome', {chromiumOptions});
+// REMOTION_BROWSER points at a local Chrome when the headless shell can't be downloaded.
+const browser = await openBrowser('chrome', {chromiumOptions, browserExecutable: process.env.REMOTION_BROWSER ?? null});
 const composition = await selectComposition({serveUrl, id: compId, puppeteerInstance: browser, chromiumOptions});
 for (const frame of frames) {
   const output = join(outDir, `f${String(frame).padStart(4, '0')}.jpg`);
