@@ -1,0 +1,157 @@
+{
+  "$comment": "CueX 宣传片的全部外部素材。status=placeholder 表示占位，替换文件后把 status 改成 final。",
+  "fonts": {
+    "sansSC": {
+      "file": "assets/fonts/NotoSansSC-VF.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/6c1dbe27dcf7d817d4b62cec033ba77fa8e2a5ec/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf",
+      "family": "CueX Sans SC",
+      "weight": "100 900",
+      "style": "normal",
+      "status": "placeholder",
+      "source": "Noto Sans SC, Google Fonts, OFL"
+    },
+    "serifSC": {
+      "file": "assets/fonts/NotoSerifSC-VF.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/6c1dbe27dcf7d817d4b62cec033ba77fa8e2a5ec/ofl/notoserifsc/NotoSerifSC%5Bwght%5D.ttf",
+      "family": "CueX Serif SC",
+      "weight": "200 900",
+      "style": "normal",
+      "status": "placeholder",
+      "source": "Noto Serif SC, Google Fonts, OFL"
+    },
+    "display": {
+      "file": "assets/fonts/InstrumentSerif-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/6c1dbe27dcf7d817d4b62cec033ba77fa8e2a5ec/ofl/instrumentserif/InstrumentSerif-Regular.ttf",
+      "family": "CueX Display",
+      "weight": "400",
+      "style": "normal",
+      "status": "placeholder",
+      "source": "Instrument Serif, Google Fonts, OFL"
+    },
+    "displayItalic": {
+      "file": "assets/fonts/InstrumentSerif-Italic.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/6c1dbe27dcf7d817d4b62cec033ba77fa8e2a5ec/ofl/instrumentserif/InstrumentSerif-Italic.ttf",
+      "family": "CueX Display",
+      "weight": "400",
+      "style": "italic",
+      "status": "placeholder",
+      "source": "Instrument Serif Italic, Google Fonts, OFL"
+    },
+    "mono": {
+      "file": "assets/fonts/JetBrainsMono-VF.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/6c1dbe27dcf7d817d4b62cec033ba77fa8e2a5ec/ofl/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf",
+      "family": "CueX Mono",
+      "weight": "100 800",
+      "style": "normal",
+      "status": "placeholder",
+      "source": "JetBrains Mono, Google Fonts, OFL"
+    },
+    "latin": {
+      "file": "assets/fonts/Inter-VF.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/6c1dbe27dcf7d817d4b62cec033ba77fa8e2a5ec/ofl/inter/Inter%5Bopsz,wght%5D.ttf",
+      "family": "CueX Latin",
+      "weight": "100 900",
+      "style": "normal",
+      "status": "placeholder",
+      "source": "Inter, Google Fonts, OFL"
+    }
+  },
+  "voice": {
+    "d_ask": {
+      "file": "assets/audio/voiceover/d_ask.wav",
+      "status": "placeholder",
+      "source": "macOS say，由 npm run audio:placeholder 生成"
+    },
+    "r_pitch": {
+      "file": "assets/audio/voiceover/r_pitch.wav",
+      "status": "placeholder",
+      "source": "macOS say，由 npm run audio:placeholder 生成"
+    },
+    "d_followup": {
+      "file": "assets/audio/voiceover/d_followup.wav",
+      "status": "placeholder",
+      "source": "macOS say，由 npm run audio:placeholder 生成"
+    },
+    "r_pitch_short": {
+      "file": "assets/audio/voiceover/r_pitch_short.wav",
+      "status": "placeholder",
+      "source": "macOS say，由 npm run audio:placeholder 生成"
+    },
+    "r_answer": {
+      "file": "assets/audio/voiceover/r_answer.wav",
+      "status": "placeholder",
+      "source": "macOS say，由 npm run audio:placeholder 生成"
+    },
+    "d_continue": {
+      "file": "assets/audio/voiceover/d_continue.wav",
+      "status": "placeholder",
+      "source": "macOS say，由 npm run audio:placeholder 生成"
+    },
+    "d_rephrase": {
+      "file": "assets/audio/voiceover/d_rephrase.wav",
+      "status": "placeholder",
+      "source": "macOS say，由 npm run audio:placeholder 生成"
+    },
+    "r_retry": {
+      "file": "assets/audio/voiceover/r_retry.wav",
+      "status": "placeholder",
+      "source": "macOS say，由 npm run audio:placeholder 生成"
+    },
+    "d_ok": {
+      "file": "assets/audio/voiceover/d_ok.wav",
+      "status": "placeholder",
+      "source": "macOS say，由 npm run audio:placeholder 生成"
+    }
+  },
+  "music": {
+    "bed": {
+      "file": "assets/audio/music/bed.wav",
+      "status": "placeholder",
+      "source": "ffmpeg 合成的低频铺底，由 npm run setup 生成"
+    }
+  },
+  "sfx": {
+    "tick": {
+      "file": "assets/audio/sfx/tick.wav",
+      "status": "placeholder",
+      "source": "ffmpeg 合成，由 npm run setup 生成"
+    },
+    "press": {
+      "file": "assets/audio/sfx/press.wav",
+      "status": "placeholder",
+      "source": "ffmpeg 合成，由 npm run setup 生成"
+    },
+    "whoosh": {
+      "file": "assets/audio/sfx/whoosh.wav",
+      "status": "placeholder",
+      "source": "ffmpeg 合成，由 npm run setup 生成"
+    },
+    "cut": {
+      "file": "assets/audio/sfx/cut.wav",
+      "status": "placeholder",
+      "source": "ffmpeg 合成，由 npm run setup 生成"
+    },
+    "dissolve": {
+      "file": "assets/audio/sfx/dissolve.wav",
+      "status": "placeholder",
+      "source": "ffmpeg 合成，由 npm run setup 生成"
+    },
+    "impact": {
+      "file": "assets/audio/sfx/impact.wav",
+      "status": "placeholder",
+      "source": "ffmpeg 合成，由 npm run setup 生成"
+    },
+    "rewind": {
+      "file": "assets/audio/sfx/rewind.wav",
+      "status": "placeholder",
+      "source": "ffmpeg 合成，由 npm run setup 生成"
+    }
+  },
+  "brand": {
+    "wordmark": {
+      "component": "src/components/CueXMark.tsx",
+      "status": "placeholder",
+      "source": "Instrument Serif 文字加两笔交叉的 X，等待正式 logo"
+    }
+  }
+}

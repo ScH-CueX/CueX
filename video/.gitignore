@@ -1,0 +1,8 @@
+node_modules
+out
+.DS_Store
+# Rebuilt by `npm run setup`: fonts are downloaded, music and sound effects are synthesized.
+# Voice files stay in git because the placeholder voices need macOS `say`.
+public/assets/fonts/*.ttf
+public/assets/audio/music/*.wav
+public/assets/audio/sfx/*.wav

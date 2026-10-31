@@ -1,0 +1,61 @@
+{
+  "voices": {
+    "doctor": {
+      "label": "模拟医生",
+      "placeholderVoice": "Reed (中文（中国大陆）)",
+      "rate": 200
+    },
+    "rep": {
+      "label": "医药代表",
+      "placeholderVoice": "Tingting",
+      "rate": 210
+    }
+  },
+  "lines": [
+    {
+      "id": "d_ask",
+      "speaker": "doctor",
+      "text": "我先了解一下，这项研究里的患者，之前接受过相关治疗吗？"
+    },
+    {
+      "id": "r_pitch",
+      "speaker": "rep",
+      "text": "这项研究采用了多中心设计，结果也显示出了比较明确的获益。而且从整体数据来看……"
+    },
+    {
+      "id": "d_followup",
+      "speaker": "doctor",
+      "text": "结果我们稍后谈。先确认一下：这些患者之前接受过相关治疗吗？"
+    },
+    {
+      "id": "r_pitch_short",
+      "speaker": "rep",
+      "text": "这项研究采用了多中心设计，结果也……"
+    },
+    {
+      "id": "r_answer",
+      "speaker": "rep",
+      "text": "我先回答您刚才的问题：这项研究纳入的是此前未接受相关治疗的人群。"
+    },
+    {
+      "id": "d_continue",
+      "speaker": "doctor",
+      "text": "明白，那你继续说这项研究的结果。"
+    },
+    {
+      "id": "d_rephrase",
+      "speaker": "doctor",
+      "text": "我确认一下，这批患者是还没有接受过相关治疗，还是治疗过以后再进入研究的？"
+    },
+    {
+      "id": "r_retry",
+      "speaker": "rep",
+      "text": "纳入的是此前未接受相关治疗的人群。您刚才想确认的就是这一点，对吗？"
+    },
+    {
+      "id": "d_ok",
+      "speaker": "doctor",
+      "text": "对。那我们继续看结果。"
+    }
+  ]
+}
