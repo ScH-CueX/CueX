@@ -5,7 +5,7 @@
     "seconds": 8,
     "source": "real browser recording of the web replay",
     "url": "http://127.0.0.1:5173/?view=live&t=26.5&jury=1&paused=1",
-    "trimOffsetSeconds": 6.171852208000001,
+    "trimOffsetSeconds": 6.691024667,
     "errors": []
   },
   {
@@ -14,7 +14,7 @@
     "seconds": 9,
     "source": "real browser recording of the web replay",
     "url": "http://127.0.0.1:5173/?view=live&t=50.5&jury=1&paused=1",
-    "trimOffsetSeconds": 3.152590250000001,
+    "trimOffsetSeconds": 3.124162209000002,
     "errors": []
   }
 ]

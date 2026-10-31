@@ -18,11 +18,11 @@ export const C = {
 };
 
 export const FONT = {
-  sans: '"CueX Sans SC", "PingFang SC", sans-serif',
+  sans: '"CueX Serif SC", "Songti SC", serif',
   serif: '"CueX Serif SC", "Songti SC", serif',
   display: '"CueX Display", "CueX Serif SC", serif',
-  mono: '"CueX Mono", "CueX Sans SC", ui-monospace, monospace',
-  latin: '"CueX Latin", "CueX Sans SC", sans-serif',
+  mono: '"CueX Display", "CueX Serif SC", serif',
+  latin: '"CueX Display", "CueX Serif SC", serif',
 };
 
 export const rgba = (hex: string, a: number) => {

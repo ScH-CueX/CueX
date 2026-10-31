@@ -11,7 +11,7 @@ const page = await browser.newPage({viewport:{width:1920,height:1080},deviceScal
 const errors=[];
 page.on('pageerror', e=>errors.push(String(e)));
 const requested=new Set(process.argv.slice(2));
-const states=[['home','?view=home'],['live-listening','?view=live&t=12.2&jury=1&paused=1'],['live-holding','?view=live&t=28&jury=1&paused=1'],['live-asked','?view=live&t=33&jury=1&paused=1'],['live-ready','?view=live&t=53.5&jury=1&paused=1'],['live-withdrawn','?view=live&t=55.8&jury=1&paused=1'],['review','?view=review&t=55.8']].filter(([name])=>requested.size===0||requested.has(name));
+const states=[['home','?view=home'],['live-listening','?view=live&t=12.2&jury=1&paused=1'],['live-holding','?view=live&t=28&jury=1&paused=1'],['live-asked','?view=live&t=33&jury=1&paused=1'],['live-ready','?view=live&t=53.5&jury=1&paused=1'],['live-withdrawn','?view=live&t=55.8&jury=1&paused=1'],['live-cue-amber','?view=live&t=28&assist=minimal&paused=1'],['live-cue-green','?view=live&t=55.8&assist=minimal&paused=1'],['review','?view=review&t=55.8']].filter(([name])=>requested.size===0||requested.has(name));
 const previous=await readFile(path.join(out,'layout.json'),'utf8').then(JSON.parse).catch(()=>({states:{}}));
 const layout=previous.states;
 for (const [name,query] of states) {

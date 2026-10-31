@@ -142,6 +142,44 @@
           "height": 157
         }
       }
+    },
+    "live-cue-amber": {
+      "pageH": 1374,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=live&t=28&assist=minimal&paused=1",
+      "elements": {
+        "doctor": {
+          "x": 618,
+          "y": 140,
+          "width": 566,
+          "height": 860
+        },
+        "transcript": {
+          "x": 1208,
+          "y": 140,
+          "width": 448,
+          "height": 860
+        }
+      }
+    },
+    "live-cue-green": {
+      "pageH": 1374,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=live&t=55.8&assist=minimal&paused=1",
+      "elements": {
+        "doctor": {
+          "x": 618,
+          "y": 140,
+          "width": 566,
+          "height": 860
+        },
+        "transcript": {
+          "x": 1208,
+          "y": 140,
+          "width": 448,
+          "height": 860
+        }
+      }
     }
   },
   "errors": []

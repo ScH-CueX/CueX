@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "id": "fs:423798",
+      "title": "Little Whoosh 3",
+      "author": "ch_ase",
+      "duration_seconds": 2.46755,
+      "preview_url": "https://cdn.freesound.org/previews/423/423798_3982955-hq.mp3",
+      "downloads": 6400,
+      "page_url": "https://freesound.org/people/ch_ase/sounds/423798/",
+      "license_url": "http://creativecommons.org/publicdomain/zero/1.0/",
+      "license": "CC0-1.0",
+      "description": "3rd in the little whoosh series. Pitch shifted wind.",
+      "rating": 4.7,
+      "rating_count": 96,
+      "provider": "freesound",
+      "file": "fs-423798.mp3",
+      "sha256": "e311eea9070020a4338914c55f3ff011a0870cc1487398985fcb1b28bc7cef84",
+      "download_url": "https://cdn.freesound.org/previews/423/423798_3982955-hq.mp3",
+      "download_kind": "mp3-preview-hq",
+      "is_preview": true,
+      "downloaded_at": "2026-10-31T21:00:58.067521+00:00",
+      "license_checked_at": "2026-10-31T21:00:58.067689+00:00",
+      "changes": [
+        "Decoded HQ MP3 preview to WAV and applied +15 dB gain; not an original lossless source."
+      ],
+      "analysis": {
+        "codec": "mp3",
+        "sample_rate": 44100,
+        "channels": 2,
+        "duration_seconds": 2.467563,
+        "sample_peak_dbfs": -24.31,
+        "rms_dbfs": -45.15,
+        "energy_window_seconds": 0.01,
+        "energy_peak_seconds": 0.875,
+        "active_start_seconds": 0.41,
+        "active_end_seconds": 2.18,
+        "activity_threshold_db_below_peak_rms": -40
+      },
+      "processed_file": "whoosh.wav",
+      "processed_sha256": "a716432ec84efb2a7605dd5e8ba5b453e55667568b378ccfed79b1c5155baee1",
+      "processed_analysis": {
+        "codec": "pcm_s16le",
+        "sample_rate": 48000,
+        "channels": 2,
+        "duration_seconds": 2.467563,
+        "sample_peak_dbfs": -9.31,
+        "rms_dbfs": -30.15,
+        "energy_window_seconds": 0.01,
+        "energy_peak_seconds": 0.875,
+        "active_start_seconds": 0.41,
+        "active_end_seconds": 2.18,
+        "activity_threshold_db_below_peak_rms": -40
+      }
+    }
+  ]
+}

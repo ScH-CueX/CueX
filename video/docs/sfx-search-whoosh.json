@@ -1,0 +1,47 @@
+{
+  "provider": "freesound",
+  "query": "whoosh",
+  "license_policy": "cc0",
+  "ordering": "relevance; popularity is supporting evidence only",
+  "results": [
+    {
+      "id": "fs:391444",
+      "title": "Arrow Whoosh 2 .R.wav",
+      "author": "saturdaysoundguy",
+      "duration_seconds": 2.80279,
+      "preview_url": "https://cdn.freesound.org/previews/391/391444_7280678-hq.mp3",
+      "downloads": 1075,
+      "page_url": "https://freesound.org/people/saturdaysoundguy/sounds/391444/",
+      "license_label": "Creative Commons 0",
+      "description": "A bamboo or arrow type whoosh. See more how I made it on this video: https://youtu.be/LU6FhrJYJ1g Recorded with Audiobox 44VLS and Rode NTG-3 https://www.patreon.com/saturdaysoundguy https://www.facebook.com/saturdaysoundguy https://www.youtube.com/channel/UCq1FV79pJLa8sxcbZ3tAYrg",
+      "rating": 4.9,
+      "rating_count": 23
+    },
+    {
+      "id": "fs:423798",
+      "title": "Little Whoosh 3",
+      "author": "ch_ase",
+      "duration_seconds": 2.46755,
+      "preview_url": "https://cdn.freesound.org/previews/423/423798_3982955-hq.mp3",
+      "downloads": 6400,
+      "page_url": "https://freesound.org/people/ch_ase/sounds/423798/",
+      "license_label": "Creative Commons 0",
+      "description": "3rd in the little whoosh series. Pitch shifted wind.",
+      "rating": 4.7,
+      "rating_count": 96
+    },
+    {
+      "id": "fs:486234",
+      "title": "Whoosh For Whip Zoom",
+      "author": "BennettFilmTeacher",
+      "duration_seconds": 2.13065,
+      "preview_url": "https://cdn.freesound.org/previews/486/486234_7254895-hq.mp3",
+      "downloads": 11415,
+      "page_url": "https://freesound.org/people/BennettFilmTeacher/sounds/486234/",
+      "license_label": "Creative Commons 0",
+      "description": "A whoosh sound- great for comical whip zooms.",
+      "rating": 4.7,
+      "rating_count": 130
+    }
+  ]
+}

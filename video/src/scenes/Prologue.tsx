@@ -9,7 +9,7 @@ const BASE_Y = 760;
 
 // A live conversation line. It kinks when the doctor's question arrives off-script,
 // then splits into two strands that foreshadow System 1 and System 2.
-const ConversationLine: React.FC<{frame: number}> = ({frame}) => {
+export const ConversationLine: React.FC<{frame: number}> = ({frame}) => {
   const kink = 46;
   const split = ramp(frame, 118, 160, EASE.inOut);
   const draw = ramp(frame, 0, 34, EASE.out);
