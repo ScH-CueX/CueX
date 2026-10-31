@@ -1,6 +1,8 @@
-import json, struct
+import argparse, json, struct
 from pathlib import Path
-root = Path(r"C:\cuex")
+parser = argparse.ArgumentParser()
+parser.add_argument('--root', default=r'C:\cuex')
+root = Path(parser.parse_args().root)
 p = root / "adapter_vllm/adapter_model.safetensors"
 with p.open("rb") as f:
     n = struct.unpack("<Q", f.read(8))[0]

@@ -43,7 +43,7 @@ export class LlamaSystemOne implements SystemOneClient {
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('CUEX_S1_URL must be an HTTP URL without credentials');
     this.timeoutMs = options.timeoutMs ?? Number(process.env.CUEX_S1_TIMEOUT_MS ?? 1460);
     if (!Number.isFinite(this.timeoutMs) || this.timeoutMs <= 0) throw new Error('System 1 timeout must be positive');
-    this.backend = options.backend ?? process.env.CUEX_S1_BACKEND ?? 'jev-9b-q4@win-vulkan';
+    this.backend = options.backend ?? process.env.CUEX_S1_BACKEND ?? 'jev-9b-q4@rtx-home';
     this.model = options.model ?? process.env.CUEX_S1_MODEL;
     const format = options.promptFormat ?? process.env.CUEX_S1_FORMAT ?? 'jev-v1';
     if (!['chat', 'jev-v1', 'jevstyle-v1'].includes(format)) throw new Error('CUEX_S1_FORMAT must be chat, jev-v1, or jevstyle-v1');

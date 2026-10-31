@@ -1,13 +1,18 @@
-import json, math, urllib.request
+import argparse, json, math, urllib.request
 from pathlib import Path
-root=Path(r"C:\cuex")
-url='http://127.0.0.1:18080'
+parser=argparse.ArgumentParser()
+parser.add_argument('--root',default=r'C:\cuex')
+parser.add_argument('--url',default='http://127.0.0.1:18080')
+args=parser.parse_args()
+root=Path(args.root)
+url=args.url
 def get(path):
     with urllib.request.urlopen(url+path,timeout=30) as r: return json.load(r)
 def post(path,body):
     req=urllib.request.Request(url+path,json.dumps(body).encode(),{'Content-Type':'application/json'})
     with urllib.request.urlopen(req,timeout=180) as r: return json.load(r)
 head=json.loads((root/'adapter_vllm/decision_head.json').read_text())
+assert len(head['slots']['verbalizers'])==24 and len(head['verbalizer_ids'])==24, 'Expected 24 verbalizers'
 token_checks=[]
 for text,expected in zip(head['slots']['verbalizers'],head['verbalizer_ids']):
     result=post('/tokenize',{'content':text,'add_special':False})
@@ -34,6 +39,7 @@ scale0=scores(results[0]['response'])
 scale1=scores(results[1]['response'])
 delta=(scale1[1802]-scale1[3721])-(scale0[1802]-scale0[3721])
 assert abs(delta)>1e-5, ('LoRA scale has no measured effect',scale0,scale1)
+post('/lora-adapters',[{'id':0,'scale':0}])
 report={'scale_logprob_odds_delta':delta,'verbalizer_logprobs':{'scale0':scale0,'scale1':scale1},'health':get('/health'),'lora_adapters':get('/lora-adapters'),'token_checks':token_checks,'prompt':prompt,'results':results}
 (root/'logs/lora-scale-check.json').write_text(json.dumps(report,indent=2))
 print(json.dumps(report,indent=2))

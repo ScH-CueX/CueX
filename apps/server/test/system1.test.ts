@@ -156,13 +156,15 @@ for(const dose of ['75岁以上从2.5毫克开始','高龄要减半起始','起�
   test(`natural elderly dose answer completes the gateway visit: ${dose}`,async()=>{
     const server=await fakeLlama();
     const neural=new LlamaSystemOne({baseUrl:server.url,timeoutMs:1000});
-    for(const engine of [neural,new HeuristicSystemOne(ANSHU_PACK)]){
+    for(const engine of [neural,new HeuristicSystemOne(ANSHU_PACK),...(process.env.CUEX_S1_REMOTE_TEST_URL?[new LlamaSystemOne({baseUrl:process.env.CUEX_S1_REMOTE_TEST_URL,timeoutMs:1460})]:[])]){
       const h=await session(engine);
       try{
         await h.speech('75岁以上约占11%，降压幅度与总体一致。',true);
         await h.speech('eGFR30到60亚组有412人，结果与总体一致。',true);
         await h.speech('eGFR低于30被排除，没有证据，说明书不建议使用。',true);
         await h.wait(e=>e.type==='controller.dispatch'&&e.payload.concernProgress.concernId==='concern-dose');
+        await h.speech('高龄起始剂量我接下来回答。',true);
+        assert(!h.gateway.inspectSessions()[0].resolvedPointIds.includes('d1'));
         await h.speech(dose,true);
         await h.wait(e=>e.type==='system1.verdict'&&e.payload.resolvedPointIds.includes('d1'));
         await h.wait(e=>e.type==='system2.candidate'&&e.payload.task==='closing'&&e.payload.candidate.phase==='spoken');

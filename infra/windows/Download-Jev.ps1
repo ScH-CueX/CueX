@@ -3,11 +3,12 @@
 param(
     [string]$Root = 'C:\cuex',
     [ValidateSet('q8','q4','adapter')][string]$Selection = 'adapter',
-    [string]$Proxy
+    [string]$Proxy,
+    [ValidateSet('https://huggingface.co','https://hf-mirror.com')][string]$Mirror = 'https://huggingface.co'
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-if (-not $IsWindows) { throw 'Run this downloader on Windows. Do not download model files to the Mac.' }
+if ([Environment]::OSVersion.Platform -ne 'Win32NT') { throw 'Run this downloader on Windows. Do not download model files to the Mac.' }
 $rootFull = [IO.Path]::GetFullPath($Root).TrimEnd('\')
 New-Item -ItemType Directory -Path (Join-Path $rootFull 'logs') -Force | Out-Null
 $manifest = Get-Content (Join-Path $PSScriptRoot 'jev-downloads.json') -Raw | ConvertFrom-Json
@@ -20,7 +21,7 @@ foreach ($entry in $items) {
     $destination = [IO.Path]::GetFullPath((Join-Path $rootFull $entry.target))
     if (-not $destination.StartsWith($rootFull + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Target escaped Root.' }
     New-Item -ItemType Directory -Path (Split-Path $destination) -Force | Out-Null
-    $url = "https://huggingface.co/$($entry.repo)/resolve/$($entry.revision)/$($entry.file)"
+    $url = "$Mirror/$($entry.repo)/resolve/$($entry.revision)/$($entry.file)"
     $partial = "$destination.partial"
     if (-not (Test-Path -LiteralPath $destination)) {
         if ($entry.PSObject.Properties.Name -contains 'bytes') {
