@@ -1,72 +1,60 @@
-# System 1 verification
+# System 1 GPU evaluation
 
-Measured on 2026-10-31 on the Mac, with Node 22.22.2. No neural inference ran on the Mac. Windows deployment/evaluation is in progress. All model transfers were stopped after the instruction to keep model deployment off the Mac. The root agent owns removal of downloaded fragments.
+Measured on 2026-10-31 through the Mac-to-Windows SSH tunnel. All neural inference and model files stayed on Windows under `C:\cuex`. The Mac ran TypeScript clients, the frontend/gateway feature tests, and model-free HTTP fakes.
 
-## Local results
+## Pick
 
-- `npx tsx --test test/system1.test.ts`: **3 feature tests passed**, zero failed. Two Chinese gateway visits exercise model HTTP and timeout fallback through candidate withdrawal, then separate point resolution. A typed HTTP round trip exercises JEV token slots, adapter selection and published calibration. Earlier helper-level tests were removed per the feature-test policy.
-- `npx tsx scripts/s1-eval.ts --heuristic --out /tmp/cuex-s1-heuristic.json`: **40 states / 240 binary judgments / 240 correct**. Measured end-to-end `decide()` p50 **0.0326 ms**, p95 **0.2254 ms**. One warm-up decide was excluded. This is the same development fixture used to build the rules, not a held-out score.
-- `npx tsc --noEmit -p .`: System 1 emitted no diagnostics. The full server is blocked by missing `./voice/index` in `src/config.ts` and `src/index.ts`, while the voice worker implements it.
-- A live-controller regression exposed overlapping Chinese question wording. Fixed contract IDs now take priority; question-text inference applies only to unknown IDs. The model gateway feature uses the exact controller wording.
+**JEV-9B on Qwen3.5-9B Q4_K_M, English questions over Chinese state.** Use the converted `autotrust/JEV-9B` adapter_vllm LoRA at request scale 1. Keep the heuristic fallback. The runtime default timeout is **1460 ms**: worst-case recheck p95 1302.506 ms + 150 ms, rounded up to the next 10 ms. The 600 ms end-to-end p95 target was not met. The selected ordinary call is about 0.58 seconds p50; the demo can use JEV rather than falling back on every call.
 
-## Model deployment list
+Selected Windows flags:
 
-| Role | Exact repository / file | Bytes (HF metadata) | Prompt format |
-| --- | --- | ---: | --- |
-| Base Qwen latency comparison | `unsloth/Qwen3.5-9B-GGUF` / `Qwen3.5-9B-Q4_K_M.gguf` | 5,680,522,464 | `chat` |
-| Smaller Windows alternative | `unsloth/Qwen3.5-4B-GGUF` / `Qwen3.5-4B-Q4_K_M.gguf` | 2,740,937,888 | `chat` |
-| Typed-decision comparison | `chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF` / `Jev-Style-Qwen3.5-2B-Decision-Q8_0.gguf` | 2,076,666,976 | `jevstyle-v1` |
+```text
+--host 127.0.0.1 --port 18080 --parallel 6 --ctx-size 16384
+--cont-batching --device Vulkan0 --n-gpu-layers 99
+--lora C:\cuex\adapter_vllm\JEV-9B-lora-f16.gguf
+--lora-init-without-apply --jinja --reasoning-budget 0
+--cache-ram 0 --ctx-checkpoints 0 --batch-size 2048 --ubatch-size 1024
+```
 
-All declare Apache-2.0 weights. JevStyle v1 also lists AG News research/non-commercial data terms. Qwen 9B is the provisional deployment pick because the publisher reports stronger Chinese C-Eval than 4B (**88.2 vs 85.1**). Those are full-model publisher results, not CueX or GGUF measurements.
+Flash attention is enabled under `auto`. Each request explicitly selects adapter scale 1 for JEV or 0 for a base-model comparison. The controller and fallback retain full speech; only the neural prompt uses the last 120 characters. Ordinary calls ask responding, drift, and only still-unresolved points (maximum five). Candidate validity is asked only in the final pre-speech recheck (maximum six).
 
-No candidate has measured CueX neural accuracy or latency yet. The prior RX 7900 XT Vulkan budget was an engineering estimate only: at four slots, approximately 100–250 ms warm p50 and 250–600 ms warm p95 for a 4–6-question decide over a short state, and 300–900 ms cold. Validate those estimates on Windows; keep the 600 ms runtime timeout and heuristic fallback during the demo.
+## Measured comparison
 
-The current deployment is autotrust JEV-9B via a Qwen3.5-9B base GGUF plus the converted adapter_vllm LoRA, including output tensors, with bias and calibration in this client. Q8_0 and Q4_K_M are being compared on the Windows GPU. JEV-27B remains a metadata-only comparison. New JevStyle v4 likewise needs its custom scorer. JackKozmo29 1.5B is an English incident-SEV JSON model without a discovered GGUF. Details and source links are in `MODELS.md`.
+Every run uses 40 labeled Chinese development states and excludes one warm-up decide. All numbers below include transport, all parallel questions and prompt formatting where applicable. Accuracy uses a 0.5 threshold; controller thresholds are separate. This is a development fixture used during rule/prompt work, not a held-out benchmark. Five-question rows omit candidate validity and therefore have 200 rather than 240 judgments.
 
-## Windows validation in progress
+| Config / change | Questions | Correct | Accuracy | Decide p50 ms | Decide p95 ms | Health HTTP RTT p50 / p95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Q4 JEV Chinese, 4 slots, default cache/checkpoints | 240 | 203 | 84.58% | 1346.7 | 2091.2 | 87.4 / 480.1 |
+| Q4 JEV English, same baseline | 240 | 219 | 91.25% | 1386.0 | 1589.4 | 71.5 / 527.8 |
+| Q4 base chat Chinese, adapter scale 0 | 240 | 198 | 82.50% | 1694.4 | 2108.9 | 68.7 / 515.4 |
+| Q4 JEV English, cache RAM 0 | 240 | 219 | 91.25% | 1088.5 | 1443.6 | 71.2 / 462.1 |
+| Add 6 slots, same total context | 240 | 219 | 91.25% | 1052.4 | 1379.8 | 87.5 / 460.0 |
+| Ordinary calls + 120-character neural window | 200 | 193 | 96.50% | 927.2 | 1187.3 | 59.2 / 242.0 |
+| Disable recurrent checkpoints | 200 | 193 | 96.50% | 658.1 | 986.8 | 75.4 / 397.6 |
+| **Selected: micro-batch 1024** | **200** | **193** | **96.50%** | **580.8** | **891.9** | **58.5 / 372.8** |
+| Selected flags, worst-case 6-question recheck | 240 | 213 | 88.75% | 926.2 | 1302.5 | 56.7 / 135.3 |
 
-Run the read-only `infra/windows/Test-Scripts.ps1`, then inspect, download and start one catalogue model on the Windows box. Use its authorized SSH tunnel or a reachable remote llama-server URL. Run `scripts/s1-eval.ts` against that URL with `--backend` and `--out`. Keep every neural candidate's accuracy, errors and p50/p95 in separate result files. A Windows worker converted the LoRA and verified output-layer tensor compatibility. Actual server readout and the six-run quant/readout matrix are pending model download completion.
+Q8_0 finished downloading and passed full SHA256 on Windows, but is not selected. The parent dropped further Q8 benchmarking because the Q4 configuration was already the demo choice and there was no evidence Q8 would offer clearly better accuracy at similar latency. No Q8 accuracy or latency is claimed.
 
-## Verified Windows runtime
+Rejected experiments: Chinese prose compact state increased token count and ran slower; terse English state degraded accuracy; task-specific drift wording increased false-positive drift decisions. Raw outputs for these experiments stay with the run evidence rather than defining defaults.
 
-- Runtime: official llama.cpp 0.8.0-dev build 12023, commit `f3586e66b`, Vulkan0 AMD Radeon RX 7900 XT. Server bound to `127.0.0.1:18080`, four slots, total context 16,384, all layers offloaded.
-- Base Q4_K_M: `C:\cuex\models\Qwen3.5-9B-Q4_K_M.gguf`, 5,680,522,464 bytes. Base output is a separate tensor; embeddings are not tied.
-- Converted adapter: `C:\cuex\adapter_vllm\JEV-9B-lora-f16.gguf`, 176,614,464 bytes, 402 tensors. It includes `output.weight.lora_a` and `output.weight.lora_b`. Conversion used CPU-only torch 2.11.0+cpu.
-- All 24 verbalizer IDs matched the server tokenizer.
-- On the same bare-v1 prompt, scale 0 logprobs were true -0.0935553 / false -2.4156150; scale 1 logprobs were true -0.0036569 / false -5.6129785. Measured change in logprob odds: **3.28726195**. The adapter changes the readout in the actual Vulkan process.
-- The process is detached from SSH. Startup details are saved in `C:\cuex\logs\server-current.json`. Only CueX-owned processes/files were created or managed.
-- First independent tunnel HTTP health RTT probe: 19 samples, p50 **68.7775 ms**, p95 **454.8335 ms**. These are HTTP/network timings without inference. Each matrix run also measures its own 19-sample RTT before inference.
+## Verified runtime and readout
 
-## Q4 baseline matrix (measured)
+- Official llama.cpp **0.8.0-dev build 12023**, commit `f3586e66b`; Vulkan0 **AMD Radeon RX 7900 XT**. All **33/33** layers were confirmed offloaded. Q4 model GPU memory was about 4861 MiB; LoRA about 168 MiB.
+- Base: `C:\cuex\models\Qwen3.5-9B-Q4_K_M.gguf`, 5,680,522,464 bytes. The base has a separate `output.weight` tensor; embeddings are not tied.
+- Adapter: `C:\cuex\adapter_vllm\JEV-9B-lora-f16.gguf`, 176,614,464 bytes, **402 tensors**, including `output.weight.lora_a` and `output.weight.lora_b`. Conversion used CPU-only torch 2.11.0+cpu.
+- All **24** published verbalizer IDs matched `/tokenize`. On the same bare-v1 prompt, scale 0 logprobs were true -0.0935553 / false -2.4156150; scale 1 was true -0.0036569 / false -5.6129785. Measured log-odds change: **3.28726195**. The adapter affects the actual Vulkan readout.
+- The client uses the published bare-v1 prompt, token-slot ranges, head bias, and per-kind calibration temperatures. It reads token logprobs, adds bias, divides by temperature, then applies softmax. It performs no JSON-generation or reasoning-token loop.
+- Four slots caused two waves for six questions. At six slots, prompt compute dominated one wave. The recurrent-state log counted 943 checkpoints created and 14 restored, motivating checkpoint removal. RAM prompt-cache copies/evictions also cost time.
+- Generic `/completion` requests do not share computed recurrent-prefix state across slots in this build. Native `/systemone` grouping supports another GGUF decision metadata path; it is not a drop-in autotrust adapter endpoint. `--kv-unified` pools storage, not automatic common-prefix compute. `--cache-reuse` alone does not provide that grouping.
+- The server is detached from SSH and remains the authorized CueX process. Startup, paths, PID and logs are recorded on Windows in `C:\cuex\logs\server-current.json`. No foreign service/process was modified.
 
-40 Chinese development states, six parallel binary questions per state, one warm-up excluded. Server: four slots, RAM prompt-cache default 8192 MiB, context 16384, same Q4 base and LoRA. Native request scale 1 for JEV, 0 for chat. Prediction threshold 0.5 for this benchmark. Every latency includes SSH/network and all question requests.
+## Feature verification
 
-| Readout | Accuracy | Exact-state accuracy | Decide p50 ms | Decide p95 ms | Health HTTP RTT p50 / p95 ms |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| JEV Chinese | 84.58% | 35.0% | 1346.7 | 2091.2 | 87.4 / 480.1 |
-| JEV English questions, Chinese state | 91.25% | 55.0% | 1386.0 | 1589.4 | 71.5 / 527.8 |
-| Base Qwen chat Chinese | 82.50% | 37.5% | 1694.4 | 2108.9 | 68.7 / 515.4 |
+- Full server `npx tsc --noEmit -p .`: passed.
+- `npx tsx --test test/controller-gateway.test.ts test/live-driver.test.ts test/system1.test.ts`: **16 passed**, one remote opt-in skipped. These are user-visible gateway/driver/engine feature flows, including candidate withdrawal, timeout fallback and preservation of an earlier answer beyond the neural window.
+- `CUEX_S1_REMOTE_TEST_URL=http://127.0.0.1:18080 npx tsx --test test/system1.test.ts`: **5 passed**, including the real JEV GPU round trip on the Chinese “I will answer the population question” hard case. It responds true while substantive resolution remains false.
+- Heuristic: 40 development states / 240 judgments, 240 correct. This uses the same development fixture as the rules and is not a held-out score.
+- Windows PowerShell script parsing, catalogue checks, conversion-script compilation, server health and runtime token/adapter checks passed.
 
-No Q4 baseline config meets p95 <=600 ms. The logs show two request waves for six questions across four slots; prompt processing dominates. Example first wave 574–586 ms and second wave 255–290 ms, before transport. RAM prompt-cache copies/evictions add tens of milliseconds. Vulkan graphs were reused; repeated kernel compilation does not explain these samples. Further cache/slot tests will be recorded separately from this baseline.
-
-Raw result files: `/tmp/cuex-s1-matrix/Q4_K_M-{jev-zh,jev-en,chat-zh}.json`; summary: `/tmp/cuex-s1-matrix/Q4_K_M-summary.json`.
-
-## Controlled Q4 cache tuning
-
-With the same four slots and 16,384 total context, disabling only RAM prompt cache (`--cache-ram 0`) preserved the English-question accuracy at **91.25%**. Measured decide p50/p95 improved from **1386.0 / 1589.4 ms** to **1088.5 / 1443.6 ms**. The run's health HTTP RTT was **71.2 / 462.1 ms**. All 33 layers were confirmed offloaded to Vulkan. This still fails the 600 ms p95 gate; a six-slot one-wave test follows.
-
-With RAM cache disabled and six slots, preserving 16,384 total context, English JEV remained **91.25%** accurate. Measured decide p50/p95: **1052.4 / 1379.8 ms**, health HTTP RTT **87.5 / 460.0 ms**. Moving from four to six slots gave only a small improvement; batching does not eliminate total prompt-processing cost.
-
-A Chinese prose compact-state/short-question experiment on Q4 six-slot/cache0 reached **92.08%** development accuracy but became slower: **1325.3 / 1622.1 ms** decide p50/p95. The state text expanded token count and the run also had higher network RTT p95 (**690.4 ms**). This experiment is not the default. A separate terse English-header state experiment preserves Chinese speech and is logged separately.
-
-## Ordinary controller call
-
-The controller already sends `candidateValid` only during the final pre-speech recheck, and asks resolution questions only for points still unresolved. The previous six-question fixture represented a maximum recheck, not every partial update. Its ordinary maximum is five questions. The neural client bounds its prompt to the last 120 characters. The controller and heuristic fallback retain the full rep speech, so an earlier answer remains available to the fallback.
-
-Measured ordinary five-question / 120-character state window on Q4 six-slot/cache0: **193/200 correct (96.50%)**, decide p50/p95 **927.2 / 1187.3 ms**, health HTTP RTT **59.2 / 242.0 ms**. This is a changed workload and denominator, not directly the six-question accuracy score. The shared gateway and LiveWSDriver feature suite stayed green: **15 passed, one remote opt-in skipped**.
-
-Disabling recurrent checkpoints (`--ctx-checkpoints 0`) on the same Q4 six-slot/cache0 ordinary workload preserved **96.50%** accuracy and improved decide p50/p95 to **658.1 / 986.8 ms**. Health HTTP RTT was **75.4 / 397.6 ms**. The prior server log counted 943 created versus 14 restored checkpoints, which supported this test. Flash attention was already enabled under `auto`, so forcing it on is not a separate measured improvement.
-
-Increasing only micro-batch (`-ub`) from 512 to 1024 on Q4 six-slot/cache0/ctxcp0 ordinary calls preserved **96.50%** accuracy. Measured decide p50/p95: **580.8 / 891.9 ms**; health HTTP RTT **58.5 / 372.8 ms**. `-b` remained 2048 and flash attention remained enabled under auto. The 600 ms p95 target is still unmet.
-
-A task-specific English responding/drift wording experiment increased drift recall but created nine false-positive drift decisions and reduced aggregate accuracy to **92.50%**. It is rejected. The default retains the original measured English questions. The final timeout is based on the six-question pre-speech recheck, measured separately below, plus 150 ms.
+Raw run evidence lives outside the repository at `/tmp/cuex-s1-matrix/`. Infrastructure scripts remain in `infra/windows/`; model selection sources remain in `MODELS.md`.

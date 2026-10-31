@@ -5,7 +5,7 @@ All deployment files live in `C:\cuex`. Run these scripts in PowerShell 7 on Win
 ## Prepare
 
 1. Inspect `llama-server.exe --version`, `--list-devices`, disk space, and port ownership first.
-2. Copy `Download-Jev.ps1`, `jev-downloads.json`, `Prepare-JevRuntime.ps1`, `Convert-JevAdapter.ps1`, `Inspect-JevAdapter.py`, and `Start-JevServer.ps1`, and `Inspect-JevBase.py` to `C:\cuex\scripts`.
+2. Copy `Download-Jev.ps1`, `jev-downloads.json`, `Prepare-JevRuntime.ps1`, `Convert-JevAdapter.ps1`, `Inspect-JevAdapter.py`, `Inspect-JevBase.py`, `Verify-JevServer.py`, and `Start-JevServer.ps1` to `C:\cuex\scripts`.
 3. Run `Prepare-JevRuntime.ps1`. It downloads official llama.cpp **b12023** Vulkan and matching converter source. Python, uv cache, and the conversion environment stay under `C:\cuex`. PyTorch uses the CPU wheel index. The script asserts `torch.version.cuda is None`.
 4. Run `Download-Jev.ps1 -Selection adapter`, then `Convert-JevAdapter.ps1`.
 5. Run `Download-Jev.ps1 -Selection q4` or `-Selection q8`. Set `-Proxy http://127.0.0.1:7890` only when that proxy is available and faster.
@@ -26,16 +26,32 @@ Startup validates the base hash, Vulkan0, runtime flags, and a free loopback por
 
 The selected Q4 server uses `127.0.0.1:18080`, six slots, continuous batching, 16,384 total context tokens, RAM prompt cache disabled, context checkpoints disabled, batch size 2048, microbatch size 1024, `--jinja`, and `--lora-init-without-apply`. Startup evidence is in `C:\cuex\logs\server-current.json`. Logs have unique timestamped names.
 
-For controlled runtime comparisons, the starter accepts `-Parallel`, `-ContextTotal`, `-CacheRamMiB`, `-ContextCheckpoints`, `-BatchSize`, `-UBatchSize`, and `-LogVerbosity`. For example:
+For controlled runtime comparisons, the starter accepts `-Parallel`, `-ContextTotal`, `-CacheRamMiB`, `-ContextCheckpoints`, `-BatchSize`, `-UBatchSize`, and `-LogVerbosity`. The selected settings are:
 
-```powershell
-# Cache-only comparison, same four slots and total context:
-C:\cuex\scripts\Start-JevServer.ps1 -Quant Q4_K_M -Parallel 4 -ContextTotal 16384 -CacheRamMiB 0 -LogVerbosity 5
-# Six-slot comparison, same total context and cache setting:
-C:\cuex\scripts\Start-JevServer.ps1 -Quant Q4_K_M -Parallel 6 -ContextTotal 16384 -CacheRamMiB 0 -LogVerbosity 5
+```text
+--parallel 6 --ctx-size 16384 --cont-batching
+--cache-ram 0 --ctx-checkpoints 0 --batch-size 2048 --ubatch-size 1024
+--device Vulkan0 --n-gpu-layers 99 --jinja --reasoning-budget 0
+--lora <adapter> --lora-init-without-apply
 ```
 
-The port must be free before either command. Coordinate with the evaluator before replacing your own running invocation.
+Flash Attention stays at `auto`; startup logs confirmed it is enabled. The port must be free before startup. Coordinate with the evaluator before replacing your own running invocation.
+
+## Mac client settings
+
+Use the authorized SSH tunnel to Windows port 18080, then set:
+
+```sh
+export CUEX_S1_URL=http://127.0.0.1:18080
+export CUEX_S1_BACKEND=autotrust-jev-9b-q4@win-vulkan
+export CUEX_S1_FORMAT=jev-v1
+export CUEX_S1_QUESTION_LANGUAGE=en
+export CUEX_S1_LORA_ID=0
+export CUEX_S1_LORA_SCALE=1
+export CUEX_S1_TIMEOUT_MS=1460
+```
+
+The 1460 ms timeout is the measured worst-case six-question p95 plus 150 ms, rounded up to 10 ms. The ordinary five-question path measured 96.5% accuracy on 200 decisions, with p50/p95 580.8/891.9 ms. The six-question recheck measured 88.75% on 240 decisions, with p50/p95 926.2/1302.5 ms. See the evaluation report for prompts, cases, and error analysis.
 
 ## Runtime provenance
 

@@ -25,7 +25,7 @@ $entry = $metadata | Where-Object file -eq "Qwen3.5-9B-$Quant.gguf"
 if ((Get-Item $model).Length -ne [long]$entry.bytes) { throw 'Model size mismatch.' }
 if ((Get-FileHash $model -Algorithm SHA256).Hash -ine $entry.sha256) { throw 'Model SHA256 mismatch.' }
 $helpText = (& $server --help 2>&1 | Out-String)
-foreach ($flag in @('--lora-init-without-apply','--jinja','--parallel','--cont-batching')) { if(-not $helpText.Contains($flag)){throw "Runtime lacks $flag"} }
+foreach ($flag in @('--lora-init-without-apply','--jinja','--parallel','--cont-batching','--cache-ram','--ctx-checkpoints','--batch-size','--ubatch-size')) { if(-not $helpText.Contains($flag)){throw "Runtime lacks $flag"} }
 $devices = (& $server --list-devices 2>&1 | Out-String)
 if($devices -notmatch '(?m)^\s*Vulkan0:'){throw 'Vulkan0 unavailable.'}
 $probe = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,$Port)
@@ -37,7 +37,9 @@ $arguments = @('--model',$model,'--host','127.0.0.1','--port',"$Port",'--paralle
 $quoted = $arguments | ForEach-Object { "'" + $_.Replace("'","''") + "'" }
 $stamp=Get-Date -Format 'yyyyMMdd-HHmmss'
 $log=Join-Path $Root "logs\server-$Quant-$stamp.log"
-$command = "& '$server' " + ($quoted -join ' ') + " *> '$log'"
+$escapedServer = $server.Replace("'","''")
+$escapedLog = $log.Replace("'","''")
+$command = "& '$escapedServer' " + ($quoted -join ' ') + " *> '$escapedLog'"
 $encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
 $result=Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine="pwsh -NoProfile -NonInteractive -OutputFormat Text -EncodedCommand $encoded";CurrentDirectory=$Root}
 if($result.ReturnValue -ne 0){throw "Create failed: $($result.ReturnValue)"}

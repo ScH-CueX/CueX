@@ -22,7 +22,7 @@ If you need a newer build, choose the Windows Vulkan package from the [official 
 
 ## 2. Download one pinned model
 
-The default is the provisional quality-first candidate for the 20 GB GPU, Qwen3.5-9B Q4_K_M. Use 4B if latency or memory needs a smaller model:
+The selected base for the 20 GB GPU is Qwen3.5-9B Q4_K_M. Use [JEV.md](JEV.md) for the complete decision-LoRA deployment. Use 4B if latency or memory needs a smaller model:
 
 ```powershell
 .\infra\windows\Download-Model.ps1 -Model qwen35-9b-q4 -AcceptLicense
@@ -75,12 +75,15 @@ Keep that tunnel in its own terminal. Set the backend environment, then start Cu
 
 ```sh
 export CUEX_S1_URL=http://127.0.0.1:18080
-export CUEX_S1_BACKEND=qwen3.5-9b@win-vulkan
-export CUEX_S1_TIMEOUT_MS=600
-export CUEX_S1_FORMAT=chat
+export CUEX_S1_BACKEND=autotrust-jev-9b-q4@win-vulkan
+export CUEX_S1_TIMEOUT_MS=1460
+export CUEX_S1_FORMAT=jev-v1
+export CUEX_S1_QUESTION_LANGUAGE=en
+export CUEX_S1_LORA_ID=0
+export CUEX_S1_LORA_SCALE=1
 ```
 
-For JevStyle v1, set `CUEX_S1_FORMAT=jev-v1`. For another authorized llama-server host, set its reachable base URL in `CUEX_S1_URL`; the backend contract stays the same. When the model URL fails or times out, CueX uses its local heuristic engine and reports `heuristic` as the answering backend.
+For the older chaoliang JevStyle v1 model, set `CUEX_S1_FORMAT=jevstyle-v1`. For base chat comparisons, set `CUEX_S1_FORMAT=chat` and send LoRA scale `0`. For another authorized llama-server host, set its reachable base URL in `CUEX_S1_URL`; the backend contract stays the same. When the model URL fails or times out, CueX uses its local heuristic engine and reports `heuristic` as the answering backend.
 
 ## Prompt and evaluation notes
 
