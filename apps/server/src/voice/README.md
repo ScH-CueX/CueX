@@ -1,14 +1,17 @@
 # Voice engines
 
-`index.ts` exports `createAsrEngine()`, `createTtsEngine()` and `warmupVoice()` for `config.ts`. Everything is chosen by environment variables, and nothing needs a model file on the CueX server machine.
+`index.ts` exports `createAsrEngine()`, `createTtsEngine()` and `warmupVoice()` for `config.ts`. Everything is chosen by environment variables. ASR runs on the Mac by default, so the venue network does not decide whether the mic works. Run `apps/server/scripts/voice-fetch-asr-model.sh` once to download the model (127 MB archive, 160 MB on disk, SHA256 checked).
 
 ## ASR (rep speech to text)
 
 | Setting | What runs | Where |
 | --- | --- | --- |
-| `CUEX_ASR_URL=ws://host:6006` | `asr-remote.ts` talks to a sherpa-onnx streaming WebSocket server | Windows box or any remote host |
+| `CUEX_ASR_URL=ws://host:6006` | `asr-remote.ts` talks to a sherpa-onnx streaming WebSocket server. It wins over everything below. | Windows box or any remote host |
 | `CUEX_ASR_MODEL_DIR=<dir>` | `asr-local.ts` runs the model inside the CueX server with `sherpa-onnx-node` | the machine that runs the server |
-| neither | text-only: the browser sends `speech.delta`, and `audio.chunk` gets `ASR_TEXT_ONLY` | any |
+| none set, and `${CUEX_MODEL_DIR:-~/.cache/cuex-models}/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30` exists | the same local engine, with that model (the demo default) | the machine that runs the server |
+| none of the above | text-only: the browser sends `speech.delta`, and `audio.chunk` gets `ASR_TEXT_ONLY` | any |
+
+The local model loads in `warmupVoice()` at server start (3 to 5 s, blocking), so nobody waits for it during a visit.
 
 Other variables: `CUEX_ASR_ENDPOINT_SILENCE` (seconds of silence that end a sentence, default 0.7, local mode only), `CUEX_ASR_THREADS`, `CUEX_ASR_CONNECT_TIMEOUT_MS`.
 

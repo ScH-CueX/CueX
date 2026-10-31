@@ -4,13 +4,18 @@
  * ASR, first match wins:
  *   CUEX_ASR_URL        ws://host:port of a sherpa-onnx streaming WebSocket server (the Windows box or any remote host)
  *   CUEX_ASR_MODEL_DIR  directory of a streaming transducer model, run in this process with sherpa-onnx-node
- *   neither             text-only: the browser sends speech.delta text and audio.chunk gets a clear error
+ *   default model       <CUEX_MODEL_DIR or ~/.cache/cuex-models>/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30, when it exists
+ *                       (scripts/voice-fetch-asr-model.sh downloads it). This is the demo default: no network is needed for the mic.
+ *   none of these       text-only: the browser sends speech.delta text and audio.chunk gets a clear error
  * TTS, tried in this order, the next one takes over when the one before fails:
  *   CUEX_TTS_BACKEND=edge|http|sherpa picks the first engine (default: http if CUEX_TTS_URL is set, else edge)
  *   edge    Edge read-aloud voices over the internet (CUEX_EDGE_VOICE, CUEX_EDGE_RATE, CUEX_EDGE_PITCH)
  *   http    CUEX_TTS_URL, POST {"text"} returns one audio file
  *   sherpa  CUEX_TTS_MODEL_DIR, VITS model in this process
  */
+import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import type { AsrCallbacks, AsrEngine, AsrStream, TtsChunk, TtsEngine } from '../contracts';
 import { LocalSherpaAsr } from './asr-local';
 import { RemoteSherpaAsr } from './asr-remote';
@@ -33,6 +38,14 @@ const reader = (source: Source) => {
   return { env, num };
 };
 const log = (message: string) => console.log(`[voice] ${message}`);
+
+/** Same model the Windows ASR server ran. 167 MB with int8 files. */
+export const DEFAULT_ASR_MODEL = 'sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30';
+
+/** Where the local ASR model is looked for when CUEX_ASR_MODEL_DIR is not set. */
+export function defaultAsrModelDir(source: Source = process.env): string {
+  return join(reader(source).env('CUEX_MODEL_DIR') ?? join(homedir(), '.cache', 'cuex-models'), DEFAULT_ASR_MODEL);
+}
 
 /** The browser sends text (speech.delta) instead of audio. The gateway refuses audio.chunk for this backend. */
 class TextOnlyAsr implements AsrEngine {
@@ -78,7 +91,8 @@ export function createAsrEngine(source: Source = process.env): AsrEngine {
   if (shared && asr) return asr;
   const { env, num } = reader(source);
   const url = env('CUEX_ASR_URL');
-  const modelDir = env('CUEX_ASR_MODEL_DIR');
+  const fallbackDir = defaultAsrModelDir(source);
+  const modelDir = env('CUEX_ASR_MODEL_DIR') ?? (existsSync(join(fallbackDir, 'tokens.txt')) ? fallbackDir : undefined);
   let engine: AsrEngine;
   if (url) {
     engine = new RemoteSherpaAsr({ url, connectTimeoutMs: num('CUEX_ASR_CONNECT_TIMEOUT_MS', 4000) });
@@ -91,7 +105,7 @@ export function createAsrEngine(source: Source = process.env): AsrEngine {
       maxUtteranceSec: num('CUEX_ASR_MAX_UTTERANCE', 20),
     });
   } else {
-    log('ASR is text-only: set CUEX_ASR_URL or CUEX_ASR_MODEL_DIR to enable speech recognition');
+    log(`ASR is text-only: no model in ${fallbackDir}. Run apps/server/scripts/voice-fetch-asr-model.sh, or set CUEX_ASR_URL or CUEX_ASR_MODEL_DIR`);
     engine = new TextOnlyAsr();
   }
   if (shared) asr = engine;
