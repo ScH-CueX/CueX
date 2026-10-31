@@ -21,6 +21,7 @@ import { loadS2Runtime, type S2Runtime } from '../src/system2/config';
 import { createDoctorStore, memoryBullets, recordSessionMemory, type DoctorStore } from '../src/system2/doctors';
 import { LI_PACK, buildBenchRequests } from '../src/system2/fixtures';
 import { PiSystemTwo } from '../src/system2/PiSystemTwo';
+import { stripFiller } from '../src/system2/spoken';
 
 type PhaseLog = Array<[FollowupPhase, string | undefined]>;
 type Scenario = [name: string, run: () => Promise<void>];
@@ -92,13 +93,13 @@ const offline: Scenario[] = [
     faux.setResponses([fauxAssistantMessage([submit({ targetPointIds: ['c3', 'c1', 'zz'], factIds: ['f-egfr-lt30', 'nope'] })], { stopReason: 'toolUse' })]);
     const phases: PhaseLog = [];
     const { draft, metrics } = await s2.prepareFollowupWithMetrics(req, (p, t) => phases.push([p, t]));
-    assert.equal(draft.text, '那 eGFR 低于 30 的患者到底能不能用？');
+    assert.equal(draft.text, '那 eGFR 低于 30 的患者能不能用？', 'the filler 到底 is removed from the spoken line');
     assert.deepEqual(draft.targetPointIds, ['c3']);
     assert.equal(draft.sourceEvidence, '安舒平说明书，禁忌与慎用');
     assert.equal(phases[0][0], 'retrieving');
     const drafting = phases.filter(([p]) => p === 'drafting');
     assert.ok(drafting.length >= 1 && drafting.every(([, t]) => typeof t === 'string'), 'drafting carries the partial text');
-    assert.equal(drafting.at(-1)![1], draft.text);
+    assert.equal(stripFiller(drafting.at(-1)![1]!), draft.text);
     assert.ok(!phases.slice(1).some(([p]) => p === 'retrieving'), 'inline mode never goes back to retrieving');
     assert.equal(faux.state.callCount, 1, 'inline mode needs one model call');
     assert.ok(metrics.ttftMs !== null && metrics.ttftMs <= metrics.totalMs);
@@ -241,10 +242,10 @@ const offline: Scenario[] = [
     ]);
     const phases: PhaseLog = [];
     const line = await s2.prepareDoctorLine(req, (p, t) => phases.push([p, t]));
-    assert.equal(line, '真实世界研究先放一边，eGFR 低于 30 的患者到底能不能用？');
+    assert.equal(line, '真实世界研究先放一边，eGFR 低于 30 的患者能不能用？');
     assert.equal(faux.state.callCount, 1);
     assert.equal(phases[0][0], 'retrieving');
-    assert.equal(phases.filter(([p]) => p === 'drafting').at(-1)?.[1], line);
+    assert.equal(stripFiller(phases.filter(([p]) => p === 'drafting').at(-1)?.[1] ?? ''), line);
 
     const missedSection = user.slice(user.indexOf('【他上一轮没答到的要点】'), user.indexOf('【这次的切入点】'));
     assert.ok(missedSection.includes('eGFR 低于 30'), 'the missed point is in the task');
@@ -288,7 +289,7 @@ const offline: Scenario[] = [
 
     // A bare last clause is closed with punctuation, so the voice pauses.
     faux.setResponses([say('这个药在 eGFR 低于 30 的患者里到底有没有证据')]);
-    assert.equal(await s2.prepareDoctorLine(req), '这个药在 eGFR 低于 30 的患者里到底有没有证据？');
+    assert.equal(await s2.prepareDoctorLine(req), '这个药在 eGFR 低于 30 的患者里有没有证据？');
 
     // 3b) The visit moves on to the next concern (no missed points): the doctor must see what the rep just answered.
     let moveOn = '';
@@ -433,6 +434,24 @@ const offline: Scenario[] = [
     const ok = await s2.prepareDoctorLineWithMetrics(req);
     assert.equal(ok.metrics.attempts, 1);
     assert.ok(ok.line.endsWith('。'));
+  }],
+
+  ['filler 到底 and 究竟 are removed from spoken lines, and kept where they are part of the sentence', async () => {
+    const { faux, rt } = fauxRuntime();
+    const s2 = new PiSystemTwo({ runtime: rt, doctors: createDoctorStore(scratchDir('no-doctors')) });
+    const ctl = new AbortController();
+    const say = (text: string) => fauxAssistantMessage([fauxToolCall('say', { text })], { stopReason: 'toolUse' });
+    const opening: DoctorLineRequest = { sessionId: 'smoke', pack: ANSHU_PACK, kind: 'opening', concernId: 'concern-scope', history: [], signal: ctl.signal };
+    faux.setResponses([say('我门诊高龄患者多，这药究竟能用在谁身上？')]);
+    assert.equal(await s2.prepareDoctorLine(opening), '我门诊高龄患者多，这药能用在谁身上？');
+    for (const [spoken, expected] of [
+      ['这药到底能用在谁身上？', '这药能用在谁身上？'],
+      ['研究里究竟有多少人？', '研究里有多少人？'],
+      ['到底怎么办？', '怎么办？'],
+      ['这件事我会坚持到底。', '这件事我会坚持到底。'],
+      ['我想问个究竟。', '我想问个究竟。'],
+      ['那我就一探究竟，资料先留下。', '那我就一探究竟，资料先留下。'],
+    ]) assert.equal(stripFiller(spoken), expected);
   }],
 
   ['a failing or hung model fails fast, and the API key never appears in the error', async () => {

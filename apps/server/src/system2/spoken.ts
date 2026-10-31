@@ -39,3 +39,17 @@ export function ensureEnding(line: string): string {
   const stripped = t.replace(/[，、；：,;:]+$/, '');
   return /[吗呢么吧]$|怎么|多少|能不能|要不要|有没有|是不是|到底|什么|哪/.test(stripped) ? `${stripped}？` : `${stripped}。`;
 }
+
+/** Words before 到底/究竟 that make it part of the sentence ("坚持到底", "问个究竟"), not a filler adverb. */
+const NOT_FILLER_AFTER = '坚持|贯彻|进行|执行|一查|查|干|做|走|推进|落实|探个|问个|看个|弄个|搞个|一探|追根';
+/** Words after 到底/究竟 that show it is the adverb of a question ("到底能不能用", "究竟有多少人"). */
+const FILLER_BEFORE = '能|可|是|有|要|会|该|应|怎|什么|多少|哪|为什么|为啥|如何|谁|几|算|适|行|不|没|用|管|肯|够|值|想|说|讲|对|比';
+const FILLER = new RegExp(`(?<!${NOT_FILLER_AFTER})(?:到底|究竟)(?=${FILLER_BEFORE})`, 'g');
+
+/**
+ * Removes 到底 / 究竟 when they are filler adverbs: "这药到底能用在谁身上" becomes "这药能用在谁身上".
+ * The model keeps using them although the prompt says not to, and a rewrite call would cost a second round trip.
+ */
+export function stripFiller(text: string): string {
+  return text.replace(FILLER, '');
+}
