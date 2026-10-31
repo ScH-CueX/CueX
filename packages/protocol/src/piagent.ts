@@ -11,6 +11,9 @@ export type CandidateLifecyclePhase =
   | 'spoken'       // 追问条件成立，已被医生实际说出（写入对话历史）
   | 'withdrawn';   // 追问条件失效，静默撤销（留在时序轨道，绝不写入对话历史）
 
+/** Why a prepared follow-up was withdrawn. A stale recheck is never a reason. */
+export type WithdrawalReason = 'target_answered' | 'response_cue' | 'concern_changed' | 'basis_revised';
+
 export interface FollowupCandidate {
   id: string;
   targetConcernId: string;
@@ -27,6 +30,8 @@ export interface FollowupCandidate {
   readyAtMs?: number;
   decidedAtMs?: number;
   fate?: 'asked' | 'withdrawn';
+  /** Set only when fate is 'withdrawn'. */
+  withdrawalReason?: WithdrawalReason;
 }
 
 /** What a System 2 job prepares: a follow-up, or one of the doctor lines written live. */

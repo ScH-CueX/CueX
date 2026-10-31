@@ -160,13 +160,20 @@ export function VisitPanel({ session, underlying, onToggleUnderlying, controls }
           <aside className="visit-under" aria-label="Underlying">
             <section className="visit-tone-cue" aria-labelledby="visit-s1">
               <h2 id="visit-s1" className="visit-sys-title">System 1 · 快速判定</h2>
-              <p className="visit-trail">{trail.length > 0 ? `${trail.join(' → ')} →` : ''}</p>
-              {latestLabel && <p key={latestLabel} className="visit-verdict visit-fade">{latestLabel}</p>}
+              {latest ? (
+                <>
+                  <p className="visit-trail">{trail.length > 0 ? `${trail.join(' → ')} →` : ''}</p>
+                  {latestLabel && <p key={latestLabel} className="visit-verdict visit-fade">{latestLabel}</p>}
+                </>
+              ) : (
+                <p className="visit-empty">等你开口</p>
+              )}
             </section>
 
             <section className="visit-tone-deep" aria-labelledby="visit-s2">
               <h2 id="visit-s2" className="visit-sys-title">System 2 · 候选追问</h2>
               {lineJob && <p key={lineJob} className="visit-linejob visit-fade">{lineJob}</p>}
+              {!lineJob && candidates.length === 0 && <p className="visit-empty">还没有候选追问</p>}
               <ol className="visit-cands">
                 {candidates.map((candidate, rank) => <Candidate key={candidate.id} candidate={candidate} showSource={rank === 0} />)}
               </ol>

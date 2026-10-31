@@ -86,3 +86,29 @@ Verification on the replacement host:
 - Natural d1 answers now include `75岁以上从2.5毫克开始`, `高龄要减半起始`, `起始剂量调低，两周后再按血压调`, and `高龄起始剂量需要按说明书调整，现有资料没有具体数据`. The shared narrow dose cue never resolves a mere promise. A result using it appends `+dose-cue` to the backend.
 
 The 1460 ms demo timeout remains unchanged. No model is downloaded to or executed on the Mac. Run evidence stays in `/tmp/cuex-s1-matrix/` and `D:\cuex\logs`; source setup instructions are in `infra/windows/PERSONAL-PC.md` and `S1-RELAY.md`.
+
+## Natural visitor pitch regression (A versus A+C)
+
+A later rehearsal exposed a remaining-points bug: after c1/c2 were answered, the broad responding question sometimes treated an unrelated pitch as responding. Thirty new variation states were measured through the real RTX relay: ten natural drift lines (two each for endpoints, safety, real-world data, adherence and price) plus five on-topic c3 answers, in both all-open and c3-only states. None reused the gateway test phrases. Controller thresholds stayed responding <0.60 and drift >=0.65.
+
+**A** preserves the original responding question while all three points are open. Once some points are resolved, responding names only the still-open points. The drift question covers a general pitch about efficacy, safety, real-world data, convenience, adherence, availability and cost in both states. **C** is a narrow ambiguity tie-break: when drift >=0.85 and responding <0.70, cap responding at 0.49. It never resolves a point and never applies to an explicit response cue. These thresholds represent clear drift and marginal responding; they were fixed before evaluation, not fitted to the ten lines. A changed result appends `+drift-tiebreak` to its backend.
+
+| Gate | Previous committed wording | A (hybrid) | A+C shipped |
+| --- | ---: | ---: | ---: |
+| Ordinary 40 states / 200 judgments | 98.50% | 98.00% | 99.00% live |
+| Responding accuracy | 39/40 | 38/40 | 40/40 live |
+| c1 resolution accuracy | 40/40 | 40/40 | 40/40 |
+| c2 resolution accuracy | 39/40 | 39/40 | 39/40 |
+| c3 resolution accuracy | 40/40 | 40/40 | 40/40 |
+| Ten natural drift lines, all open | 4/10 | 7/10 | 9/10 live |
+| Ten natural drift lines, c3 only | 0/10 | 10/10 | 10/10 live |
+| False drift on five c3 answers, all open | 0/5 | 0/5 | 0/5 |
+| False drift on five c3 answers, c3 only | 0/5 | 0/5 | 0/5 |
+
+The required offline comparison applied C to the same logged A probabilities: all-open recall **7→8/10**, c3-only **10→10/10**, false drift **0→0/5** in each state, ordinary **196→197/200**, and responding **38→39/40**. **Three of the 40 ordinary states** were in the tie-break region (`endpoint`, `regional`, `general-efficacy`); only `regional` changed its >=0.5 prediction, from wrong to right. No correct ordinary prediction became wrong. No cue case changed. The live A+C repeat differed slightly from the offline predictions because batching/logit values vary near boundaries; the table reports its measured live values, not the offline estimate.
+
+A's two responding errors were **false responding on pitches** (`safety` p=0.5045 and `regional` p=0.5125), which can miss an interruption. They were not false “not responding” on an answer. The old wording's one error was the opposite (`age-overclaim`, p=0.4763 versus a responding label).
+
+A+C live ordinary decide p50/p95: **409.7 / 742.9 ms** over the 40 states. Explicit “我先回答” stayed responding and resolved no point. All four natural-dose variants still resolved d1 only after the actual answer. Four real gateway flows passed: listen/advance, interrupt continued speech, explicit-promise withdrawal, and a new c3-only price/adherence pitch followed by c3-answer withdrawal. No controller threshold or lifecycle code changed in this fix.
+
+Evidence: `/tmp/cuex-s1-matrix/drift-variation-{before,hybrid,hybrid-tiebreak}.json`, `RTX5080-{hybrid,hybrid-tiebreak}-ordinary40.json`; fixtures/probes are saved in the same directory, outside the repository.

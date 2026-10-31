@@ -4,7 +4,7 @@
 
 import type { AudioChunkPayload, AsrTranscriptDelta, TtsAudioStreamChunk, TtsAbortSignal, TtsPlaybackReport } from './audio';
 import type { JevDecisionResponse } from './jev';
-import type { FollowupCandidate, PiAgentCandidateUpdate } from './piagent';
+import type { FollowupCandidate, PiAgentCandidateUpdate, WithdrawalReason } from './piagent';
 import type { ControllerDispatchEvent } from './controller';
 import type { TrainingScenarioDef } from './scenario';
 
@@ -50,6 +50,8 @@ export interface ReviewMoment {
   doctorSaid?: string;
   /** withdrawn: the follow-up System 2 had ready that the doctor never said. */
   withdrawnText?: string;
+  /** withdrawn: why it was withdrawn. */
+  withdrawalReason?: WithdrawalReason;
   /** Why System 2 prepared the follow-up. */
   basis: string;
   sourceEvidence?: string;
