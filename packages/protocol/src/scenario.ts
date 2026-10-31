@@ -73,3 +73,22 @@ export interface IntelligentCoachingFeedback {
     focusPoint: string;
   };
 }
+
+/** One fact from the rep's material pack, with its source. */
+export interface BriefingFact {
+  id: string;
+  text: string;
+  source: string;
+}
+
+/**
+ * GET /briefing: what the rep reads before the visit. It names the doctor but not the doctor's concerns;
+ * the profile, memory and concerns stay on the server.
+ */
+export interface BriefingResponse {
+  productName: string;
+  packTitle: string;
+  studyName: string;
+  doctor: Pick<DoctorProfile, 'name' | 'department' | 'title'>;
+  facts: BriefingFact[];
+}

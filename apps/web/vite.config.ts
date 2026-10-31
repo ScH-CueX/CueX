@@ -16,6 +16,7 @@ export default defineConfig({
     proxy: {
       '/ws': { target: process.env.CUEX_SERVER_ORIGIN ?? 'http://127.0.0.1:8765', ws: true },
       '/health': { target: process.env.CUEX_SERVER_ORIGIN ?? 'http://127.0.0.1:8765' },
+      '/briefing': { target: process.env.CUEX_SERVER_ORIGIN ?? 'http://127.0.0.1:8765' },
     },
   },
   preview: {

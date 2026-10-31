@@ -47,6 +47,7 @@ export const ANSHU_PACK: ScenarioPack = {
     { id: 'f-elderly', text: '75 岁以上患者约占 11%，降压幅度与总体一致。', source: 'ANSHU-3 亚组分析表，第 14 页' },
     { id: 'f-egfr-30-60', text: 'eGFR 30 到 60 的亚组有 412 人，降压幅度与总体一致。', source: 'ANSHU-3 亚组分析表，第 14 页' },
     { id: 'f-egfr-lt30', text: 'eGFR 低于 30 的患者被排除在研究之外，没有证据，说明书不建议使用。', source: '安舒平说明书，禁忌与慎用' },
+    { id: 'f-dose-elderly', text: '常规起始剂量每日 5 mg；75 岁以上患者从每日 2.5 mg 起始，两周后按血压调整。', source: '安舒平说明书，用法用量' },
     { id: 'f-rwe', text: '另有一项覆盖两万多名患者的真实世界研究。', source: '安舒平上市后研究摘要' },
   ],
   lineExamples: {
