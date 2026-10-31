@@ -4,8 +4,9 @@ import {noise2D} from '@remotion/noise';
 import {C, H, W, rgba} from '../theme';
 
 // Ink background with two slow light fields, a dot grid and a vignette.
-export const Backdrop: React.FC<{intensity?: number}> = ({intensity = 1}) => {
-  const frame = useCurrentFrame();
+export const Backdrop: React.FC<{intensity?: number; frame?: number}> = ({intensity = 1, frame: frameOverride}) => {
+  const localFrame = useCurrentFrame();
+  const frame = frameOverride ?? localFrame;
   const t = frame / 30;
   const ax = 30 + noise2D('ax', t * 0.03, 0) * 14;
   const ay = 30 + noise2D('ay', 0, t * 0.03) * 12;
@@ -35,8 +36,9 @@ export const Backdrop: React.FC<{intensity?: number}> = ({intensity = 1}) => {
 };
 
 // Animated film grain. The seed changes every frame so the texture never freezes.
-export const Grain: React.FC<{opacity?: number}> = ({opacity = 0.13}) => {
-  const frame = useCurrentFrame();
+export const Grain: React.FC<{opacity?: number; frame?: number}> = ({opacity = 0.13, frame: frameOverride}) => {
+  const localFrame = useCurrentFrame();
+  const frame = frameOverride ?? localFrame;
   const seed = Math.floor(random(`grain-${frame}`) * 1000);
   return (
     <AbsoluteFill style={{pointerEvents: 'none', mixBlendMode: 'screen', opacity}}>

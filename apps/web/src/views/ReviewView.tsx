@@ -41,7 +41,7 @@ export const ReviewView: React.FC<ReviewViewProps> = ({ onNavigate }) => {
     return Number.isFinite(value) ? Math.max(0, Math.min(DUR, value)) : 29.4;
   });
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [selectedMomentId, setSelectedMomentId] = useState<string>('m2');
+  const [selectedMomentId, setSelectedMomentId] = useState<string>(() => MOMENTS.find(moment => t >= moment.at && t < moment.to)?.id ?? 'm2');
   const [practiceMode, setPracticeMode] = useState<'learning' | 'performance'>('learning');
 
   const currentDoctorState = useMemo(() => stateAt(t), [t]);
@@ -187,7 +187,7 @@ export const ReviewView: React.FC<ReviewViewProps> = ({ onNavigate }) => {
                 seek(pos * DUR);
               }}
             >
-              <svg className="w-full h-full" viewBox="0 0 800 80" preserveAspectRatio="none">
+              <svg data-capture="timeline" className="w-full h-full" viewBox="0 0 800 80" preserveAspectRatio="none">
                 {/* Moment highlight spans */}
                 {MOMENTS.map((m) => {
                   const x1 = (m.at / DUR) * 800;

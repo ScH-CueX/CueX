@@ -41,3 +41,5 @@ assets/captures/raw/
 
 # TypeScript incremental build info
 *.tsbuildinfo
+__pycache__/
+*.py[cod]

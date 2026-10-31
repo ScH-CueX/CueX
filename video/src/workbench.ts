@@ -1,15 +1,13 @@
-import {Demo45, SHOT_COMPONENTS, Caption, DEMO_VOICE, DEMO_CAPTIONS} from './demo/Demo45';
-import {DEMO_SHOTS, DEMO_TOTAL, DEMO_FPS} from './content/demo45';
+import {Cinematic45, CINEMA_SHOTS, CINEMA_UNITS, CINEMA_VOICE, CINEMA_SFX, CINEMA_TOTAL} from './cinema/Cinematic45';
 import {loadFonts} from './fonts';
 
 loadFonts();
-
-export const WORKBENCH = {
-  name:'CueX · 45秒产品演示',fps:DEMO_FPS,width:1920,height:1080,total:DEMO_TOTAL,
-  background:'#ecede8',revision:'demo45-v1',
-  shots:DEMO_SHOTS.map(s=>({id:s.id,label:s.title,from:s.from,duration:s.duration,component:SHOT_COMPONENTS[s.id]})),
-  transitions:[],overlays:[],
-  captions:DEMO_CAPTIONS.map(s=>({id:`caption-${s.id}`,label:s.title,from:s.from,duration:s.duration,component:Caption,props:{text:s.title},schema:[{type:'textarea',key:'text',label:'文案',default:s.title}]})),
-  sfx:DEMO_VOICE,
-  bgm:[],order:['captions'],original:Demo45,
+export const WORKBENCH={
+  name:'CueX · Cinematic 45',fps:30,width:1920,height:1080,total:CINEMA_TOTAL,
+  background:'#07080b',revision:'cinematic-2',
+  shots:CINEMA_SHOTS.map(s=>({id:s.id,label:s.label,from:s.from,duration:s.duration,component:CINEMA_UNITS[s.id]})),
+  transitions:[],captions:[],overlays:[],
+  sfx:[...CINEMA_VOICE,...CINEMA_SFX],
+  bgm:[{from:0,duration:CINEMA_TOTAL,src:'audio/cinematic/bed45.wav',volume:.15}],
+  order:[],original:Cinematic45,
 };

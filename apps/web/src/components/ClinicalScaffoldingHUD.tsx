@@ -58,7 +58,7 @@ export const ClinicalScaffoldingHUD: React.FC<ClinicalScaffoldingHUDProps> = ({
 
         <div className="flex items-center gap-1.5">
           {/* 辅助等级切换 */}
-          <div className="seg" role="group" aria-label="辅助等级">
+          <div data-capture="assist-controls" className="seg" role="group" aria-label="辅助等级">
             <button
               type="button"
               aria-pressed={level === 'full'}

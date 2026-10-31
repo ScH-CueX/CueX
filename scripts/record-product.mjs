@@ -15,10 +15,16 @@ for(const shot of [{id:'live-interrupt',t:26.5,seconds:8},{id:'live-withdraw',t:
   const page=await context.newPage();
   const errors=[];page.on('pageerror',e=>errors.push(String(e)));
   await page.goto(`http://127.0.0.1:5173/?view=live&t=${shot.t}&jury=1&paused=1`,{waitUntil:'networkidle'});
-  await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(1800);
+  await page.evaluate(()=>document.fonts.ready);
+  await page.waitForFunction(()=>document.querySelector('[data-capture="doctor"] [data-doctor-ready="true"]'));
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))));
+  await page.waitForTimeout(1800);
+  if(errors.length)throw new Error(errors.join('\n'));
   const at=(performance.now()-zero)/1000;
+  await page.evaluate(()=>{window.__cuexRecording=true;});
   await page.getByRole('button',{name:'播放',exact:true}).click();
   await page.waitForTimeout(shot.seconds*1000+350);
+  if(!await page.evaluate(()=>window.__cuexRecording))throw new Error('Page reloaded during recording; no capture was published.');
   const video=page.video();
   await context.close();
   const raw=await video.path();

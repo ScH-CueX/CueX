@@ -301,7 +301,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
             {!activeUtterance && driverType === 'live' && <p className="text-sm text-ink-3">{connected ? '等待医生开场，你也可以直接回应。' : '连接后开始对谈。'}</p>}
             {/* 当前正在进行的语句 */}
             {activeUtterance && (
-              <div className="pt-3 border-t border-line space-y-1">
+              <div data-capture="active-utterance" className="pt-3 border-t border-line space-y-1">
                 {(() => {
                   const body = activeUtterance.text;
                   const len = Math.round(body.length * activeUtteranceProgress);
@@ -381,7 +381,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
                       {phaseLabels[candidate.phase]}
                     </Badge>
                     {candidate.text && <p className="font-doctor text-sm text-ink-2 bg-surface p-2 rounded-[2px] border border-line">
-                      {candidate.phase === 'withdrawn' ? <del className="text-ink-3">{candidate.text}</del> : candidate.text}
+                      <span data-capture="candidate-quote">{candidate.phase === 'withdrawn' ? <del className="text-ink-3">{candidate.text}</del> : candidate.text}</span>
                     </p>}
                     {driverType === 'live' && <p className="text-ink-3 leading-relaxed">{candidate.basis}</p>}
                   </div>

@@ -3,13 +3,12 @@ import {AbsoluteFill, Audio, Img, OffthreadVideo, Sequence, staticFile, useCurre
 import {ThreeCanvas} from '@remotion/three';
 import {Backdrop, Grain} from '../components/Backdrop';
 import {RevealText} from '../components/RevealText';
-import {TextParticles, wrapLines} from '../components/TextParticles';
+import {TextParticles} from '../components/TextParticles';
 import {ConversationLine} from '../scenes/Prologue';
 import {ArchField, type ArchBeats} from '../three/ArchField';
 import {cameraPose, FOV, project, type Vec} from '../three/camera';
 import {DimensionalX} from '../three/DimensionalX';
 import {C, EASE, FONT, H, W, mix, ramp} from '../theme';
-import {CANDIDATES} from '../../../apps/web/src/lib/scenario';
 
 export const CINEMA_TOTAL=1350;
 export const CINEMA_SHOTS=[
@@ -22,13 +21,12 @@ export const CINEMA_SHOTS=[
 ] as const;
 type ShotId=typeof CINEMA_SHOTS[number]['id'];
 
-const Provenance: React.FC=()=> <div style={{position:'absolute',right:60,bottom:36,fontFamily:FONT.serif,fontSize:32,color:C.soft}}>演示回放 · 虚构资料</div>;
-const BrandCorner: React.FC=()=> <div style={{position:'absolute',left:64,top:38,fontFamily:FONT.display,color:C.paper,fontSize:42,display:'flex',alignItems:'baseline',gap:4}}>Cue<Img src={staticFile('brand/cuex-symbol-dimensional.svg')} style={{width:30,height:30}}/></div>;
+const BrandCorner: React.FC=()=> <div style={{position:'absolute',zIndex:20,left:64,top:38,fontFamily:FONT.display,color:C.paper,fontSize:42,display:'flex',alignItems:'baseline',gap:4}}>Cue<Img src={staticFile('brand/cuex-symbol-dimensional.svg')} style={{width:30,height:30}}/></div>;
 
-const Plane:React.FC<{src?:string;video?:string;frame:number;shift?:number;scale?:number;opacity?:number}>=({src,video,frame,shift=0,scale=.8,opacity=1})=>{
+const Plane:React.FC<{src?:string;video?:string;frame:number;shift?:number;scale?:number;opacity?:number;offsetY?:number}>=({src,video,frame,shift=0,scale=.66,opacity=1,offsetY=30})=>{
   const p=ramp(frame,0,42,EASE.inOut);
-  return <div style={{position:'absolute',inset:0,perspective:1800,perspectiveOrigin:'50% 50%',opacity}}>
-    <div style={{position:'absolute',width:1920,height:1080,overflow:'hidden',borderRadius:12,background:'#ecede8',transformOrigin:'50% 50%',transform:`translate(${shift}px,${(1-p)*100}px) rotateY(${mix(-9,-2,p)}deg) rotateX(${mix(7,0,p)}deg) scale(${scale})`,boxShadow:'0 38px 90px rgba(0,0,0,.34)'}}>
+  return <div style={{position:'absolute',zIndex:0,inset:0,perspective:1800,perspectiveOrigin:'50% 50%',opacity,clipPath:'inset(180px 36px 120px 36px)'}}>
+    <div style={{position:'absolute',width:1920,height:1080,overflow:'hidden',borderRadius:12,background:'#ecede8',transformOrigin:'50% 50%',transform:`translate(${shift}px,${offsetY+(1-p)*70}px) rotateY(${mix(-7,-2,p)}deg) rotateX(${mix(5,0,p)}deg) scale(${scale})`,boxShadow:'0 38px 90px rgba(0,0,0,.34)'}}>
       {src?<Img src={staticFile(src)} style={{width:1920,maxWidth:'none'}}/>:null}
       {video?<OffthreadVideo src={staticFile(video)} muted style={{width:1920,height:1080}}/>:null}
     </div>
@@ -48,23 +46,22 @@ export const Opening:React.FC=()=>{
 };
 
 export const Conversation:React.FC=()=>{
-  const f=useCurrentFrame();const emphasis=ramp(f,155,190,EASE.inOut);
+  const f=useCurrentFrame();const emphasis=ramp(f,125,155,EASE.inOut);
   return <AbsoluteFill>
-    {f<60?<Plane src="captures/live-listening.png" frame={f}/>:<Sequence from={60}><Plane video="captures/live-interrupt.mp4" frame={100} shift={-230*emphasis} scale={mix(.8,.69,emphasis)} opacity={mix(1,.38,emphasis)}/></Sequence>}
-    <div style={{position:'absolute',left:140,top:80,fontFamily:FONT.serif,fontSize:64,color:f<155?C.paper:C.cue,opacity:ramp(f,10,30)}}>{f<155?'继续听。':'追问。'}</div>
-    {f>=155?<div style={{position:'absolute',left:870,top:365,right:90,padding:'25px 0',background:'rgba(7,8,11,.86)'}}>
-      <RevealText text="“先停一下。”" frame={f} start={164} stagger={2} style={{fontFamily:FONT.serif,fontSize:82,color:C.paper,fontWeight:600}}/>
+    {f<60?<Plane src="captures/live-listening.png" frame={f}/>:<Sequence from={60} style={{zIndex:0}}><Plane video="captures/live-interrupt.mp4" frame={100} shift={-505*emphasis} scale={mix(.66,.38,emphasis)} opacity={mix(1,.9,emphasis)}/></Sequence>}
+    <div style={{position:'absolute',zIndex:10,left:140,top:80,fontFamily:FONT.serif,fontSize:64,color:f<155?C.paper:C.cue,opacity:ramp(f,10,30)}}>{f<155?'继续听。':'追问。'}</div>
+    {f>=160?<div style={{position:'absolute',zIndex:10,left:900,top:365,right:90,padding:'25px 0'}}>
+      <RevealText text="“先停一下。”" frame={f} start={160} stagger={.2} style={{fontFamily:FONT.serif,fontSize:82,color:C.paper,fontWeight:600}}/>
       <div style={{height:2,background:C.cue,width:780*ramp(f,160,180),margin:'26px 0'}}/>
-      <RevealText text="结论能用在他们身上吗？" frame={f} start={185} stagger={1.2} style={{fontFamily:FONT.serif,fontSize:60,color:C.paper}}/>
+      <RevealText text="结论能用在他们身上吗？" frame={f} start={175} stagger={.15} style={{fontFamily:FONT.serif,fontSize:60,color:C.paper}}/>
     </div>:null}
-    <Provenance/>
   </AbsoluteFill>;
 };
 
 const FLOW_BEATS:ArchBeats={aFrom:48,aGate:96,bFrom:108,bStop:151,bGone:190};
 const FlowLabel:React.FC<{frame:number;anchor:Vec;text:string;sub:string;color:string;dx?:number;dy?:number}>=({frame,anchor,text,sub,color,dx=0,dy=0})=>{
   const [x,y]=project(frame,210,anchor);
-  return <div style={{position:'absolute',left:x+dx,top:y+dy,fontFamily:FONT.serif,color,opacity:ramp(frame,14,40),whiteSpace:'nowrap'}}><div style={{fontSize:56,fontFamily:FONT.display}}>{text}</div><div style={{fontSize:38,color:C.paper,marginTop:10}}>{sub}</div></div>;
+  return <div style={{position:'absolute',zIndex:5,left:x+dx,top:y+dy,fontFamily:FONT.serif,color,opacity:ramp(frame,14,40),whiteSpace:'nowrap'}}><div style={{fontSize:56,fontFamily:FONT.display}}>{text}</div><div style={{fontSize:38,color:C.paper,marginTop:10}}>{sub}</div></div>;
 };
 export const Parallel:React.FC=()=>{
   const f=useCurrentFrame();const start=cameraPose(0,210);
@@ -78,28 +75,36 @@ export const Parallel:React.FC=()=>{
 };
 
 export const Withdrawal:React.FC=()=>{
-  const f=useCurrentFrame();const lift=ramp(f,40,85,EASE.inOut);const dissolve=ramp(f,145,224,EASE.inOut);
-  const quote=CANDIDATES[1].text;
+  const f=useCurrentFrame();const lift=ramp(f,40,70,EASE.inOut);const dissolve=ramp(f,170,245,EASE.inOut);const relay=ramp(f,140,170,EASE.inOut);
+  // Frozen with the captures: apps/web/src/lib/scenario.ts, candidate k2.
+  const quote='那 eGFR 低于 30 的呢？这部分患者能用吗？';
   return <AbsoluteFill>
-    <Plane src={f<145?'captures/live-ready.png':'captures/live-cue-green.png'} frame={100} shift={-370*lift} scale={mix(.8,.57,lift)} opacity={mix(1,.3,lift)}/>
-    <div style={{position:'absolute',right:0,top:0,width:1100,height:1080,background:'linear-gradient(90deg, transparent, rgba(7,8,11,.94) 32%)',opacity:lift}}/>
-    <div style={{position:'absolute',left:900,top:260,opacity:lift}}>
-      <div style={{fontFamily:FONT.serif,fontSize:38,color:f<145?C.deep:C.ok,marginBottom:38}}>{f<145?'已准备，未说出':'你已经回答'}</div>
-      <TextParticles lines={wrapLines(quote,14)} fontSize={68} weight={600} family={FONT.serif} lineHeight={1.55} width={950} color={C.paper} progress={dissolve}/>
-      <div style={{fontFamily:FONT.serif,fontSize:76,color:C.ok,marginTop:18,opacity:ramp(f,228,254)}}>继续听。</div>
+    <Plane src={f<132?'captures/live-ready.png':'captures/live-answered.png'} frame={100} shift={-505*lift} scale={mix(.66,.37,lift)} opacity={mix(1,.9,lift)}/>
+    <div style={{position:'absolute',zIndex:10,left:128,top:825,fontFamily:FONT.serif,fontSize:56,color:C.ok,opacity:ramp(f,112,132)}}>“这部分目前没有证据。”</div>
+    <svg width={1920} height={1080} style={{position:'absolute',zIndex:9,inset:0,opacity:ramp(f,132,142)*(1-ramp(f,185,205))}}>
+      <path d="M 650 813 Q 825 780 902 530" fill="none" stroke={C.ok} strokeOpacity=".38" strokeWidth="2"/>
+      <circle cx={mix(650,902,relay)} cy={813-283*relay*relay} r="7" fill={C.ok}/>
+    </svg>
+    <div style={{position:'absolute',zIndex:10,left:900,top:260,opacity:ramp(f,72,85)}}>
+      <div style={{fontFamily:FONT.serif,fontSize:38,color:f<170?C.deep:C.ok,marginBottom:38}}>{f<170?'已准备，未说出':'撤销追问'}</div>
+      <TextParticles lines={quote.match(/[^？]+？/g) ?? [quote]} fontSize={68} weight={600} family={FONT.serif} lineHeight={1.55} width={950} color={C.paper} progress={dissolve}/>
+      <div style={{fontFamily:FONT.serif,fontSize:76,color:C.ok,marginTop:18,opacity:ramp(f,250,270)}}>继续听。</div>
     </div>
-    <Provenance/>
   </AbsoluteFill>;
 };
 
 export const Practice:React.FC=()=>{
-  const f=useCurrentFrame();const swap=ramp(f,118,162,EASE.inOut);
+  const f=useCurrentFrame();const swap=ramp(f,118,162,EASE.inOut);const travel=ramp(f,105,170,EASE.inOut);
   return <AbsoluteFill>
-    <div style={{position:'absolute',inset:0,opacity:1-swap}}><Plane src="captures/review.png" frame={f} scale={.84}/></div>
-    <div style={{position:'absolute',inset:0,opacity:swap,transform:`translateX(${(1-swap)*160}px)`}}><Plane src="captures/live-cue-amber.png" frame={100} scale={.80}/></div>
-    <div style={{position:'absolute',left:140,top:80,fontFamily:FONT.serif,fontSize:68,color:C.paper}}>{f<135?'回到这一刻。':'少一点提示。'}</div>
-    <div style={{position:'absolute',left:140,bottom:120,fontFamily:FONT.serif,fontSize:62,color:C.paper,opacity:ramp(f,174,200)}}>多一次自己的应对。</div>
-    <Provenance/>
+    <div style={{position:'absolute',zIndex:0,inset:0,opacity:1-swap}}><Plane src="captures/review.png" frame={f} scale={.62} offsetY={0}/></div>
+    <div style={{position:'absolute',zIndex:0,inset:0,opacity:swap,transform:`translateX(${(1-swap)*160}px)`}}><Plane src="captures/live-cue-amber.png" frame={100} scale={.62} offsetY={0}/></div>
+    <div style={{position:'absolute',zIndex:10,left:160,top:725,width:1600,opacity:ramp(f,16,32)*(1-swap)}}>
+      <Img src={staticFile('captures/review-timeline.png')} style={{width:1600,height:95,clipPath:'inset(0 0 0 12%)'}}/>
+      <div style={{position:'absolute',right:90,top:-68,fontFamily:FONT.serif,fontSize:44,color:C.ok}}>0:55 · 主动补正</div>
+    </div>
+    <div style={{position:'absolute',zIndex:11,left:mix(1452,405,travel)-8,top:mix(807,250,travel)-8,width:16,height:16,borderRadius:'50%',background:C.ok,boxShadow:`0 0 ${18+18*travel}px ${7*travel}px ${C.ok}`,opacity:ramp(f,30,45)*(1-ramp(f,174,198))}}/>
+    <div style={{position:'absolute',zIndex:10,left:140,top:80,fontFamily:FONT.serif,fontSize:68,color:C.paper}}>{f<135?'回到这一刻。':'再练一次。'}</div>
+    <div style={{position:'absolute',zIndex:10,left:140,bottom:120,fontFamily:FONT.serif,fontSize:62,color:C.paper,opacity:ramp(f,174,200)}}>少一点提示。</div>
   </AbsoluteFill>;
 };
 
@@ -117,15 +122,25 @@ export const CinematicBrand:React.FC=()=>{
 };
 
 export const CINEMA_COMPONENTS:Record<ShotId,React.FC>={opening:Opening,conversation:Conversation,parallel:Parallel,withdraw:Withdrawal,practice:Practice,brand:CinematicBrand};
+export const CINEMA_UNITS=Object.fromEntries(CINEMA_SHOTS.map(shot=>{
+  const Content=CINEMA_COMPONENTS[shot.id];
+  const Unit:React.FC=()=>{
+    const globalFrame=shot.from+useCurrentFrame();
+    return <AbsoluteFill><Backdrop intensity={.8} frame={globalFrame}/><Content/>{shot.id!=='brand'?<BrandCorner/>:null}<Grain opacity={.025} frame={globalFrame}/></AbsoluteFill>;
+  };
+  return [shot.id,Unit];
+})) as Record<ShotId,React.FC>;
 export const CINEMA_VOICE=CINEMA_SHOTS.map(s=>({from:s.from+8,duration:s.duration-8,src:`audio/narration/${s.voice}.wav`,volume:1}));
+// Source energy peak is 0.875s; align it to the page settling / quote release.
+export const CINEMA_SFX=[
+  {from:CINEMA_SHOTS[1].from+42-26,duration:74,src:'audio/cinematic/whoosh.wav',volume:.42},
+  {from:CINEMA_SHOTS[3].from+170-26,duration:74,src:'audio/cinematic/whoosh.wav',volume:.34},
+];
 export const Cinematic45:React.FC<{bgm?:boolean;voice?:boolean}>=({bgm=true,voice=true})=>{
-  const f=useCurrentFrame();
   return <AbsoluteFill>
-    <Backdrop intensity={.8}/>
-    {CINEMA_SHOTS.map(s=>{const Shot=CINEMA_COMPONENTS[s.id];return <Sequence key={s.id} from={s.from} durationInFrames={s.duration}><Shot/></Sequence>;})}
-    {f<1170?<BrandCorner/>:null}
-    <Grain opacity={.025}/>
+    {CINEMA_SHOTS.map(s=>{const Shot=CINEMA_UNITS[s.id];return <Sequence key={s.id} from={s.from} durationInFrames={s.duration}><Shot/></Sequence>;})}
     {voice?CINEMA_VOICE.map(v=><Sequence key={v.src} from={v.from} durationInFrames={v.duration}><Audio src={staticFile(v.src)} volume={v.volume}/></Sequence>):null}
-    {bgm?<Audio src={staticFile('audio/music/bed.wav')} volume={.15*ramp(f,0,45)*(1-ramp(f,1300,1350))}/>:null}
+    {CINEMA_SFX.map(s=><Sequence key={s.from} from={s.from} durationInFrames={s.duration}><Audio src={staticFile(s.src)} volume={s.volume}/></Sequence>)}
+    {bgm?<Audio src={staticFile('audio/cinematic/bed45.wav')} volume={.15}/>:null}
   </AbsoluteFill>;
 };

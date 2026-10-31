@@ -1,10 +1,11 @@
 import {useMemo} from 'react';
 import {ThreeCanvas} from '@remotion/three';
 import * as THREE from 'three';
-import model from '../../../assets/brand/x-model.json';
+import {useAssetJson} from '../assets/useAssetJson';
 import {ramp, EASE} from '../theme';
 
-function Ribbons({frame}: {frame:number}) {
+type XDimensions={amber:string;lavender:string;length:number;width:number;depth:number;bevel:number;crossingAngle:number};
+function Ribbons({frame,model}: {frame:number;model:XDimensions}) {
   const geometry=useMemo(()=>{
     const x=model.width/2, y=model.length/2, r=x;
     const shape=new THREE.Shape();
@@ -13,7 +14,7 @@ function Ribbons({frame}: {frame:number}) {
     shape.quadraticCurveTo(-x,-y,-x,-y+r);
     const geo=new THREE.ExtrudeGeometry(shape,{depth:model.depth,bevelEnabled:true,bevelSegments:4,bevelSize:model.bevel,bevelThickness:model.bevel,curveSegments:16,steps:1});
     geo.translate(0,0,-model.depth/2);return geo;
-  },[]);
+  },[model]);
   const turn=ramp(frame,0,90,EASE.inOut);
   const a=ramp(frame,5,40),b=ramp(frame,18,66);
   return <group rotation={[-.27+.09*turn,-.62+.34*turn,-.025]}>
@@ -27,11 +28,13 @@ function Ribbons({frame}: {frame:number}) {
 }
 
 export function DimensionalX({frame,width=640,height=640}: {frame:number;width?:number;height?:number}) {
+  const model=useAssetJson<XDimensions>('brand/x-model.json');
+  if(!model)return null;
   return <ThreeCanvas width={width} height={height} dpr={1.5} gl={{alpha:true,antialias:true}} camera={{position:[0,0,5.4],fov:34,near:.1,far:30}}>
     <ambientLight intensity={.7}/>
     <directionalLight position={[-2,4,5]} intensity={3.8} color="#fff5e4"/>
     <directionalLight position={[4,-1,3]} intensity={2.5} color="#c5c7ff"/>
     <pointLight position={[-3,-2,2]} intensity={16} color="#ffbe80"/>
-    <Ribbons frame={frame}/>
+    <Ribbons frame={frame} model={model}/>
   </ThreeCanvas>;
 }
