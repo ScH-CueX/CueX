@@ -8,6 +8,7 @@ import {ConversationLine} from '../scenes/Prologue';
 import {ArchField, type ArchBeats} from '../three/ArchField';
 import {cameraPose, FOV, project, type Vec} from '../three/camera';
 import {DimensionalX} from '../three/DimensionalX';
+import {NarrationCaptions} from './NarrationCaptions';
 import {LIGHT_C as C, EASE, FONT, H, W, mix, ramp} from '../theme';
 
 export const CINEMA_TOTAL=1350;
@@ -65,7 +66,7 @@ const FlowLabel:React.FC<{frame:number;anchor:Vec;text:string;sub:string;color:s
 };
 export const Parallel:React.FC=()=>{
   const f=useCurrentFrame();const start=cameraPose(0,210);
-  return <AbsoluteFill>
+  return <AbsoluteFill style={{transform:'translateY(-48px)'}}>
     <ThreeCanvas width={W} height={H} dpr={1} linear flat gl={{antialias:true,alpha:true}} camera={{fov:FOV,near:.1,far:100,position:start.pos}}><ArchField frame={f} dur={210} beats={FLOW_BEATS} light/></ThreeCanvas>
     <div style={{position:'absolute',left:0,right:0,top:100,textAlign:'center',fontFamily:FONT.serif,fontSize:68,color:C.paper}}>同时发生。</div>
     <FlowLabel frame={f} anchor={[-.8,1.45,0]} dx={-240} dy={-160} text="System 1" sub="判断" color={C.cue}/>
@@ -100,7 +101,7 @@ export const Practice:React.FC=()=>{
     <div style={{position:'absolute',zIndex:0,inset:0,opacity:swap,transform:`translateX(${(1-swap)*160}px)`}}><Plane src="captures/live-cue-amber.png" frame={100} scale={.62} offsetY={0}/></div>
     <div style={{position:'absolute',zIndex:10,left:160,top:725,width:1600,opacity:ramp(f,16,32)*(1-ramp(f,105,128))}}>
       <Img src={staticFile('captures/review-timeline.png')} style={{width:1600,height:95,clipPath:'inset(0 0 0 12%)'}}/>
-      <div style={{position:'absolute',right:90,top:180,fontFamily:FONT.serif,fontSize:44,color:C.ok}}>0:55 · 主动补正</div>
+      <div style={{position:'absolute',right:90,top:160,fontFamily:FONT.serif,fontSize:44,color:C.ok}}>0:55 · 主动补正</div>
     </div>
     <div style={{position:'absolute',zIndex:11,left:mix(1452,405,travel)-8,top:mix(807,250,travel)-8,width:16,height:16,borderRadius:'50%',background:travel>.8?C.cue:C.ok,boxShadow:`0 0 ${18+18*travel}px ${7*travel}px ${travel>.8?C.cue:C.ok}`,opacity:ramp(f,30,45)*(1-ramp(f,174,198))}}/>
     <div style={{position:'absolute',zIndex:10,left:140,top:80,fontFamily:FONT.serif,fontSize:68,color:C.paper}}>{f<135?'回到这一刻。':'再练一次。'}</div>
@@ -136,9 +137,10 @@ export const CINEMA_SFX=[
   {from:CINEMA_SHOTS[1].from+42-26,duration:74,src:'audio/cinematic/whoosh.wav',volume:.42},
   {from:CINEMA_SHOTS[3].from+170-26,duration:74,src:'audio/cinematic/whoosh.wav',volume:.34},
 ];
-export const Cinematic45:React.FC<{bgm?:boolean;voice?:boolean}>=({bgm=true,voice=true})=>{
+export const Cinematic45:React.FC<{bgm?:boolean;voice?:boolean;captions?:boolean}>=({bgm=true,voice=true,captions=true})=>{
   return <AbsoluteFill>
     {CINEMA_SHOTS.map(s=>{const Shot=CINEMA_UNITS[s.id];return <Sequence key={s.id} from={s.from} durationInFrames={s.duration}><Shot/></Sequence>;})}
+    {captions?<NarrationCaptions/>:null}
     {voice?CINEMA_VOICE.map(v=><Sequence key={v.src} from={v.from} durationInFrames={v.duration}><Audio src={staticFile(v.src)} volume={v.volume}/></Sequence>):null}
     {CINEMA_SFX.map(s=><Sequence key={s.from} from={s.from} durationInFrames={s.duration}><Audio src={staticFile(s.src)} volume={s.volume}/></Sequence>)}
     {bgm?<Audio src={staticFile('audio/cinematic/bed45.wav')} volume={.15}/>:null}

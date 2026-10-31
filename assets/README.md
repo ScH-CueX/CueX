@@ -6,6 +6,7 @@ All authored media lives in this directory. The web app uses it as Vite's public
 - `fonts/`: local fonts, so the product and deliverables do not require Google Fonts at presentation time.
 - `models/`, `images/`, `env/`: existing product and film media.
 - `audio/`: voice, music, and sound effects, with provenance in the film manifest.
+- `captions/`: narration-aligned caption JSON and editable SRT.
 - `captures/`: captured product screens, cutouts, and layout measurements.
 - `qa/`: rendered preview images and contact sheets; generated, not source artwork.
 

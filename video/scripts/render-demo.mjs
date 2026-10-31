@@ -2,6 +2,7 @@ import {bundle} from '@remotion/bundler';
 import {openBrowser, renderMedia, selectComposition} from '@remotion/renderer';
 import {mkdirSync,readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
+import './build-captions.mjs';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 

@@ -13,7 +13,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
-    watch: { ignored: ['**/assets/captures/**', '**/assets/qa/**', '**/assets/audio/**'] },
+    watch: { ignored: ['**/assets/captures/**', '**/assets/qa/**', '**/assets/audio/**', '**/assets/captions/**'] },
     // Dev proxy to apps/server, so LiveWSDriver's same-host /ws/session URL reaches the backend.
     proxy: {
       '/ws': { target: process.env.CUEX_SERVER_ORIGIN ?? 'http://127.0.0.1:8765', ws: true },

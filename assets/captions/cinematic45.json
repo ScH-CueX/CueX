@@ -1,0 +1,60 @@
+{
+  "fps": 30,
+  "source": "Existing Ming narration; frame-aligned start with a 6-frame reading hold after each clip.",
+  "cues": [
+    {
+      "id": "problem",
+      "from": 8,
+      "to": 86,
+      "text": "医生的追问，不会按你的稿子来。",
+      "audio": "audio/narration/problem.wav",
+      "audioSha256": "7b9452724d89afbcf0b5e944e56b452d5b2e03f1d7f2a669b691290512f72216",
+      "audioSeconds": 2.397896
+    },
+    {
+      "id": "enter",
+      "from": 158,
+      "to": 293,
+      "text": "CueX，让医药代表在对话压力里，练习临场应对。",
+      "audio": "audio/narration/enter.wav",
+      "audioSha256": "54b7a64110722eda9f3589a69a45d8f6f215c94695bd553b875765a9078712c3",
+      "audioSeconds": 4.297792
+    },
+    {
+      "id": "interrupt",
+      "from": 428,
+      "to": 515,
+      "text": "快层判断时机，慢层提前准备。",
+      "audio": "audio/narration/interrupt.wav",
+      "audioSha256": "78a1c5a9e81db4856a590afb25e37769699e33932fcd14a8c8141adeae59d4ae",
+      "audioSeconds": 2.692729
+    },
+    {
+      "id": "withdraw",
+      "from": 638,
+      "to": 767,
+      "text": "但当你主动补上答案，已经准备好的追问，就不必再说。",
+      "audio": "audio/narration/withdraw.wav",
+      "audioSha256": "efaae242baf7870a7cdd32a31b08541635ca43bc58919242c935446bcd9007d3",
+      "audioSeconds": 4.088063
+    },
+    {
+      "id": "review",
+      "from": 938,
+      "to": 1040,
+      "text": "回到关键时刻，减少提示，再练一次。",
+      "audio": "audio/narration/review.wav",
+      "audioSha256": "a1b31845901fbb27bf1e4157460e0aa3b56c7150d875e9e461a2543a5def7ef6",
+      "audioSeconds": 3.196438
+    },
+    {
+      "id": "brand",
+      "from": 1178,
+      "to": 1280,
+      "text": "CueX，让每一次临场应对，都有准备。",
+      "audio": "audio/narration/brand.wav",
+      "audioSha256": "f83789b7adf032de99ca932ad8b72bd7e0c792cabff8cd8bcb0941687175cfd3",
+      "audioSeconds": 3.197875
+    }
+  ]
+}

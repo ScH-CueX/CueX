@@ -39,6 +39,7 @@ mkdirSync(code);mkdirSync(extras);
 cpSync(pdfPath,path.join(stage,pdfName));
 cpSync(path.join(root,'video/out',videoName),path.join(stage,videoName));
 cpSync(path.join(root,'video/out',dryName),path.join(extras,dryName));
+cpSync(path.join(root,'assets/captions',videoName.replace('.mp4','.srt')),path.join(extras,videoName.replace('.mp4','.srt')));
 cpSync(path.join(root,'ppt/out',pdfName.replace('.pdf','.html')),path.join(extras,pdfName.replace('.pdf','.html')));
 buildRoadshow(path.join(extras,'联动路演.html'),`../${videoName}`);
 cpSync(path.join(root,'docs/RUNNING.md'),path.join(code,'运行说明.md'));
