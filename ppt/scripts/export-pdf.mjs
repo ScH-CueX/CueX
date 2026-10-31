@@ -30,7 +30,16 @@ for(let n=1;n<=count;n++){
       canvas.replaceWith(image);
     });
     for(const img of clone.querySelectorAll('img'))img.src=new URL(img.getAttribute('src'),document.baseURI).href;
-    return {html:clone.outerHTML,css:[...document.querySelectorAll('style')].map(s=>s.textContent).join('\n')};
+    // Resolve Vite's root-relative font URLs before the offline inlining pass.
+    // Otherwise /@fs/... authoring paths survive inside exported stylesheets.
+    const css=[...document.querySelectorAll('style')].map(s=>s.textContent).join('\n')
+      .replace(/\/\*[#@]\s*sourceMappingURL=[\s\S]*?\*\//g,'')
+      .replace(/url\(\s*(?:(["'])(.*?)\1|([^)]*?))\s*\)/g,(original,quote,quoted,unquoted)=>{
+        const url=(quoted??unquoted).trim();
+        if(!url||/^(?:data:|blob:|#)/i.test(url))return original;
+        return `url("${new URL(url,document.baseURI).href}")`;
+      });
+    return {html:clone.outerHTML,css};
   });
   css=content.css;sections.push(content.html);
 }
@@ -39,6 +48,7 @@ let html=`<!doctype html><html lang="zh-Hans"><meta charset="utf-8"><title>${nam
 // Inline only the resources referenced by the rendered deck, for offline review.
 const urls=[...new Set([...html.matchAll(/(?:src=["']|url\(["']?)(https?:\/\/[^"')\s>]+)/g)].map(m=>m[1]))];
 for(const url of urls){const res=await fetch(url);if(!res.ok)throw new Error(`Asset ${res.status}: ${url}`);const mime=res.headers.get('content-type')??'application/octet-stream';const data=`data:${mime};base64,${Buffer.from(await res.arrayBuffer()).toString('base64')}`;html=html.split(url).join(data);}
+if(/(?:url\(\s*["']?|src=["'])https?:\/\/|\/@fs\/|file:\/\//i.test(html))throw new Error('Export still references an external or authoring-only resource.');
 await writeFile(path.join(out,`${name}.html`),html);
 await page.setContent(html,{waitUntil:'load'});await page.evaluate(()=>document.fonts.ready);
 await page.waitForFunction(()=>[...document.images].every(i=>i.complete&&i.naturalWidth>0));
