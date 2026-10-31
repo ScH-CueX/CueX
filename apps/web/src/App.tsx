@@ -4,22 +4,26 @@ import { Footer } from '@/components/layout/Footer';
 import { HomepageView } from '@/views/HomepageView';
 import { LiveTrainingView } from '@/views/LiveTrainingView';
 import { ReviewView } from '@/views/ReviewView';
+import { StageView } from '@/views/StageView';
+
+type AppView = ViewKey | 'stage';
+const VIEWS: AppView[] = ['home', 'live', 'review', 'stage'];
 
 export function App() {
-  const [view, setView] = useState<ViewKey>('home');
+  // The stage page is the default view. It has no navbar.
+  const [view, setView] = useState<AppView>(() => {
+    const requested = new URLSearchParams(window.location.search).get('view') as AppView | null;
+    return requested && VIEWS.includes(requested) ? requested : 'stage';
+  });
   const [initialTime, setInitialTime] = useState<number>(0);
   const [initialJury, setInitialJury] = useState<boolean>(false);
 
   // Initialize from URL params
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const viewParam = params.get('view') as ViewKey;
     const tParam = parseFloat(params.get('t') || '0');
     const juryParam = params.get('jury') === '1' || params.get('jury') === 'true';
 
-    if (viewParam && ['home', 'live', 'review'].includes(viewParam)) {
-      setView(viewParam);
-    }
     if (tParam > 0) {
       setInitialTime(tParam);
     }
@@ -53,6 +57,8 @@ export function App() {
     window.history.pushState({}, '', url.toString());
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  if (view === 'stage') return <StageView />;
 
   return (
     <div className="min-h-screen flex flex-col bg-ground text-ink selection:bg-held-tint selection:text-ink font-ui antialiased">
