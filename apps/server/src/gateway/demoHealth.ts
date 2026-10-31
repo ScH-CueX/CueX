@@ -1,6 +1,7 @@
 import { createEngines, readConfig } from '../config';
 import { ANSHU_PACK } from '../scenario/anshu';
 import type { FollowupDraft } from '../contracts';
+import { warmupVoice } from '../voice/index';
 
 let failures = 0;
 function report(engine: string, backend: string, ok: boolean, detail = ''): void {
@@ -8,6 +9,9 @@ function report(engine: string, backend: string, ok: boolean, detail = ''): void
   if (!ok) failures++;
 }
 try {
+  // This preflight runs before the server, in a separate process with a cold local ASR model.
+  // Load it before starting HTTP deadlines; ASR.open() would otherwise block those probes.
+  await warmupVoice();
   const engines = await createEngines(readConfig(), ANSHU_PACK);
   // Real cloud content and real audio are checked once before opening the demo.
   await Promise.all([
