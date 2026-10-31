@@ -48,4 +48,9 @@ export const ANSHU_PACK: ScenarioPack = {
     { id: 'f-rwe', text: '另有一项覆盖两万多名患者的真实世界研究。', source: '安舒平上市后研究摘要' },
   ],
   doctorOpening: '你说这个研究结果不错。我先问一句：它适用于哪些患者？我门诊里七十五岁以上、肾功能不太好的很多。',
+  retryOpenings: {
+    'concern-scope': '我换个问法：七十五岁以上、eGFR 偏低的患者，研究里有没有？结论能不能用在他们身上？',
+    'concern-dose': '我再问一次：高龄患者开始用的时候，剂量要不要调？',
+  },
+  doctorClosing: '好，这几个问题清楚了。资料留下，我回头再看看。',
 };

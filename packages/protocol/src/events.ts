@@ -10,7 +10,15 @@ import type { TrainingScenarioDef } from './scenario';
 
 // 客户端上行消息
 export type ClientMessage =
-  | { type: 'session.start'; payload: { scenarioId: string; mode: 'performance' | 'learning' } }
+  | {
+      type: 'session.start';
+      payload: {
+        scenarioId: string;
+        mode: 'performance' | 'learning';
+        /** 复盘后“从这里再试一次”：医生换一种问法，重新提出这项关切。 */
+        retry?: { concernId: string };
+      };
+    }
   | { type: 'session.stop'; payload: { sessionId: string } }
   | { type: 'audio.chunk'; payload: AudioChunkPayload }
   | { type: 'speech.delta'; payload: { text: string; isFinal: boolean } }

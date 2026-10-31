@@ -18,6 +18,10 @@ export interface ScenarioPack {
   facts: PackFact[];
   /** Line the doctor says to open the session. It raises the first concern. */
   doctorOpening: string;
+  /** Rephrased opening per concern id, used when the rep retries from the review. */
+  retryOpenings: Record<string, string>;
+  /** Line the doctor says once every concern is resolved. The visit ends after it. */
+  doctorClosing: string;
 }
 
 // ---------- System 1: Jev-style typed decisions ----------
