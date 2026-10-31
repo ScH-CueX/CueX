@@ -7,7 +7,7 @@
   --text: #ECE8DF; --secondary: #B9B5AC; --dim: #7E828C; --hair: rgba(236, 232, 223, 0.10); --bg: #07080B;
   --amber: #FF7A2F; --violet: #8E8CFF; --mint: #7FE3C3;
   --serif: 'Noto Serif SC', 'Songti SC', 'STSong', 'Source Han Serif SC', 'Noto Serif CJK SC', serif;
-  --sans: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif;
+  --sans: var(--serif);
   position: absolute; inset: 0; box-sizing: border-box; display: flex; flex-direction: column;
   padding: 88px 96px 64px; background: transparent; color: var(--text);
   font-family: var(--sans); font-size: 28px; line-height: 1.45;

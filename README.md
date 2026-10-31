@@ -158,7 +158,7 @@ apps/
     core/driver/           ReplayDriver / LiveWSDriver
     core/session/          会话状态与界面投影
     core/audio/            PCM 采集、音频播放与中断
-    stage/                 独立舞台组件，尚未接入默认导航
+    stage/                 独立全屏演练入口（?view=stage）
   server/src/
     gateway/               HTTP / WebSocket 入口与连接隔离
     controller/            轮次控制、输出前复核、台词预取
@@ -216,7 +216,7 @@ npx --yes pnpm@9.15.9 dev:web
 npx --yes pnpm@9.15.9 dev:server
 ```
 
-默认使用替身引擎。真实语音、外部模型与服务器运行请继续阅读[通用部署指南](docs/DEPLOYMENT.md)。
+默认使用替身引擎。已启动后端时，可通过 `/?view=stage` 进入独立的全屏演练流程；默认入口仍为浅色首页。真实语音、外部模型与服务器运行请继续阅读[通用部署指南](docs/DEPLOYMENT.md)。
 
 <a id="deployment"></a>
 ## 通用部署
@@ -279,10 +279,10 @@ node scripts/build-roadshow.mjs
 <a id="contributing"></a>
 ## 开发与维护
 
-1. 从最新 `main` 创建功能分支，在功能分支开发。
+1. 团队以 `main` 为共同开发基线。队友在 main 开发；独立改动可使用短期功能分支，开始工作前先同步 `origin/main`。
 2. 保持 `packages/protocol` 与前后端消息一致；修改接口时补齐对应行为验证。
 3. 使用 `feat(scope): ...`、`fix(scope): ...`、`docs(scope): ...` 等提交格式，正文说明行为与验证。
-4. 同步上游、解决冲突，通过相关检查后再合入 `main`。
+4. 推送前再次检查 `origin/main`，合并协作增量并解决冲突，通过相关检查后再发布。常规更新不强推覆盖 main。
 
 ```sh
 pnpm build

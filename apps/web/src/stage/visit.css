@@ -5,7 +5,7 @@
   --line: rgba(236, 232, 223, 0.10);
   --cue: #FF7A2F; --deep: #8E8CFF; --ok: #7FE3C3;
   --serif: "Noto Serif SC", "Songti SC", serif;
-  --sans: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
+  --sans: var(--serif);
   position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden;
   background: transparent; color: var(--paper); font-family: var(--sans); line-height: 1.5; -webkit-font-smoothing: antialiased;
 }

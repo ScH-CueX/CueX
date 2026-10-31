@@ -71,6 +71,8 @@ pnpm dev:web
 
 打开 http://127.0.0.1:5173 。回放模式无需后端；切换实时连线后，开发服务器会代理 `/ws`、`/health` 和 `/briefing` 到 8765。
 
+全屏演练入口是 `/?view=stage`，默认 `/` 保留首页。真实模式下，建立 WebSocket 连接会触发医生台词预取。
+
 默认替身 ASR 不识别真实麦克风，替身 TTS 也不生成真实声音。先用文字输入验证会话，再按下一节启用模型。
 
 ### 1.5 自定义端口
@@ -150,7 +152,7 @@ Windows 或自定义安装可从 [sherpa-onnx 官方发布](https://github.com/k
 CUEX_ASR_MODEL_DIR=C:/CueX/models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30
 ```
 
-目录应包含 `tokens.txt`、encoder、decoder、joiner 模型文件。已有 sherpa WebSocket 服务时，也可使用 `CUEX_ASR_URL=ws://your-asr-host:6006`；显式 URL 优先于本地目录。没有可用配置时会成为文字模式，麦克风输入返回 `ASR_TEXT_ONLY`。[ASR 配置详情](../apps/server/src/voice/README.md)。
+目录应包含 `tokens.txt`、encoder、decoder、joiner 模型文件。已有 sherpa WebSocket 服务时，也可使用 `CUEX_ASR_URL=ws://asr.example.com:6006`；显式 URL 优先于本地目录。没有可用配置时会成为文字模式，麦克风输入返回 `ASR_TEXT_ONLY`。[ASR 配置详情](../apps/server/src/voice/README.md)。
 
 ### 2.4 Ming TTS：语音输出
 

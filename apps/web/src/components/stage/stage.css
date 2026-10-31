@@ -9,9 +9,9 @@
   --line: rgba(236, 232, 223, 0.10);
   --cue: #FF7A2F; --deep: #8E8CFF; --ok: #7FE3C3;
   --serif: "Noto Serif SC", "Songti SC", "STSong", serif;
-  --sans: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
+  --sans: var(--serif);
   --display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
-  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --mono: var(--serif);
   position: fixed; inset: 0; z-index: 100; overflow: hidden;
   background: var(--ink); color: var(--paper); font-family: var(--sans);
   -webkit-font-smoothing: antialiased; user-select: none; cursor: default;

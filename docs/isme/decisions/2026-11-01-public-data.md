@@ -4,7 +4,7 @@ Status: accepted. Designer: user in this conversation, 2026-11-01.
 
 ## Basis
 
-The user requested maintainable, portable documentation with no private/sensitive information, then explicitly instructed removal of sensitive Git history. Existing authorization covers syncing branches and publishing the completed changes to main.
+The user requested maintainable, portable documentation with no private/sensitive information, then explicitly instructed removal of sensitive Git history. Existing authorization covers syncing branches and publishing the completed changes to main. The user subsequently stated teammates will develop on main; main is the collaboration baseline. This sensitive-data cleanup is a one-time authorized rewrite; ordinary updates remain fast-forward or merge-based.
 
 ## Decisions and invariants
 

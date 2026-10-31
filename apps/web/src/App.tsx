@@ -10,10 +10,10 @@ type AppView = ViewKey | 'stage';
 const VIEWS: AppView[] = ['home', 'live', 'review', 'stage'];
 
 export function App() {
-  // The stage page is the default view. It has no navbar.
+  // Keep the clinic homepage as the default; the full-screen stage is an explicit entry.
   const [view, setView] = useState<AppView>(() => {
     const requested = new URLSearchParams(window.location.search).get('view') as AppView | null;
-    return requested && VIEWS.includes(requested) ? requested : 'stage';
+    return requested && VIEWS.includes(requested) ? requested : 'home';
   });
   const [initialTime, setInitialTime] = useState<number>(0);
   const [initialJury, setInitialJury] = useState<boolean>(false);
