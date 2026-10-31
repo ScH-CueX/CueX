@@ -79,5 +79,6 @@ export function liveSessionReducer(state: LiveSession, action: LiveAction): Live
     case 'session.error': return { ...state, error: event.payload.message };
     case 'tts.stream_chunk': return state;
     case 'tts.abort': return state;
+    case 'visit.ended': return state;
   }
 }
