@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import type { ViewKey } from '@/components/layout/Navbar';
 import { DoctorCanvas } from '@/components/r3f/DoctorCanvas';
 import { ClinicalScaffoldingHUD, type ScaffoldingLevel } from '@/components/ClinicalScaffoldingHUD';
+import { CueEdgeLight, type EdgeCuePhase } from '@/components/CueEdgeLight';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -39,7 +40,10 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
 }) => {
   const [t, setT] = useState<number>(initialTime);
   const [playing, setPlaying] = useState<boolean>(() => new URLSearchParams(window.location.search).get('paused') !== '1');
-  const [scaffoldingLevel, setScaffoldingLevel] = useState<ScaffoldingLevel>('full');
+  const [scaffoldingLevel, setScaffoldingLevel] = useState<ScaffoldingLevel>(() => {
+    const value=new URLSearchParams(window.location.search).get('assist');
+    return value === 'minimal' || value === 'faded' ? value : 'full';
+  });
   const [jury, setJury] = useState<boolean>(initialJury);
   const [nodTrigger, setNodTrigger] = useState<number>(0);
   const [driverType, setDriverType] = useState<'replay' | 'live'>('replay');
@@ -158,8 +162,16 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
     setT(Math.min(D, Math.max(0, targetTime)));
   }, []);
 
+  const edgePhase: EdgeCuePhase = scaffoldingLevel !== 'minimal' || driverType !== 'replay'
+    ? 'quiet'
+    : currentStateName === 'withdrawing' ? 'resolved'
+    : currentStateName === 'asking' || currentStateName === 'holding' ? 'focus'
+    : latestJudgment?.verdict === 'drift' && activeUtterance?.who === 'rep' ? 'drift'
+    : 'quiet';
+
   return (
     <div data-ui="training" className="flex flex-col min-h-[calc(100vh-3.5rem)] bg-ground text-ink select-none">
+      <CueEdgeLight phase={edgePhase} paused={!playing} />
       {/* 极简顶栏 */}
       <div className="w-full border-b border-line bg-surface/80 px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2 text-ink-2">
@@ -174,7 +186,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 max-w-full">
           {/* Driver 模式快速切换 */}
           <div className="seg" role="group" aria-label="驱动模式">
             <button
@@ -299,7 +311,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
           )}
         </div>
 
-        {/* 右列：双声部排版对谈现场 (宋体为医生，黑体为代表) */}
+        {/* 右列：双声部对谈现场，以字号和字重区别角色 */}
         <div data-capture="transcript" className="lg:col-span-4 flex flex-col justify-between border border-line bg-surface rounded-[2px] p-5 shadow-sm">
           <div className="space-y-5">
             <div className="flex items-center justify-between border-b border-line pb-2">
@@ -357,7 +369,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
           </div>
 
           <div className="pt-4 border-t border-line/60 flex items-center justify-between text-[11px] text-ink-3">
-            <span>宋体：医生 · 黑体：代表</span>
+            <span>陈主任 / 医药代表</span>
             <span className="font-mono">{fmtD(t)}</span>
           </div>
         </div>

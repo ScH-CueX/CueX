@@ -71,7 +71,7 @@ export const ClinicalScaffoldingHUD: React.FC<ClinicalScaffoldingHUDProps> = ({
               aria-pressed={level === 'minimal'}
               onClick={() => onLevelChange('minimal')}
               className="text-[11px] h-6 px-2"
-              title="微信号：仅提供关键数据点与红线"
+              title="轻提示：用页面边缘的柔光提示关切变化"
             >
               轻提示
             </button>
@@ -86,19 +86,19 @@ export const ClinicalScaffoldingHUD: React.FC<ClinicalScaffoldingHUDProps> = ({
             </button>
           </div>
 
-          <button
+          {level === 'full' && <button
             type="button"
             onClick={() => setIsOpen(!isOpen)}
             className="p-1 hover:bg-ground-2 rounded-[2px] text-ink-2"
             aria-label={isOpen ? '收起辅助托盘' : '展开辅助托盘'}
           >
             {isOpen ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
-          </button>
+          </button>}
         </div>
       </div>
 
       {/* HUD 内容主体 */}
-      {isOpen && (
+      {isOpen && level === 'full' && (
         <div className="p-4 space-y-4">
           {/* 实时情境应对战术（伴随式提示） */}
           {level === 'full' && currentSec >= 23.5 && currentSec < 36.4 && (

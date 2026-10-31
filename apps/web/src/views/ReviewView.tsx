@@ -287,7 +287,7 @@ export const ReviewView: React.FC<ReviewViewProps> = ({ onNavigate }) => {
             <div className="border-b border-line pb-3">
               <h2 className="text-xl font-bold text-ink">对谈稿（Score）</h2>
               <p className="text-xs text-ink-2 mt-1">
-                宋体为医生，黑体为你。<span className="text-held-ink font-semibold">朱砂色</span>表示医生想好、尚未说出口的追问。页边为 System One 当时的研判。
+                <span className="text-held-ink font-semibold">朱砂色</span>表示医生想好、尚未说出口的追问。页边为当时的判断。
               </p>
             </div>
 

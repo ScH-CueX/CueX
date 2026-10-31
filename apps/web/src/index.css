@@ -47,7 +47,7 @@
 
   /* Fonts */
   --font-doctor: "Noto Serif SC", "Songti SC", "STSong", serif;
-  --font-ui: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  --font-ui: "Noto Serif SC", "Songti SC", "STSong", serif;
 
   /* Type steps */
   --t-13: 13px;
@@ -213,6 +213,52 @@ body {
   box-shadow: inset 0 -2px 0 var(--ink);
 }
 
+/* A cue sits at the periphery, leaving the original clinic surface untouched. */
+.cue-edge-light {
+  --cue-color: 210, 70, 30;
+  --cue-period: 2.6s;
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+  isolation: isolate;
+}
+.cue-edge-light__halo, .cue-edge-light__rim {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  opacity: 0;
+  transition: opacity 240ms var(--ease-out);
+}
+.cue-edge-light__halo {
+  box-shadow: inset 0 0 34px 8px rgba(var(--cue-color), .60);
+}
+.cue-edge-light__rim {
+  border: 2px solid rgba(var(--cue-color), .72);
+  box-shadow: inset 0 0 8px rgba(var(--cue-color), .32);
+}
+.cue-edge-light[data-phase="drift"] > *,
+.cue-edge-light[data-phase="focus"] > * {
+  animation: cue-breathe var(--cue-period) cubic-bezier(.45, 0, .55, 1) infinite;
+}
+.cue-edge-light[data-phase="focus"] { --cue-period: 1.6s; }
+.cue-edge-light[data-phase="resolved"] { --cue-color: 40, 96, 79; }
+.cue-edge-light[data-phase="resolved"] > * { animation: cue-release 1.2s ease-out both; }
+.cue-edge-light[data-paused][data-phase]:not([data-phase="quiet"]) > * { animation: none; opacity: .42; }
+.cuex-nav-mark { transform: perspective(120px) rotateY(-10deg); transition: transform 240ms var(--ease-out); }
+@media (hover: hover) and (pointer: fine) {
+  button:hover > .cuex-nav-mark { transform: perspective(120px) rotateY(10deg) rotateZ(3deg); }
+}
+@keyframes cue-breathe {
+  0%, 100% { opacity: .10; }
+  45% { opacity: .58; }
+}
+@keyframes cue-release {
+  0% { opacity: .08; }
+  30% { opacity: .55; }
+  100% { opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 1ms !important;
@@ -220,4 +266,10 @@ body {
     transition-duration: 1ms !important;
     scroll-behavior: auto !important;
   }
+  .cue-edge-light[data-phase]:not([data-phase="quiet"]) > * {
+    animation: none;
+    opacity: .22;
+    transition: none;
+  }
+  .cuex-nav-mark, button:hover > .cuex-nav-mark { transform: none; }
 }

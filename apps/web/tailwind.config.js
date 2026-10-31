@@ -36,7 +36,9 @@ export default {
       },
       fontFamily: {
         doctor: ["Noto Serif SC", "Songti SC", "STSong", "serif"],
-        ui: ["Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "system-ui", "sans-serif"],
+        ui: ["Noto Serif SC", "Songti SC", "STSong", "serif"],
+        sans: ["Noto Serif SC", "Songti SC", "STSong", "serif"],
+        mono: ["Noto Serif SC", "Songti SC", "STSong", "serif"],
       },
       borderRadius: {
         DEFAULT: "2px",
