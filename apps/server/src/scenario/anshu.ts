@@ -1,7 +1,9 @@
 import type { ScenarioPack } from '../contracts';
+import { ANSHU_ASR_CORRECTIONS } from './asr-corrections';
 
 // Fictional demo pack. It matches apps/web/src/lib/scenario.ts so the live session and the replay tell the same story.
 export const ANSHU_PACK: ScenarioPack = {
+  asrCorrections: ANSHU_ASR_CORRECTIONS,
   scenario: {
     id: 'anshu-hypertension-01',
     productName: '安舒平',
