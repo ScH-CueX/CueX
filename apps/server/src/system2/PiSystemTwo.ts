@@ -5,10 +5,14 @@
  */
 import { Agent, type AgentEvent, type AgentTool, type ThinkingLevel } from '@earendil-works/pi-agent-core';
 import { Type, type Api, type Model } from '@earendil-works/pi-ai';
-import type { FollowupDraft, FollowupPhase, FollowupRequest, SystemTwo } from '../contracts';
+import type { DoctorLineRequest, FollowupDraft, FollowupPhase, FollowupRequest, SystemTwo } from '../contracts';
 import { loadS2Runtime, type S2Runtime } from './config';
 import { defaultDoctorStore, type DoctorStore } from './doctors';
+import { DoctorLineAgent, type LineMetrics } from './DoctorLineAgent';
+import { numbersIn } from './numbers';
+import { clampSpoken } from './spoken';
 import { buildSystemPrompt, buildUserPrompt, formatFact, searchFacts, type RetrievalMode } from './prompt';
+import { abortError, runAgentGuarded } from './run';
 
 export interface PiSystemTwoOptions {
   providerId?: string;
@@ -43,24 +47,7 @@ export interface S2Metrics {
 
 const MAX_SPOKEN_CHARS = 48;
 
-function abortError(): Error {
-  const e = new Error('System 2 request aborted');
-  e.name = 'AbortError';
-  return e;
-}
-
-/** Keep the spoken line short even when a model ignores the length rule. Cut at a sentence end if possible. */
-export function clampSpoken(text: string, max = MAX_SPOKEN_CHARS): string {
-  const t = text.replace(/\s+/g, ' ').trim();
-  if (t.length <= max) return t;
-  const head = t.slice(0, max);
-  const cut = Math.max(head.lastIndexOf('？'), head.lastIndexOf('。'), head.lastIndexOf('，'), head.lastIndexOf('?'));
-  return cut >= 12 ? head.slice(0, cut + 1) : head;
-}
-
-function numbersIn(text: string): string[] {
-  return text.match(/\d+(?:\.\d+)?/g) ?? [];
-}
+export { clampSpoken };
 
 export function checkGrounding(draftText: string, req: FollowupRequest): string[] {
   const allowed = new Set<string>();
@@ -82,6 +69,8 @@ export class PiSystemTwo implements SystemTwo {
   private readonly thinking: ThinkingLevel;
   private readonly timeoutMs: number;
   private readonly doctors: DoctorStore;
+  /** The second worker: writes the doctor's opening, retry and closing lines. It never shares an Agent with prepareFollowup. */
+  private readonly lineAgent: DoctorLineAgent;
   /** Metrics of the most recent finished call. */
   lastMetrics: S2Metrics | null = null;
 
@@ -95,6 +84,20 @@ export class PiSystemTwo implements SystemTwo {
     // The constructor runs once per session. Read every doctor's files here so the live loop never touches the disk.
     this.doctors = opts.doctors ?? defaultDoctorStore();
     this.doctors.reload();
+    this.lineAgent = new DoctorLineAgent({ runtime: this.rt, doctors: this.doctors, timeoutMs: this.timeoutMs, thinkingLevel: this.thinking });
+  }
+
+  /**
+   * Writes one spoken doctor line live (opening, retry or closing) on its own Agent, in parallel with follow-up drafting.
+   * Rejects with AbortError on cancel. Rejects with another Error when the line is empty, repeats the doctor, mentions an
+   * earlier visit or holds a number outside the pack. The Controller then speaks a pack example instead.
+   */
+  async prepareDoctorLine(req: DoctorLineRequest, onPhase?: (phase: FollowupPhase, partialText?: string) => void): Promise<string> {
+    return (await this.lineAgent.write(req, onPhase)).line;
+  }
+
+  prepareDoctorLineWithMetrics(req: DoctorLineRequest, onPhase?: (phase: FollowupPhase, partialText?: string) => void): Promise<{ line: string; metrics: LineMetrics }> {
+    return this.lineAgent.write(req, onPhase);
   }
 
   async prepareFollowup(req: FollowupRequest, onPhase?: (phase: FollowupPhase, partialText?: string) => void): Promise<FollowupDraft> {
@@ -209,21 +212,7 @@ export class PiSystemTwo implements SystemTwo {
       }
     });
 
-    const onAbort = () => agent.abort();
-    req.signal.addEventListener('abort', onAbort, { once: true });
-    let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      agent.abort();
-    }, this.timeoutMs);
-    try {
-      await agent.prompt(buildUserPrompt(req, mode));
-    } finally {
-      clearTimeout(timer);
-      req.signal.removeEventListener('abort', onAbort);
-    }
-    if (req.signal.aborted) throw abortError();
-    if (timedOut) throw new Error(`System 2 timed out after ${this.timeoutMs} ms (${rt.backend})`);
+    await runAgentGuarded(agent, buildUserPrompt(req, mode), req.signal, this.timeoutMs, rt.backend);
 
     const last = [...agent.state.messages].reverse().find((m) => m.role === 'assistant');
     if (!submitted && (!last || last.role !== 'assistant' || last.stopReason === 'error')) {

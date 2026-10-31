@@ -2,7 +2,8 @@
  * Doctor profile and memory files.
  *
  *   agents/doctors/<doctorId>/PROFILE.md   who the doctor is (edited by people)
- *   agents/doctors/<doctorId>/MEMORY.md    what the doctor remembers about this rep (header lines plus "- " bullets)
+ *   agents/doctors/<doctorId>/MEMORY.md    the doctor's impressions of recent reps (header lines plus "- " bullets).
+ *                                          Every visitor is a new rep, so the impressions steer what the doctor presses on and no spoken line may refer to an earlier visit.
  *
  * loadDoctor() is synchronous and cached. Call it at session start (PiSystemTwo does) so the live loop never reads files.
  * appendMemory() is asynchronous, runs at session end, and does not touch the live loop.
@@ -129,7 +130,7 @@ export function createDoctorStore(dir: string): DoctorStore {
           if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
         }
         const date = today();
-        const next = mergeMemory(current, clean.map((l) => `- ${date} ${l}`), `# ${doctorId} 对这位代表的记忆`);
+        const next = mergeMemory(current, clean.map((l) => `- ${date} ${l}`), `# ${doctorId} 对近来来访代表的印象`);
         const tmp = `${file}.${process.pid}.tmp`;
         await writeFile(tmp, next, 'utf8');
         await rename(tmp, file);
