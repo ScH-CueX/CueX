@@ -4,6 +4,7 @@ import type { DialogueTurn, DoctorLineKind, ScenarioPack, SystemTwo } from '../c
 
 export interface DoctorLines {
   prefetch(kind: DoctorLineKind, concernId?: string, history?: DialogueTurn[], missedPointIds?: string[]): void;
+  refresh(kind: DoctorLineKind, concernId?: string, history?: DialogueTurn[], missedPointIds?: string[]): void;
   take(kind: DoctorLineKind, concernId?: string, history?: DialogueTurn[], missedPointIds?: string[]): Promise<string>;
 }
 interface LineTask { abort: AbortController; promise: Promise<string | undefined>; event: FollowupCandidate; kind: DoctorLineKind; started?: boolean }
@@ -55,6 +56,12 @@ export class DoctorLinePrefetch implements DoctorLines {
       this.update(task);
       return text.trim();
     } catch { return undefined; }
+  }
+  refresh(kind: DoctorLineKind, concernId?: string, history: DialogueTurn[] = [], missedPointIds?: string[]): void {
+    const key = this.key(kind, concernId);
+    const existing = this.tasks.get(key);
+    if (existing) { existing.abort.abort(); this.active.delete(existing); this.tasks.delete(key); }
+    this.prefetch(kind, concernId, history, missedPointIds);
   }
   async take(kind: DoctorLineKind, concernId?: string, history: DialogueTurn[] = [], missedPointIds?: string[]): Promise<string> {
     this.prefetch(kind, concernId, history, missedPointIds);
