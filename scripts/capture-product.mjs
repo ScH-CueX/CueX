@@ -21,9 +21,9 @@ for (const [name,query] of states) {
   await page.waitForTimeout(2200);
   if(errors.length)throw new Error(`Capture stopped before replacing assets: ${errors.join('\n')}`);
   if(!await page.locator('#root').evaluate(el=>(el.textContent?.trim().length ?? 0)>40))throw new Error(`Application did not render: ${page.url()}`);
-  await page.screenshot({path:path.join(out,`${name}.png`),fullPage:true});
+  await page.screenshot({path:path.join(out,`${name}.png`),fullPage:true,scale:'css'});
   const dims=await page.evaluate(()=>({pageH:document.documentElement.scrollHeight,width:innerWidth}));
-  layout[name]={...dims,url:page.url(),elements:{}};
+  layout[name]={...dims,fullImageScale:1,cutoutScale:2,url:page.url(),elements:{}};
   for(const id of ['doctor','transcript','decisions','timeline','active-utterance','candidate-quote','assist-controls']) {
     const el=page.locator(`[data-capture="${id}"]`);
     if(await el.count()) {layout[name].elements[id]=await el.boundingBox();await el.screenshot({path:path.join(out,`${name}-${id}.png`)});}

@@ -1,0 +1,55 @@
+import {cpSync,existsSync,mkdirSync,mkdtempSync,readFileSync,readdirSync,renameSync,statSync,writeFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {createRequire} from 'node:module';
+import {fileURLToPath} from 'node:url';
+import path from 'node:path';
+
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const require=createRequire(import.meta.url);
+const {PDFDocument}=require(require.resolve('pdf-lib',{paths:[path.join(root,'ppt')]}));
+const run=(command,args,options={})=>execFileSync(command,args,{cwd:root,encoding:'utf8',...options});
+run('git',['diff','--quiet']);run('git',['diff','--cached','--quiet']);
+const revision=run('git',['rev-parse','HEAD']).trim();
+const title='AI+医疗健康-CueX-路皓然';
+const pdfName='CueX-记性好了一点-PPT.pdf';
+const videoName='AI+医疗健康-记性好了一点-视频.mp4';
+const dryName='AI+医疗健康-记性好了一点-视频-无配乐.mp4';
+const pdfPath=path.join(root,'ppt/out',pdfName);
+const pdf=await PDFDocument.load(readFileSync(pdfPath));
+if(pdf.getPageCount()!==5||pdf.getPages().some(p=>Math.abs(p.getWidth()-738)>.001||Math.abs(p.getHeight()-206.64)>.001))throw new Error('PDF must contain five exact 10.25 × 2.87 inch pages.');
+const media=[];
+for(const name of [videoName,dryName]){
+  const file=path.join(root,'video/out',name);
+  const info=JSON.parse(run('ffprobe',['-v','error','-show_streams','-show_format','-of','json',file]));
+  const video=info.streams.find(stream=>stream.codec_type==='video');
+  const audio=info.streams.find(stream=>stream.codec_type==='audio');
+  if(video?.width!==1920||video?.height!==1080||video?.r_frame_rate!=='30/1'||!audio||Math.abs(Number(info.format.duration)-45)>.1||statSync(file).size>300_000_000)throw new Error(`Invalid deliverable video: ${name}`);
+  run('ffmpeg',['-v','error','-i',file,'-f','null','-']);
+  media.push({name,duration:Number(info.format.duration),bytes:statSync(file).size,width:video.width,height:video.height,fps:30});
+}
+if(!existsSync(path.join(root,'apps/web/dist/index.html')))throw new Error('Build the frontend before packaging.');
+const out=path.join(root,'deliverables');mkdirSync(out,{recursive:true});
+const stage=mkdtempSync(path.join(out,'.stage-'));
+const code=path.join(stage,'代码与运行说明');const extras=path.join(stage,'备用材料');
+mkdirSync(code);mkdirSync(extras);
+cpSync(pdfPath,path.join(stage,pdfName));
+cpSync(path.join(root,'video/out',videoName),path.join(stage,videoName));
+cpSync(path.join(root,'video/out',dryName),path.join(extras,dryName));
+cpSync(path.join(root,'ppt/out',pdfName.replace('.pdf','.html')),path.join(extras,pdfName.replace('.pdf','.html')));
+cpSync(path.join(root,'docs/RUNNING.md'),path.join(code,'运行说明.md'));
+run('git',['archive','--format=zip','--output',path.join(code,`CueX-source-${revision.slice(0,7)}.zip`),'HEAD']);
+const dist=path.join(root,'apps/web/dist');
+cpSync(dist,path.join(code,'web-offline'),{recursive:true,filter:source=>!['qa','captures','audio'].includes(path.relative(dist,source).split(path.sep)[0])});
+writeFileSync(path.join(stage,'请先阅读.md'),`# CueX 交付材料\n\n团队：记性好了一点；队长：路皓然；队员：任逸康。赛道：AI + 医疗健康。\n\n- 项目介绍：${pdfName}（5 页，10.25 × 2.87 英寸）。\n- 产品视频：${videoName}（1920 × 1080，约 45 秒）。在 PPT 第 3 页讲述后播放，片尾继续第 4 页。\n- 源码与运行说明：代码与运行说明目录，代码版本 ${revision}。\n- 备用材料：无配乐视频和可离线查看的 HTML。\n\n## 本地备用演示\n\n在“代码与运行说明”目录运行：\n\n\x60\x60\x60sh\npython3 -m http.server 5173 --directory web-offline\n\x60\x60\x60\n\n打开 http://127.0.0.1:5173 。此备用包提供首页、演示回放和示例复盘，不需要在线模型；实时语音模式需按源码内 docs/RUNNING.md 配置后端与模型服务。源码不含 SSH 私钥、模型权重或账号凭据。\n\nGitHub：https://github.com/ScH-CueX/CueX\n\n完整讲述约 135 秒，视频 45 秒，总计 3 分钟。\n`);
+const sha=file=>createHash('sha256').update(readFileSync(file)).digest('hex');
+const files=[];
+function walk(dir){for(const name of readdirSync(dir).sort()){const file=path.join(dir,name);if(statSync(file).isDirectory())walk(file);else files.push({path:path.relative(stage,file),bytes:statSync(file).size,sha256:sha(file)});}}
+walk(stage);
+writeFileSync(path.join(stage,'文件校验.json'),JSON.stringify({revision,createdAt:new Date().toISOString(),pdf:{pages:5,widthPt:738,heightPt:206.64},media,files},null,2));
+const destination=path.join(out,title);const zip=path.join(out,`${title}.zip`);
+if(existsSync(destination))renameSync(destination,`${destination}.previous-${Date.now()}`);
+if(existsSync(zip))renameSync(zip,`${zip}.previous-${Date.now()}`);
+renameSync(stage,destination);
+run('python3',['-c',`import pathlib,sys,zipfile\np=pathlib.Path(sys.argv[1])\nwith zipfile.ZipFile(sys.argv[2],'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:\n for f in sorted(p.rglob('*')):\n  if f.is_file(): z.write(f, pathlib.Path(p.name)/f.relative_to(p))\nwith zipfile.ZipFile(sys.argv[2]) as z:\n assert z.testzip() is None\n`,destination,zip]);
+console.log(JSON.stringify({folder:destination,zip,bytes:statSync(zip).size,sha256:sha(zip),revision},null,2));

@@ -25,7 +25,7 @@ const BrandCorner: React.FC=()=> <div style={{position:'absolute',zIndex:20,left
 
 const Plane:React.FC<{src?:string;video?:string;frame:number;shift?:number;scale?:number;opacity?:number;offsetY?:number}>=({src,video,frame,shift=0,scale=.66,opacity=1,offsetY=30})=>{
   const p=ramp(frame,0,42,EASE.inOut);
-  return <div style={{position:'absolute',zIndex:0,inset:0,perspective:1800,perspectiveOrigin:'50% 50%',opacity,clipPath:'inset(180px 36px 120px 36px)'}}>
+  return <div style={{position:'absolute',zIndex:0,inset:0,perspective:1800,perspectiveOrigin:'50% 50%',opacity:opacity*ramp(frame,0,12,EASE.inOut),clipPath:'inset(180px 36px 120px 36px)'}}>
     <div style={{position:'absolute',width:1920,height:1080,overflow:'hidden',borderRadius:12,background:'#ecede8',transformOrigin:'50% 50%',transform:`translate(${shift}px,${offsetY+(1-p)*70}px) rotateY(${mix(-7,-2,p)}deg) rotateX(${mix(5,0,p)}deg) scale(${scale})`,boxShadow:'0 38px 90px rgba(0,0,0,.34)'}}>
       {src?<Img src={staticFile(src)} style={{width:1920,maxWidth:'none'}}/>:null}
       {video?<OffthreadVideo src={staticFile(video)} muted style={{width:1920,height:1080}}/>:null}
@@ -80,7 +80,7 @@ export const Withdrawal:React.FC=()=>{
   const quote='那 eGFR 低于 30 的呢？这部分患者能用吗？';
   return <AbsoluteFill>
     <Plane src={f<112?'captures/live-ready.png':'captures/live-answered.png'} frame={100} shift={-505*lift} scale={mix(.66,.37,lift)} opacity={mix(1,.9,lift)}/>
-    <div style={{position:'absolute',zIndex:10,left:128,top:825,fontFamily:FONT.serif,fontSize:56,color:C.ok,opacity:ramp(f,112,132)}}>“这部分目前没有证据。”</div>
+    <div style={{position:'absolute',zIndex:10,left:128,top:825,fontFamily:FONT.serif,fontSize:64,color:C.ok,opacity:ramp(f,112,132)}}>“这部分目前没有证据。”</div>
     <svg width={1920} height={1080} style={{position:'absolute',zIndex:9,inset:0,opacity:ramp(f,132,142)*(1-ramp(f,185,205))}}>
       <path d="M 650 813 Q 825 780 902 530" fill="none" stroke={C.ok} strokeOpacity=".38" strokeWidth="2"/>
       <circle cx={mix(650,902,relay)} cy={813-283*relay*relay} r="7" fill={C.ok}/>

@@ -5,9 +5,9 @@ import {PDFDocument} from 'pdf-lib';
 import {getChromium} from '../../scripts/browser-runtime.mjs';
 
 const project=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const id=process.argv[2] ?? 'dir-clinic';
-const count=Number(process.argv[3] ?? 2);
-const name=process.argv[4] ?? `${id}-方向预览`;
+const id=process.argv[2] ?? 'cuex-pitch';
+const count=Number(process.argv[3] ?? (id==='cuex-pitch'?5:2));
+const name=process.argv[4] ?? (id==='cuex-pitch'?'CueX-记性好了一点-PPT':`${id}-方向预览`);
 if(!Number.isInteger(count)||count<1||count>5)throw new Error('Use 1–5 pages.');
 const out=path.join(project,'out');await mkdir(out,{recursive:true});
 const browser=await getChromium().launch({channel:'chrome',headless:true});
