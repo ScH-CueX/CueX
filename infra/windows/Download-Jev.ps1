@@ -31,15 +31,16 @@ foreach ($entry in $items) {
         if (-not [string]::IsNullOrWhiteSpace($Proxy)) { $proxyArgs = @('--proxy',$Proxy) }
         & curl.exe @proxyArgs --disable --fail --location --proto '=https' --proto-redir '=https' --retry 5 --retry-delay 3 --continue-at - --output $partial $url
         if ($LASTEXITCODE -ne 0) { throw "curl failed: $LASTEXITCODE" }
-        [IO.File]::Move($partial, $destination)
     }
+    $candidate = if(Test-Path -LiteralPath $destination){$destination}else{$partial}
     if ($entry.PSObject.Properties.Name -contains 'bytes') {
-        if ((Get-Item $destination).Length -ne [long]$entry.bytes) { throw "Size mismatch: $destination" }
+        if ((Get-Item $candidate).Length -ne [long]$entry.bytes) { throw "Size mismatch: $destination" }
     }
-    $hash = (Get-FileHash $destination -Algorithm SHA256).Hash.ToLowerInvariant()
+    $hash = (Get-FileHash $candidate -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($entry.PSObject.Properties.Name -contains 'sha256') {
         if ($hash -cne $entry.sha256) { throw "SHA256 mismatch: $destination" }
     }
+    if ($candidate -ne $destination) { [IO.File]::Move($partial, $destination) }
     [pscustomobject]@{file=$destination;sha256=$hash;bytes=(Get-Item $destination).Length} | ConvertTo-Json -Compress
 }
 [IO.File]::WriteAllText((Join-Path $rootFull "logs\download-$Selection.done"), (Get-Date -Format o))

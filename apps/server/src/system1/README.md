@@ -38,3 +38,16 @@ PATH=/opt/homebrew/opt/node@22/bin:$PATH npx tsx scripts/s1-eval.ts --url http:/
 ```
 
 For JEV-9B use `--format jev-v1`; add `--english` to evaluate English questions over Chinese state. Base-model comparisons use `--format chat --lora-scale 0`. For the original JevStyle 2B GGUF, use `--format jevstyle-v1 --lora-scale 0` on a suitable server. The evaluation script has a 30-second deadline to measure slow machines without automatic fallback. It runs all six questions per state concurrently and excludes one warm-up decide. The 40 Chinese states are development examples derived from ANSHU, with partial speech, corrections, wrong generalizations, and candidate withdrawal. They are not a held-out test. Model selection evidence and Windows commands are in `MODELS.md` and `infra/windows/README.md`.
+
+## Windows benchmark matrix
+
+After Windows starts one base quant with the JEV LoRA loaded, run from `apps/server`:
+
+```sh
+PATH=/opt/homebrew/opt/node@22/bin:$PATH npx tsx scripts/s1-matrix.ts --quant Q4_K_M --out /tmp/cuex-s1-matrix
+PATH=/opt/homebrew/opt/node@22/bin:$PATH CUEX_S1_REMOTE_TEST_URL=http://127.0.0.1:18080 npx tsx --test test/system1.test.ts
+```
+
+Switch the Windows process to Q8_0, then repeat with `--quant Q8_0`. The matrix runs JEV Chinese questions, JEV English questions over Chinese state, and base-Qwen Chinese chat questions sequentially. It measures health HTTP RTT separately and saves raw decisions and summaries outside the repository. No model downloads or model execution run on the Mac.
+
+The reconnecting tunnel is `bash scripts/s1-tunnel.sh`. It owns only its SSH child and reconnects when the link drops. The Windows model process is detached and has a separate lifecycle.

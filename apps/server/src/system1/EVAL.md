@@ -23,6 +23,6 @@ No candidate has measured CueX neural accuracy or latency yet. The prior RX 7900
 
 The current deployment is autotrust JEV-9B via a Qwen3.5-9B base GGUF plus the converted adapter_vllm LoRA, including output tensors, with bias and calibration in this client. Q8_0 and Q4_K_M are being compared on the Windows GPU. JEV-27B remains a metadata-only comparison. New JevStyle v4 likewise needs its custom scorer. JackKozmo29 1.5B is an English incident-SEV JSON model without a discovered GGUF. Details and source links are in `MODELS.md`.
 
-## Windows validation to run
+## Windows validation in progress
 
-Run the read-only `infra/windows/Test-Scripts.ps1`, then inspect, download and start one catalogue model on the Windows box. Use its authorized SSH tunnel or a reachable remote llama-server URL. Run `scripts/s1-eval.ts` against that URL with `--backend` and `--out`. Keep every neural candidate's accuracy, errors and p50/p95 in separate result files. Windows PowerShell/Vulkan execution has not been run by this worker.
+Run the read-only `infra/windows/Test-Scripts.ps1`, then inspect, download and start one catalogue model on the Windows box. Use its authorized SSH tunnel or a reachable remote llama-server URL. Run `scripts/s1-eval.ts` against that URL with `--backend` and `--out`. Keep every neural candidate's accuracy, errors and p50/p95 in separate result files. A Windows worker converted the LoRA and verified output-layer tensor compatibility. Actual server readout and the six-run quant/readout matrix are pending model download completion.

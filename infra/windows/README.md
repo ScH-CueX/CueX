@@ -91,4 +91,4 @@ For JevStyle v1, set `CUEX_S1_FORMAT=jev-v1`. For another authorized llama-serve
 
 ## Validation record
 
-On 2026-10-31 the model metadata, cards, LFS hashes, official licence text and llama.cpp flag documentation were read over HTTPS. No model was downloaded by this research task. The local Mac had llama.cpp 0.8.0 (build 11960) available. Windows paths and the existing Worker process were not observed: the parent reported that SSH banner exchange timed out. Run the read-only discovery on Windows before deployment. PowerShell execution and Vulkan inference remain the next validation steps.
+On 2026-10-31, the Windows deployment used official llama.cpp b12023 (`f3586e66b`) and Vulkan0 on AMD Radeon RX 7900 XT. The conversion environment used Python 3.12.15 and PyTorch 2.11.0+cpu. Conversion produced 402 LoRA tensors, including both `output.weight.lora_a` and `output.weight.lora_b`. The base GGUF has separate `output.weight` and `token_embd.weight` tensors. Runtime evidence and repeat commands are in [JEV.md](JEV.md).

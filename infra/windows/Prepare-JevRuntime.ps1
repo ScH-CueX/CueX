@@ -8,18 +8,20 @@ $archive = "$Root\downloads\llama-b12023-bin-win-vulkan-x64.zip"
 if (-not (Test-Path "$Root\runtime\llama-server.exe")) {
     & curl.exe --disable -fL --retry 4 -o $archive 'https://github.com/ggml-org/llama.cpp/releases/download/b12023/llama-b12023-bin-win-vulkan-x64.zip'
     if ($LASTEXITCODE -ne 0) { throw 'Runtime download failed.' }
-    Get-FileHash $archive -Algorithm SHA256 | Format-List
+    if ((Get-FileHash $archive -Algorithm SHA256).Hash -ine '99afa5556bbc0206ed1d4d0cc7ac56200c5080cc81e4a2f5a08367ae48b33625') { throw 'Runtime archive SHA256 mismatch.' }
     Expand-Archive -LiteralPath $archive -DestinationPath "$Root\runtime"
 }
 $sourceArchive = "$Root\downloads\llama-b12023-source.zip"
 if (-not (Test-Path "$Root\source\llama.cpp-b12023\convert_lora_to_gguf.py")) {
     & curl.exe --disable -fL --retry 4 -o $sourceArchive 'https://codeload.github.com/ggml-org/llama.cpp/zip/refs/tags/b12023'
     if ($LASTEXITCODE -ne 0) { throw 'Source download failed.' }
-    Get-FileHash $sourceArchive -Algorithm SHA256 | Format-List
+    if ((Get-FileHash $sourceArchive -Algorithm SHA256).Hash -ine 'ae16e0ff793b13d0a047c07ff72f2b7c7bbcd9c7c175de5020d5ce2a811beed3') { throw 'Source archive SHA256 mismatch.' }
     Expand-Archive -LiteralPath $sourceArchive -DestinationPath "$Root\source"
 }
-& uv venv "$Root\convert-env" --python 3.12 --managed-python --clear
-if ($LASTEXITCODE -ne 0) { throw 'uv venv failed.' }
+if (-not (Test-Path "$Root\convert-env\Scripts\python.exe")) {
+    & uv venv "$Root\convert-env" --python 3.12 --managed-python
+    if ($LASTEXITCODE -ne 0) { throw 'uv venv failed.' }
+}
 & uv pip install --python "$Root\convert-env\Scripts\python.exe" -r "$Root\source\llama.cpp-b12023\requirements\requirements-convert_lora_to_gguf.txt"
 if ($LASTEXITCODE -ne 0) { throw 'Converter dependency install failed.' }
 & "$Root\convert-env\Scripts\python.exe" -c 'import torch; print(torch.__version__, "cuda", torch.version.cuda); assert torch.version.cuda is None'

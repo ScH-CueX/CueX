@@ -14,7 +14,7 @@ For a faster transfer, run `Download-JevRanged.ps1 -Selection q4 -Connections 8`
 
 Downloads use pinned Hugging Face revisions. Weight files have pinned byte counts and SHA256. Partial downloads resume. Existing files must match metadata. No foreign cache or model directory is changed.
 
-The adapter inspection checks `lm_head` tensors. The converter checks `output.weight.lora_a` and `output.weight.lora_b` in the resulting GGUF. The base config has `tie_word_embeddings=false`.
+Run `Inspect-JevBase.py` after the model download to confirm that `output.weight` and `token_embd.weight` have different offsets. The adapter inspection checks `lm_head` tensors. The converter checks `output.weight.lora_a` and `output.weight.lora_b` in the resulting GGUF. The base config has `tie_word_embeddings=false`.
 
 ## Start
 
@@ -36,6 +36,10 @@ The single adapter is ID `0`.
 - Base chat: `"lora":[{"id":0,"scale":0}]`.
 
 JEV uses the repository's `bare-v1` raw prompt, not a chat wrapper. `adapter_vllm/decision_head.json` defines verbalizers and the bias. Repository-root `calibration.json` defines per-kind temperatures.
+
+## Verify
+
+Run `C:\cuex\convert-env\Scripts\python.exe C:\cuex\scripts\Verify-JevServer.py` after `/health` is ready. This checks all 24 verbalizer token IDs and confirms that scale `0` and `1` change their logprob odds. Evidence is saved in `C:\cuex\logs\lora-scale-check.json`.
 
 ## Safety
 
