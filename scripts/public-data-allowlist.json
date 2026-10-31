@@ -1,0 +1,14 @@
+[
+  {
+    "file": "apps/server/scripts/s2-smoke.ts",
+    "rule": "key-token",
+    "sha256": "c9ee925831e623c1fd62f9c43db9f8997173765175537e9a503a4c8cd1e6752e",
+    "reason": "Synthetic fake or intentionally invalid API-key fixture used to test redaction; not a credential."
+  },
+  {
+    "file": "apps/server/scripts/s2-smoke.ts",
+    "rule": "key-token",
+    "sha256": "856ad0d133053b1eacd9c7854b8cd80a1891e83e4425f95dc8e22fc58c4af11b",
+    "reason": "Synthetic fake or intentionally invalid API-key fixture used to test redaction; not a credential."
+  }
+]

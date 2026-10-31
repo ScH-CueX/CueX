@@ -9,6 +9,7 @@
     "dev:server": "pnpm --filter @cuex/server dev",
     "build": "pnpm --filter @cuex/web build",
     "typecheck": "pnpm -r run typecheck",
+    "check:public-data": "node scripts/check-public-data.mjs",
     "video:studio": "pnpm --filter cuex-promo studio",
     "video:render": "pnpm --filter cuex-promo render",
     "video:demo": "pnpm --filter cuex-promo render:demo",
