@@ -1,0 +1,67 @@
+# System 1 model shortlist
+
+Evidence checked **2026-10-31 UTC**. This report reads public cards, configs and file metadata. Benchmark figures below are publisher reports, not CueX measurements. No weights were downloaded or run for this report.
+
+## Deployment update: autotrust JEV-9B
+
+The deployment is now **Qwen3.5-9B GGUF plus autotrust/JEV-9B adapter_vllm converted to a LoRA GGUF**. The original backbone-GGUF caution below is not a statement that this adapter path needs a custom runtime. The model card says the language weights are bit-identical to Qwen3.5-9B. `adapter_vllm` includes `lm_head` LoRA tensors; its published decision-head formula is verbalizer-token logprob + bias, divided by per-kind temperature. Current llama.cpp uses `build_lora_mm` for the qwen35 output layer. The client implements this formula. Runtime validation must confirm output tensors load and scale 0/1 changes the verbalizer probabilities.
+
+Use one localhost Vulkan process with the adapter loaded but initially inactive. Each request selects adapter scale 1 for `jev-v1`, or scale 0 for base Qwen `chat`. Compare Q8_0 (calibration fidelity) and Q4_K_M (latency). All weights and conversion run on Windows under `C:\cuex`; no model inference or model downloads run on the Mac. The final accuracy/latency selection is recorded in `EVAL.md` after GPU measurements.
+
+## Original metadata comparison
+
+`contracts.ts` needs independent `noul`, `choice` and six-level `score` distributions against the same state, with cancellation and latency reporting. `scenario/anshu.ts` is spoken Chinese about a fictional trial. Relevant checks include age over 75, eGFR 30–60 versus below 30, partial answers, unsupported claims, topic drift and whether a concern was actually resolved.
+
+**Original shortlist before the adapter integration was verified: Qwen3.5-9B Q4_K_M.** Its official Chinese benchmark is stronger than 4B (C-Eval 88.2 versus 85.1), and its 5.68 GB weight file leaves room for runtime state at a short context. Measure that memory use rather than treating file size as VRAM demand. Use **Qwen3.5-4B Q4_K_M** as the smaller latency-first comparison and **JevStyle v1 2B Q8_0** as the typed-decision comparison. No CueX latency or quality winner has been measured. Keep Autotrust JEV and current JevStyle v4 as separate-runtime experiments.
+
+The two Qwen models are strong current 4–9B candidates, not a claim of an exhaustive leaderboard win. The current Qwen author listings for [3.6](https://huggingface.co/api/models?author=Qwen&search=Qwen3.6&limit=100) and [3.8](https://huggingface.co/api/models?author=Qwen&search=Qwen3.8&limit=100) contain no dense 4–9B successor; 3.8-27B is real but outside this size range.
+
+## Comparison
+
+| Candidate | Base and declared weight licence | Chinese evidence | GGUF and stock llama-server fit |
+|---|---|---|---|
+| **autotrust/JEV-9B** [A] | Qwen3.5-9B text backbone; separate decision LoRA and 24-slot head. Apache-2.0. | Card tags English and says the training corpus is English. Publisher reports 18/19 decisions on Chinese V2EX examples, explicitly illustrations rather than a multilingual benchmark. | Source has safetensors, adapter, head and calibration files, no GGUF. Community `mradermacher/JEV-9B-GGUF` exists (Q4_K_M 5.63 GB). Its card gives no decision-adapter/head parity evidence. Do not treat loading that GGUF as the JEV decision path. |
+| **autotrust/JEV-27B** [B] | Qwen3.8-27B text backbone; same separate-block design. Apache-2.0. | English-centric corpus; publisher reports 19/19 Chinese V2EX illustration decisions. Chinese clinical speech is unmeasured. | Source has no GGUF. Search returned similarly named derivatives, including Solar and uncensored releases; no verified direct, full typed-decision GGUF path was established. Publisher recommends vLLM with its adapter/decision endpoint. |
+| **JevStyle v1 2B**: `chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF` [C] | Qwen3.5-2B-Base; merged decision fine-tune. Weights Apache-2.0. Card notes AG News research/non-commercial data terms; review these for intended distribution. | English-only card/training tasks. Chinese ability may transfer from Qwen, but the card supplies no Chinese decision evaluation. | Exact older repo requested. Q4_K_M, Q8_0 and BF16 files. One letter-token readout on stock llama.cpp; exact bare prompt required. Up to 26 options (20 through the card's top-logprob client). |
+| **JevStyle current 2B v4** [D] | Quant of `chaoliangUNSW/Jev-Style-2B-Decision-v4`, based on Qwen3.5-2B. Apache-2.0 weights; additional dataset/provider terms are listed. Part of training uses TypeSafe Jev 1.14 API soft labels. | Main card says 91% English and 7% Chinese training rows. This is provenance, not Chinese accuracy. | Q4_K_M 1.27 GB and Q8_0 2.01 GB exist. **Not a drop-in for stock /completion**: requires `jev-score-v2`, block attention, a verdict slot per option and per-kind temperature. Windows Vulkan scorer support needs its own validation. |
+| **JackKozmo29/sevclassifier-jev-style-1.5b** [E] | Qwen2.5-1.5B-Instruct. Card and upstream licence are Apache-2.0. | Card explicitly says English incident descriptions. No Chinese result. | Source has a 6,174,895,536-byte FP32 safetensors file and no GGUF. Exact-name public search found only this source repo. Outputs incident-SEV JSON, not general `noul`/`choice`/`score` distributions. Exclude from the CueX benchmark shortlist. |
+| **Qwen3.5-4B** [F] | Post-trained/instruct model over Qwen3.5-4B-Base; Apache-2.0. | Official card reports 201 languages/dialects and C-Eval **85.1**. This is the clearest Chinese evaluation evidence in this shortlist, not a CueX score. | `unsloth/Qwen3.5-4B-GGUF`: Q4_K_M **2,740,937,888 bytes**. Stock llama.cpp text-only path, non-thinking prompt. |
+| **Qwen3.5-9B** [G] | Post-trained/instruct model over Qwen3.5-9B-Base; Apache-2.0. | Same 201-language claim; official C-Eval **88.2**. | `unsloth/Qwen3.5-9B-GGUF`: Q4_K_M **5,680,522,464 bytes**. Same text-only path, more weight and state memory. |
+
+C-Eval figures are official full-model reports in the Qwen card, not quantized non-thinking single-token measurements. GGUF file sizes are observed Hugging Face LFS metadata, not VRAM requirements. Context, hybrid recurrent state, parallel slots and runtime buffers add memory.
+
+## What the published decision numbers mean
+
+- **Autotrust JEV** reports mean KL to Jev-labelled held-out distributions of about **0.019 (9B)** and **0.017 (27B)**. Single-request medians are about **90 ms** and **137 ms on one B200**. These are the publisher's serving results, not Windows Vulkan forecasts or evidence about this Chinese scenario. The HF model index marks its metrics `verified: false`.
+- **JevStyle v1** reports **82.3%** over 1,500 held-out English tasks and ECE **0.017**. Its GGUF table reports Q8_0 agreement with BF16 **99.4%**, and **81.6%** accuracy over 500 examples. Reported HTTP latency is about **110 ms on M1 Max**. Its calibration domain is not Chinese clinical dialogue.
+- **JevStyle v4** reports **74.9%** on the public 231 JevBench items and index **44.37** using its PyTorch runtime. The GGUF card separately reports Q8_0 top-1 parity **99.6%** over its 1,000-question fixture. These benchmark/parity numbers use different fixtures and runtimes; retain that distinction.
+- **SevClassifier** claims **92.9% F1** on its incident holdout and **76 ms p50** on Apple M2/MPS. Those task and hardware results are not relevant evidence for CueX's probability contract. Its quickstart also names `enterprise-ai-lab/...`, which differs from the hosting repo; verify provenance before any future use.
+
+## Adapter implications
+
+1. **Generic instruct models:** use a non-thinking Qwen prompt and constrain one-token labels. Map them back to all declared options and normalize. A prompt that asks for JSON probabilities is a different method. Calibration must be measured on held-out Chinese data.
+2. **JevStyle v1:** follow [the card's exact prompt](https://huggingface.co/chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF#prompt-format), ending in `Answer:`. Use letter-labelled options; bool options are yes/no and score uses six ordered levels. Preserve the single-token mapping. Never silently substitute v3/v4.
+3. **Autotrust:** `judge_config.json` declares `weights_mode: unmerged`, an adapter, and 24 decision slots. `adapter_vllm/decision_head.json` states that the decision uses adapter logprobs plus bias and per-kind temperature. Plain backbone conversion omits that computation; a separate adapter/export with numerical parity tests is required.
+4. **Probability extraction:** validate `/completion` token IDs, raw versus post-sampling probabilities, grammar effects, and complete coverage of allowed labels. Top-N can omit a low-probability allowed token. Missing tokens are not measured zeros. Compare probability extraction with direct logits on a small fixture before trusting confidence thresholds.
+5. **Latency:** the Windows default is four slots with continuous batching. Slots permit concurrent questions; they do not promise linear speedup or automatic state reuse. Measure prompt cache behavior for this Qwen hybrid architecture and inspect actual prompt-evaluation timings.
+
+## Benchmark gate
+
+Use the same Chinese fixture and prompt scheme for both Qwen sizes. Include incomplete speech, negation, colloquial age expressions, eGFR boundary wording, correct exclusion statements, partially answered concerns, claims not present in the fictional pack, prompt injection, unrelated efficacy/safety claims, and true topic changes. A response about the overall endpoint alone must not resolve the age or renal concern.
+
+Record per-kind accuracy, per-point precision/recall, false interruption rate, false concern-resolution rate, score MAE, Brier/ECE, invalid or missing probabilities, cancellation behavior, and cold/warm p50/p95 end-to-end latency at 1 and 8 concurrent questions. Shuffle option order. Separate Chinese-only and mixed-language results. Fit thresholds on a training split, then report a held-out split. Save the GGUF revision/hash, runtime version, device, context, flags and prompt revision with every run.
+
+## Source register
+
+All links below were read as public metadata/cards, not downloaded model weights. Pinned revisions preserve this report's snapshot.
+
+- **[A] Autotrust 9B:** [card](https://huggingface.co/autotrust/JEV-9B/blob/7ac669b8fb476ba926491e3d1c39f9330d68dbed/README.md), [API/files](https://huggingface.co/api/models/autotrust/JEV-9B?blobs=true), [judge config](https://huggingface.co/autotrust/JEV-9B/blob/7ac669b8fb476ba926491e3d1c39f9330d68dbed/judge_config.json), [head specification](https://huggingface.co/autotrust/JEV-9B/blob/7ac669b8fb476ba926491e3d1c39f9330d68dbed/adapter_vllm/decision_head.json), [community GGUF card](https://huggingface.co/mradermacher/JEV-9B-GGUF/blob/194088f98678b5abbd82768952ba62f97c39a3ad/README.md).
+- **[B] Autotrust 27B:** [card](https://huggingface.co/autotrust/JEV-27B/blob/14b425269ed24452e0a5ad5a8f3e51d139647a88/README.md), [API/files](https://huggingface.co/api/models/autotrust/JEV-27B?blobs=true), [real upstream Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B), [GGUF-name search](https://huggingface.co/api/models?search=JEV-27B-GGUF&limit=20).
+- **[C] JevStyle v1:** [card](https://huggingface.co/chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF/blob/5b695182b78c970e1a5d679b495f890ec8b230dc/README.md), [API/files and LFS hashes](https://huggingface.co/api/models/chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF?blobs=true).
+- **[D] JevStyle v4:** [GGUF card](https://huggingface.co/chaoliangUNSW/Jev-Style-2B-Decision-v4-GGUF/blob/d1b3dfd6f47e8e0b4b366c401e2309043fb6510c/README.md), [base/model training card](https://huggingface.co/chaoliangUNSW/Jev-Style-2B-Decision-v4/blob/61e43347cd7b5342e1b86d85787e9c71112166e0/README.md).
+- **[E] SevClassifier:** [card](https://huggingface.co/JackKozmo29/sevclassifier-jev-style-1.5b/blob/9bc3b3f266e277998413f6a33940ce13d5be4f65/README.md), [API/files](https://huggingface.co/api/models/JackKozmo29/sevclassifier-jev-style-1.5b?blobs=true), [exact-name search](https://huggingface.co/api/models?search=sevclassifier-jev-style&limit=100), [upstream licence](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct/blob/main/LICENSE).
+- **[F] Qwen 4B:** [official card](https://huggingface.co/Qwen/Qwen3.5-4B/blob/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a/README.md), [licence](https://huggingface.co/Qwen/Qwen3.5-4B/blob/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a/LICENSE), [GGUF metadata](https://huggingface.co/api/models/unsloth/Qwen3.5-4B-GGUF?blobs=true).
+- **[G] Qwen 9B:** [official card](https://huggingface.co/Qwen/Qwen3.5-9B/blob/c202236235762e1c871ad0ccb60c8ee5ba337b9a/README.md), [licence](https://huggingface.co/Qwen/Qwen3.5-9B/blob/c202236235762e1c871ad0ccb60c8ee5ba337b9a/LICENSE), [GGUF metadata](https://huggingface.co/api/models/unsloth/Qwen3.5-9B-GGUF?blobs=true).
+- **Runtime:** [official llama.cpp server flags and probability API](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md), [Windows Vulkan releases](https://github.com/ggml-org/llama.cpp/releases).
+
+Pinned download URLs and SHA256 values for the three stock-server candidates are in [`infra/windows/models.json`](../../../../infra/windows/models.json). Safe discovery/download/start steps are in [`infra/windows/README.md`](../../../../infra/windows/README.md).

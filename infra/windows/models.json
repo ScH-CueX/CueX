@@ -1,0 +1,72 @@
+{
+  "checkedAt": "2026-10-31",
+  "defaultModel": "qwen35-9b-q8",
+  "models": {
+    "qwen35-4b-q4": {
+      "repo": "unsloth/Qwen3.5-4B-GGUF",
+      "revision": "e87f176479d0855a907a41277aca2f8ee7a09523",
+      "file": "Qwen3.5-4B-Q4_K_M.gguf",
+      "bytes": 2740937888,
+      "sha256": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+      "promptFormat": "qwen35",
+      "license": "Apache-2.0",
+      "cardUrl": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/blob/e87f176479d0855a907a41277aca2f8ee7a09523/README.md",
+      "url": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/Qwen3.5-4B-Q4_K_M.gguf"
+    },
+    "qwen35-9b-q4": {
+      "repo": "unsloth/Qwen3.5-9B-GGUF",
+      "revision": "3885219b6810b007914f3a7950a8d1b469d598a5",
+      "file": "Qwen3.5-9B-Q4_K_M.gguf",
+      "bytes": 5680522464,
+      "sha256": "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8",
+      "promptFormat": "qwen35",
+      "license": "Apache-2.0",
+      "cardUrl": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/blob/3885219b6810b007914f3a7950a8d1b469d598a5/README.md",
+      "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q4_K_M.gguf"
+    },
+    "jevstyle-v1-2b-q8": {
+      "repo": "chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF",
+      "revision": "5b695182b78c970e1a5d679b495f890ec8b230dc",
+      "file": "Jev-Style-Qwen3.5-2B-Decision-Q8_0.gguf",
+      "bytes": 2076666976,
+      "sha256": "470aa63b87fedf852e292580424fc4511778dffdbd459858f68abf4892dba040",
+      "promptFormat": "jevstyle-v1",
+      "license": "Apache-2.0",
+      "cardUrl": "https://huggingface.co/chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF/blob/5b695182b78c970e1a5d679b495f890ec8b230dc/README.md",
+      "url": "https://huggingface.co/chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF/resolve/5b695182b78c970e1a5d679b495f890ec8b230dc/Jev-Style-Qwen3.5-2B-Decision-Q8_0.gguf"
+    },
+    "qwen35-9b-q8": {
+      "repo": "unsloth/Qwen3.5-9B-GGUF",
+      "revision": "3885219b6810b007914f3a7950a8d1b469d598a5",
+      "file": "Qwen3.5-9B-Q8_0.gguf",
+      "bytes": 9527502048,
+      "sha256": "809626574d0cb43d4becfa56169980da2bb448f2299270f7be443cb89d0a6ae4",
+      "promptFormat": "qwen35",
+      "license": "Apache-2.0",
+      "cardUrl": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/blob/3885219b6810b007914f3a7950a8d1b469d598a5/README.md",
+      "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q8_0.gguf"
+    }
+  },
+  "defaultDeployment": "autotrust-jev-9b-q8",
+  "adapters": {
+    "autotrust-jev-9b": {
+      "repo": "autotrust/JEV-9B",
+      "revision": "7ac669b8fb476ba926491e3d1c39f9330d68dbed",
+      "file": "adapter_vllm/adapter_model.safetensors",
+      "bytes": 176641800,
+      "sha256": "a26723d3a1c6b0b59ca5e1bdd4cafaf955531a3f7f7d378390a9e49f0cc476a7",
+      "ggufFile": "JEV-9B-lora-f16.gguf",
+      "ggufSha256": "c36b94a24e7a74199828cfcb50e1f683a4773a10c552bc83d93299255f2e95ca",
+      "tensorCount": 402,
+      "outputTensors": [
+        "output.weight.lora_a",
+        "output.weight.lora_b"
+      ],
+      "decisionHead": "adapter_vllm/decision_head.json",
+      "calibration": "calibration.json",
+      "promptFormat": "bare-v1",
+      "documentation": "JEV.md",
+      "downloadManifest": "jev-downloads.json"
+    }
+  }
+}
