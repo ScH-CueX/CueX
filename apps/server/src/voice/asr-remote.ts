@@ -78,6 +78,7 @@ class RemoteStream implements AsrStream {
     let message: ServerResult;
     try { message = JSON.parse(raw) as ServerResult; } catch { return; } // "Done!" and other plain text
     if (typeof message.text !== 'string') return;
+    this.retries = 0; // the connection works, so a later drop gets fresh retries
     const text = message.text.trim();
     const segment = typeof message.segment === 'number' ? message.segment : this.segment;
     if (this.segment >= 0 && segment > this.segment) this.finish(); // the previous sentence ended

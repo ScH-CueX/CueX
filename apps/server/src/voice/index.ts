@@ -47,6 +47,10 @@ class FallbackTts implements TtsEngine {
   constructor(private readonly engines: TtsEngine[]) {}
   get backend(): string { return this.engines.map(e => e.backend).join('>'); }
 
+  close(): void {
+    for (const engine of this.engines) (engine as { close?: () => void }).close?.();
+  }
+
   async *synthesize(text: string, signal: AbortSignal): AsyncIterable<TtsChunk> {
     let lastError: unknown;
     for (const engine of this.engines) {
@@ -104,7 +108,7 @@ export function createTtsEngine(source: Source = process.env): TtsEngine {
     edge: () => {
       const engine = new EdgeTts({
         voice: env('CUEX_EDGE_VOICE') ?? DEFAULT_EDGE_VOICE,
-        rate: env('CUEX_EDGE_RATE') ?? '+0%',
+        rate: env('CUEX_EDGE_RATE') ?? '+8%', // Yunyang at +8% is about 4.2 to 4.7 chars/s: calm and slightly brisk
         pitch: env('CUEX_EDGE_PITCH') ?? '+0Hz',
         timeoutMs: num('CUEX_TTS_TIMEOUT_MS', 8000),
       });

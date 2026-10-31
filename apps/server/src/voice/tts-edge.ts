@@ -16,6 +16,8 @@ export interface EdgeTtsOptions {
 }
 
 const FORMAT = 'audio-24khz-48kbitrate-mono-mp3';
+const REFRESH_AFTER_MS = 18_000; // swap the socket after this much idle time
+const STALE_AFTER_MS = 30_000; // never trust a socket that has been idle this long
 const escapeXml = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /**
@@ -27,7 +29,9 @@ export class EdgeTts implements TtsEngine {
   readonly backend = 'edge-tts';
   private client?: EdgeClient;
   private ready?: Promise<EdgeClient>;
-  private lastUsed = 0;
+  private lastActivity = 0;
+  private busy = 0;
+  private keepAlive?: NodeJS.Timeout;
 
   constructor(private readonly opts: EdgeTtsOptions) {}
 
@@ -39,12 +43,27 @@ export class EdgeTts implements TtsEngine {
     return client.setMetadata(this.opts.voice, FORMAT).then(() => client);
   }
 
+  /**
+   * The service drops an idle socket after roughly 30 s, and the first sentence after that pays 1.3 to 1.6 s for the silent reconnect.
+   * A follow-up usually comes after the rep has talked for a while, so swap in a fresh socket in the background while nobody is speaking.
+   */
+  private startKeepAlive(): void {
+    if (this.keepAlive) return;
+    this.keepAlive = setInterval(() => {
+      if (this.busy === 0 && this.client && Date.now() - this.lastActivity > REFRESH_AFTER_MS) {
+        this.reset();
+        this.acquire().catch(() => { /* the next synthesize() reports the failure */ });
+      }
+    }, 4000);
+    this.keepAlive.unref();
+  }
+
   private async acquire(): Promise<EdgeClient> {
-    // The service drops idle sockets after roughly half a minute, and a silent reconnect costs over a second. Reconnect early.
-    if (this.client && Date.now() - this.lastUsed > 25_000) this.reset();
+    this.startKeepAlive();
+    if (this.client && Date.now() - this.lastActivity > STALE_AFTER_MS) this.reset();
     if (!this.ready) {
       this.ready = this.connect().then(
-        client => { this.client = client; return client; },
+        client => { this.client = client; this.lastActivity = Date.now(); return client; },
         error => { this.ready = undefined; throw error; },
       );
     }
@@ -58,40 +77,51 @@ export class EdgeTts implements TtsEngine {
     try { old?.close(); } catch { /* already closed */ }
   }
 
+  /** Close the connection. A later synthesize() reconnects. */
+  close(): void {
+    if (this.keepAlive) clearInterval(this.keepAlive);
+    this.keepAlive = undefined;
+    this.reset();
+  }
+
   /** Open the connection ahead of the first sentence. */
   async warmup(): Promise<void> {
     await this.acquire();
-    this.lastUsed = Date.now();
   }
 
   async *synthesize(text: string, signal: AbortSignal): AsyncIterable<TtsChunk> {
     signal.throwIfAborted();
-    const client = await this.acquire();
-    if (signal.aborted) return;
-    const { audioStream } = client.toStream(escapeXml(text), { rate: this.opts.rate, pitch: this.opts.pitch });
-    const parts: Buffer[] = [];
-    let failure: Error | undefined;
-    const done = new Promise<void>(resolve => {
-      audioStream.on('data', (part: Buffer) => parts.push(part));
-      audioStream.on('error', (error: Error) => { failure = error; resolve(); });
-      audioStream.on('close', () => resolve());
-      audioStream.on('end', () => resolve());
-    });
-    const onAbort = () => audioStream.destroy();
-    signal.addEventListener('abort', onAbort, { once: true });
+    this.busy++;
     try {
-      await done;
+      const client = await this.acquire();
+      if (signal.aborted) return;
+      const { audioStream } = client.toStream(escapeXml(text), { rate: this.opts.rate, pitch: this.opts.pitch });
+      const parts: Buffer[] = [];
+      let failure: Error | undefined;
+      const done = new Promise<void>(resolve => {
+        audioStream.on('data', (part: Buffer) => parts.push(part));
+        audioStream.on('error', (error: Error) => { failure = error; resolve(); });
+        audioStream.on('close', () => resolve());
+        audioStream.on('end', () => resolve());
+      });
+      const onAbort = () => audioStream.destroy();
+      signal.addEventListener('abort', onAbort, { once: true });
+      try {
+        await done;
+      } finally {
+        signal.removeEventListener('abort', onAbort);
+      }
+      if (signal.aborted) return;
+      this.lastActivity = Date.now();
+      if (failure) { this.reset(); throw failure; }
+      const audio = Buffer.concat(parts);
+      if (sniffAudio(audio) !== 'audio/mpeg') {
+        this.reset();
+        throw new Error(`Edge TTS returned ${audio.length} bytes that are not MP3 audio`);
+      }
+      yield { audio, mimeType: 'audio/mpeg' };
     } finally {
-      signal.removeEventListener('abort', onAbort);
+      this.busy--;
     }
-    if (signal.aborted) return;
-    this.lastUsed = Date.now();
-    if (failure) { this.reset(); throw failure; }
-    const audio = Buffer.concat(parts);
-    if (sniffAudio(audio) !== 'audio/mpeg') {
-      this.reset();
-      throw new Error(`Edge TTS returned ${audio.length} bytes that are not MP3 audio`);
-    }
-    yield { audio, mimeType: 'audio/mpeg' };
   }
 }
