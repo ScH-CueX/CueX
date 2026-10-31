@@ -1,15 +1,25 @@
 # CueX 运行与演示说明
 
+## 在线体验与源码
+
+- 项目地址：[cuex.kanglives.top](https://cuex.kanglives.top/)
+- 代码仓库：[ScH-CueX/CueX](https://github.com/ScH-CueX/CueX)
+- [GitHub README](https://github.com/ScH-CueX/CueX/blob/main/README.md) · [GitHub 运行说明](https://github.com/ScH-CueX/CueX/blob/main/docs/RUNNING.md) · [通用部署指南](https://github.com/ScH-CueX/CueX/blob/main/docs/DEPLOYMENT.md)
+
+通过浏览器访问项目地址，进入演练并在结束后查看复盘。语音交互需要允许浏览器使用麦克风。交付包内的 PDF 与 MP4 可直接离线打开；下方命令供从源码运行时使用。
+
 ## 当前交付范围
 
-Web 首页、68 秒演示回放和复盘页面可本地运行。回放使用虚构的 ANSHU-3 资料。main 已整合前后端、Windows Ming 语音与媒体工程，包括语音输入、会话结束记录、单项重练与医生台词预取。日常开发仍在功能分支完成，验证后合入 main。本轮验证了离线引擎的前后端交互，不能把演示回放或离线测试当作真实模型性能基准。
+Web 首页、68 秒演示回放和复盘页面可本地运行。回放使用虚构的 ANSHU-3 资料。main 已整合前后端、Windows Ming 语音与媒体工程，包括语音输入、会话结束记录、单项重练与医生台词预取。团队以 main 为共同开发基线，推送前先同步上游并解决冲突。本轮验证了离线引擎的前后端交互，不能把演示回放或离线测试当作真实模型性能基准。
 
 ## Web
 
 环境：Node.js 22.19 或更高；pnpm 9.15.9（packageManager 已固定）。
 
 ```sh
-pnpm install
+git clone https://github.com/ScH-CueX/CueX.git
+cd CueX
+pnpm install --frozen-lockfile
 pnpm dev:web
 ```
 

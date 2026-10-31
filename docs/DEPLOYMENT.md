@@ -277,7 +277,7 @@ pnpm --filter @cuex/web preview --host 127.0.0.1 --port 5174 --strictPort
 
 正式静态托管可使用同样的 `apps/web/dist`。当前前端按域名根路径部署；如需子路径，需要同时修改 Vite base、静态资源绝对路径和服务入口，不能只改目录名。
 
-比赛交付包的 `web-offline` 可用 HTTP 静态服务打开。完整实时训练需要模型与后端，离线回放不声称替代它。预渲染视频和 PDF 可直接播放或打开。
+比赛交付包提供在线体验与 GitHub 链接，以及可离线阅读的 README、运行说明、PDF 和 MP4。本地备用运行时，先从仓库构建上述静态产物。完整实时训练需要模型与后端。
 
 <a id="operations"></a>
 ## 5. 维护、升级与排障

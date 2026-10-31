@@ -258,6 +258,8 @@ node scripts/build-roadshow.mjs
 
 运行命令使用已安装的 pnpm 9.15.9；也可把 `pnpm` 换成 `npx --yes pnpm@9.15.9`。字幕源与 SRT 在 [assets/captions](assets/captions/)，语音部署与重建见 [Windows TTS 说明](infra/windows/tts/README.md)。
 
+比赛材料用 `node scripts/package-delivery.mjs main` 打包。ZIP 内只保留 PDF、MP4、离线文本版 README 与运行说明；文档附 [项目地址](https://cuex.kanglives.top/)、[GitHub 仓库](https://github.com/ScH-CueX/CueX)和对应的 GitHub 文件链接。
+
 <!-- ROADMAP -->
 <a id="roadmap"></a>
 ## 未来规划
