@@ -1,0 +1,99 @@
+/* Visit screen. Laid out in px for the stage's fixed 1920x1080 canvas. The page background belongs to the stage.
+   Amber = System 1 and follow-ups, violet = System 2, mint = answered or withdrawn. Colors follow video/src/theme.ts. */
+.visit {
+  --paper: #ECE8DF; --soft: #B9B5AC; --dim: #7E828C;
+  --line: rgba(236, 232, 223, 0.10);
+  --cue: #FF7A2F; --deep: #8E8CFF; --ok: #7FE3C3;
+  --serif: "Noto Serif SC", "Songti SC", serif;
+  --sans: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
+  position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden;
+  background: transparent; color: var(--paper); font-family: var(--sans); line-height: 1.5; -webkit-font-smoothing: antialiased;
+}
+.visit *, .visit *::before, .visit *::after { box-sizing: border-box; }
+.visit :focus-visible { outline: 2px solid var(--paper); outline-offset: 4px; border-radius: 8px; }
+.visit-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+.visit-tone-cue { --c: var(--cue); --cr: 255, 122, 47; }
+.visit-tone-deep { --c: var(--deep); --cr: 142, 140, 255; }
+.visit-tone-ok { --c: var(--ok); --cr: 127, 227, 195; }
+
+@keyframes visit-fade { from { opacity: 0; } to { opacity: 1; } }
+.visit-fade { animation: visit-fade 0.22s ease-out both; }
+
+/* Top bar: 120 px tall. The stage's fullscreen button owns the top-right 120 x 120 px, so the toggle stops short of it. */
+.visit-top { flex: none; height: 120px; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 144px 0 96px; }
+.visit-doctor { margin: 0; font-size: 24px; letter-spacing: 0.02em; color: var(--soft); }
+.visit-doctor b { font-weight: 500; color: var(--paper); }
+.visit-toggle {
+  display: inline-flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 20px;
+  font: 500 22px/1 var(--sans); letter-spacing: 0.02em; color: var(--dim); background: transparent;
+  border: 1px solid var(--line); border-radius: 999px; cursor: pointer; transition: color 0.2s ease, border-color 0.2s ease;
+}
+.visit-toggle:hover { color: var(--paper); border-color: rgba(236, 232, 223, 0.28); }
+.visit-toggle[aria-pressed="true"] { color: var(--paper); border-color: rgba(142, 140, 255, 0.55); }
+.visit-toggle kbd { font: 500 17px/1 var(--sans); padding: 5px 9px; color: var(--dim); border: 1px solid var(--line); border-radius: 6px; }
+
+/* Body: the stage on the left, the underlying panel (30%) on the right */
+.visit-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
+.visit-body[data-underlying="true"] { grid-template-columns: minmax(0, 1fr) 576px; }
+.visit-main { min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 0 96px 48px; }
+.visit-body[data-underlying="true"] .visit-main { padding: 0 64px 48px; }
+/* One reading column, the same width with the panel on or off, centered in the room it has. */
+.visit-col { width: 100%; max-width: 1152px; margin: 0 auto; }
+.visit-center { flex: 1; min-height: 0; padding-top: 56px; }
+
+/* The doctor's line */
+.visit-doctor-block { min-height: 252px; }
+.visit-line {
+  position: relative; margin: 0; font-family: var(--serif); font-weight: 500; font-size: 56px; line-height: 1.5;
+  letter-spacing: 0.01em; color: var(--paper); text-wrap: pretty; overflow-wrap: anywhere; transition: color 1.4s ease, text-shadow 1.4s ease;
+}
+.visit-line[data-size="m"] { font-size: 50px; }
+.visit-line[data-size="s"] { font-size: 44px; }
+.visit-line::before {
+  content: ""; position: absolute; left: -32px; top: 14px; bottom: 14px; width: 4px; border-radius: 2px;
+  background: var(--cue); opacity: 0; transition: opacity 1.4s ease;
+}
+/* The interruption: amber for a few seconds, then the line settles. */
+.visit-line[data-flash="true"] { color: var(--cue); text-shadow: 0 0 56px rgba(255, 122, 47, 0.30); transition: none; }
+.visit-line[data-flash="true"]::before { opacity: 1; transition: none; }
+
+/* The rep's words */
+.visit-rep { margin-top: 40px; font-size: 28px; line-height: 1.7; overflow-wrap: anywhere; }
+.visit-rep p { margin: 0 0 8px; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+.visit-rep-final { font-size: 26px; color: var(--dim); -webkit-line-clamp: 1; }
+.visit-rep-partial { color: var(--soft); -webkit-line-clamp: 3; }
+
+/* Bottom: the concern's points, then the input row */
+.visit-bottom { flex: none; }
+.visit-bottom .visit-col { display: flex; flex-direction: column; gap: 28px; }
+.visit-points { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 36px; margin: 0; padding: 22px 0 0; list-style: none; border-top: 1px solid var(--line); font-size: 26px; }
+.visit-point { display: inline-flex; align-items: center; gap: 12px; color: var(--dim); transition: color 0.3s ease; }
+.visit-point::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid currentColor; transition: background-color 0.3s ease; }
+.visit-point[data-resolved="true"] { color: var(--ok); }
+.visit-point[data-resolved="true"]::before { background: currentColor; }
+.visit-controls { min-width: 0; }
+
+/* Underlying panel */
+.visit-under {
+  min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 40px; padding: 8px 36px 48px 44px;
+  border-left: 1px solid var(--line); animation: visit-fade 0.2s ease-out both;
+}
+.visit-sys-title { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; font-size: 22px; font-weight: 500; letter-spacing: 0.06em; color: var(--c); }
+.visit-sys-title::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+.visit-trail { margin: 0 0 4px; min-height: 33px; font-size: 22px; color: var(--dim); }
+.visit-verdict { margin: 0; font-size: 42px; font-weight: 500; line-height: 1.3; color: var(--cue); }
+.visit-linejob { display: flex; align-items: center; gap: 12px; margin: 0 0 20px; font-size: 24px; color: var(--deep); }
+.visit-linejob::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--deep); }
+.visit-cands { display: flex; flex-direction: column; gap: 26px; margin: 0; padding: 0; list-style: none; }
+.visit-cand { padding-left: 20px; border-left: 2px solid rgba(var(--cr), 0.55); }
+.visit-phase { margin: 0 0 6px; font-size: 22px; font-weight: 500; letter-spacing: 0.04em; color: var(--c); }
+.visit-draft { margin: 0; font-family: var(--serif); font-size: 26px; line-height: 1.5; color: var(--paper); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.visit-draft del { color: var(--ok); text-decoration: line-through; text-decoration-thickness: 1.5px; text-decoration-color: rgba(127, 227, 195, 0.7); }
+.visit-basis, .visit-source { margin: 8px 0 0; font-size: 21px; line-height: 1.5; color: var(--dim); }
+.visit-basis { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.visit-source { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+@media (prefers-reduced-motion: reduce) {
+  .visit *, .visit *::before, .visit *::after { animation: none !important; transition: none !important; }
+}

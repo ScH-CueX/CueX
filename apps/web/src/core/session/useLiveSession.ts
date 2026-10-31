@@ -3,6 +3,8 @@ import { AudioCapture } from '../audio/AudioCapture';
 import { LiveWSDriver } from '../driver/LiveWSDriver';
 import { emptySession, liveSessionReducer } from './liveSession';
 
+export type RetryRequest = { concernId: string };
+
 export function useLiveSession(enabled: boolean) {
   const [session, dispatch] = useReducer(liveSessionReducer, emptySession);
   const [mic, setMic] = useState<'off' | 'starting' | 'on'>('off');
@@ -30,12 +32,12 @@ export function useLiveSession(enabled: boolean) {
     void driver.current?.stop();
   }, [cancelText, stopMic]);
 
-  const connect = useCallback(() => {
+  const startVisit = useCallback((retry?: RetryRequest, idle = false) => {
     cancelText();
     stopMic();
     driver.current?.destroy();
     dispatch({ type: 'reset' });
-    const live = new LiveWSDriver();
+    const live = new LiveWSDriver({ retry, idle });
     driver.current = live;
     void live.init({
       onServerEvent: event => {
@@ -53,9 +55,32 @@ export function useLiveSession(enabled: boolean) {
       },
     });
     // connect() is called by a user gesture. Resume before the server's first audio.
-    void live.unlockAudio().catch(() => dispatch({ type: 'error', message: '请允许浏览器播放音频，再重新连接。' }));
+    if (!idle) void live.unlockAudio().catch(() => dispatch({ type: 'error', message: '请允许浏览器播放音频，再重新连接。' }));
     void live.start();
   }, [cancelText, stopMic]);
+  const connect = useCallback(() => startVisit(), [startVisit]);
+  /** Connects without starting a visit. The stage page calls this on load. */
+  const open = useCallback(() => startVisit(undefined, true), [startVisit]);
+
+  /** Review ends the visit but keeps the socket, so the server can write the retry line meanwhile. */
+  const endVisit = useCallback(() => {
+    cancelText();
+    stopMic();
+    driver.current?.endVisit();
+  }, [cancelText, stopMic]);
+
+  /** Next visit on the same socket. A dead socket falls back to a fresh connection. */
+  const restartVisit = useCallback((retry?: RetryRequest) => {
+    cancelText();
+    stopMic();
+    dispatch({ type: 'visit' });
+    const live = driver.current;
+    if (live && live.restart(retry)) {
+      void live.unlockAudio().catch(() => dispatch({ type: 'error', message: '请允许浏览器播放音频，再重新连接。' }));
+      return;
+    }
+    startVisit(retry);
+  }, [cancelText, stopMic, startVisit]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -68,8 +93,8 @@ export function useLiveSession(enabled: boolean) {
     };
   }, [enabled, connect, cancelText, stopMic]);
 
-  const toggleMic = useCallback(async () => {
-    if (mic !== 'off') { stopMic(); return; }
+  /** Always (re)starts capture. Call it from a click so the browser can ask for permission. */
+  const startMic = useCallback(async (): Promise<boolean> => {
     cancelText();
     dispatch({ type: 'error', message: undefined });
     setMic('starting');
@@ -88,7 +113,29 @@ export function useLiveSession(enabled: boolean) {
       onError: error => dispatch({ type: 'error', message: error.name === 'NotAllowedError' ? '麦克风权限已关闭。请允许访问，或用文字回应。' : error.message }),
     });
     setMic(started ? 'on' : 'off');
-  }, [mic, cancelText, stopMic]);
+    return started;
+  }, [cancelText]);
+  const toggleMic = useCallback(async () => {
+    if (mic !== 'off') { stopMic(); return; }
+    await startMic();
+  }, [mic, stopMic, startMic]);
+
+  /** Clears the visit for the next audience member and keeps the socket for the server's prepared opening. */
+  const clear = useCallback(() => {
+    cancelText();
+    stopMic();
+    driver.current?.endVisit();
+    dispatch({ type: 'visit' });
+    // The socket stays open for the next audience member. Reset must not read as a closed connection.
+    if (driver.current) dispatch({ type: 'status', status: driver.current.status });
+  }, [cancelText, stopMic]);
+
+  useEffect(() => () => {
+    window.clearInterval(textTimer.current);
+    capture.current.stop();
+    driver.current?.destroy();
+    driver.current = undefined;
+  }, []);
 
   const sendText = useCallback((text: string) => {
     const speech = text.trim();
@@ -117,5 +164,5 @@ export function useLiveSession(enabled: boolean) {
     cancelText();
   }, [sending, cancelText]);
 
-  return { session, connect, stop, mic, volume, toggleMic, sending, sendText, finishText };
+  return { session, connect, open, startVisit, restartVisit, endVisit, clear, stop, stopMic, startMic, mic, volume, toggleMic, sending, sendText, finishText };
 }

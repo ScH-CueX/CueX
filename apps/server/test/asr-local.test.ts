@@ -8,6 +8,7 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { existsSync } from 'node:fs';
+import { loadavg } from 'node:os';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -36,6 +37,24 @@ test('mic audio is recognized by the local model with the default settings, corr
   asr.warmup(); // the server does this at startup, so the first visitor does not pay for it
   const loadMs = Math.round(performance.now() - loadStarted);
 
+  // Time every synchronous decode call the gateway makes, in wall time and in CPU time. CPU time does not grow when the machine is busy.
+  const decodeWallMs: number[] = [];
+  const decodeCpuMs: number[] = [];
+  const openStream = asr.open.bind(asr);
+  asr.open = async (opts, callbacks) => {
+    const stream = await openStream(opts, callbacks);
+    const write = stream.write.bind(stream);
+    stream.write = pcm => {
+      const cpuBefore = process.cpuUsage();
+      const started = performance.now();
+      write(pcm);
+      decodeWallMs.push(performance.now() - started);
+      const cpu = process.cpuUsage(cpuBefore);
+      decodeCpuMs.push((cpu.user + cpu.system) / 1000);
+    };
+    return stream;
+  };
+
   const gateway = new WebSocketGateway({
     port: 0, host: '127.0.0.1', pack: ANSHU_PACK,
     createEngines: () => ({ asr, system1: new FakeSystemOne(), system2: new FakeSystemTwo(35), tts: new SilentTts() }),
@@ -52,23 +71,31 @@ test('mic audio is recognized by the local model with the default settings, corr
     }
   };
 
-  const healthMs: number[] = [];
+  // One GET /health, timed. The first fetch in a process loads undici and opens the connection, so it is warmed up before the audio starts.
+  const probe = async () => {
+    const started = performance.now();
+    const response = await fetch(`http://127.0.0.1:${gateway.port}/health`);
+    await response.arrayBuffer();
+    return { at: started, ms: performance.now() - started };
+  };
+  const probes: Array<{ at: number; ms: number }> = [];
   const loop = monitorEventLoopDelay({ resolution: 10 });
-  let probing = true;
-  const prober = (async () => {
-    while (probing) {
-      const started = performance.now();
-      const response = await fetch(`http://127.0.0.1:${gateway.port}/health`);
-      await response.arrayBuffer();
-      healthMs.push(performance.now() - started);
-      await delay(50);
-    }
-  })();
+  let probing = false;
+  let prober: Promise<void> = Promise.resolve();
 
   try {
     await once(ws, 'open');
     ws.send(JSON.stringify({ type: 'session.start', payload: { scenarioId: ANSHU_PACK.scenario.id, mode: 'performance' } }));
     await waitFor(() => events.some(e => e.event.type === 'session.ready'), 'session.ready');
+    const coldProbeMs = Math.round((await probe()).ms);
+    const windowStart = performance.now();
+    probing = true;
+    prober = (async () => {
+      while (probing) {
+        probes.push(await probe());
+        await delay(50);
+      }
+    })();
 
     const results: Array<{ line: string; heard: string; firstPartialMs: number; endpointDelayMs: number }> = [];
     loop.enable();
@@ -101,14 +128,21 @@ test('mic audio is recognized by the local model with the default settings, corr
 
     probing = false;
     await prober;
+    const healthMs = probes.map(p => p.ms);
+    const summary = (values: number[]) => ({ p50: Math.round(percentile(values, 0.5)), p95: Math.round(percentile(values, 0.95)), max: Math.round(Math.max(...values)) });
+    const decode = { calls: decodeWallMs.length, wallMs: summary(decodeWallMs), cpuMs: summary(decodeCpuMs) };
     assert(healthMs.length > 20, `the /health probe ran ${healthMs.length} times while audio was decoding`);
     const maxHealth = Math.round(Math.max(...healthMs));
-    assert(maxHealth < 400, `/health took ${maxHealth} ms while decoding`);
+    const slowest = [...probes].sort((a, b) => b.ms - a.ms).slice(0, 3).map(p => `${Math.round(p.ms)} ms at +${Math.round(p.at - windowStart)} ms`);
+    assert(maxHealth < 400, `/health took ${maxHealth} ms while decoding. Slowest probes: ${slowest.join('; ')}. Cold first probe: ${coldProbeMs} ms. Decode calls: ${JSON.stringify(decode)}. Load average: ${loadavg().map(v => v.toFixed(1)).join(' ')}`);
     console.log(JSON.stringify({
       flow: 'local-asr-gateway', backend: asr.backend, modelLoadMs: loadMs, chunkMs: 256,
       lines: results,
-      healthDuringDecode: { probes: healthMs.length, p50Ms: Math.round(percentile(healthMs, 0.5)), p95Ms: Math.round(percentile(healthMs, 0.95)), maxMs: maxHealth },
+      coldProbeMs,
+      healthDuringDecode: { probes: healthMs.length, p50Ms: summary(healthMs).p50, p95Ms: summary(healthMs).p95, maxMs: maxHealth, slowest },
+      decodeCalls: decode,
       eventLoopDelayMs: { p99: Math.round(loop.percentile(99) / 1e6), max: Math.round(loop.max / 1e6) },
+      loadAverage: loadavg().map(v => +v.toFixed(1)),
     }));
   } finally {
     probing = false;

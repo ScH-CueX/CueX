@@ -68,3 +68,21 @@ The applicability concern now asks JEV the focused positive question: “Is the 
 Final measured ordinary fixture: **197/200 correct (98.50%)**, decide p50/p95 **648.3 / 908.4 ms**; health RTT **63.7 / 390.5 ms**. Drift recall **100%** (6/6), precision **85.71%** (one false positive). Resolution precision remained 100% for c1/c2/c3; c2 recall was 90%. Raw evidence: `/tmp/cuex-s1-matrix/Q4_K_M-focused-drift-cue-ordinary120.json`.
 
 Three real-JEV gateway flows passed: listening/resolve-and-advance; continued partial pitch→prepare→interrupt; and prepared candidate→explicit answering promise→withdraw without speech. These runs used the controller's current in-tree any-target-resolved withdrawal patch. The 1460 ms timeout remains based on the earlier measured worst-case recheck, with the heuristic available on transport/timeout failures.
+
+## RTX 5080 replacement host and SSH exec relay
+
+The old Windows SSH route stopped accepting sessions. The replacement personal PC runs the same Q4 base and LoRA under `D:\cuex`, official b12023 CUDA 13.4 (`f3586e66b`), CUDA0 RTX 5080, driver 621.01. The detached server is PID 24308 with launcher 27288. Requested context 16384 is aligned by this build to effective 16896 (six slots of 2816). Desktop apps remain running; after checks GPU use was about 12,595 / 16,303 MiB.
+
+All 24 verbalizer IDs matched. LoRA scale 0→1 changed true/false log-odds by **3.49358369**. Conversion again produced 402 tensors including output LoRA, with the same expected GGUF hash. The server first answered locally, but native SSH `-L` channels were administratively prohibited. No SSH policy, firewall, frp or `G:\SSHAccess` changed.
+
+The authorized replacement is one persistent pinned SSH **exec** session. Mac `scripts/s1-relay.mjs` listens only on `127.0.0.1:18080`; remote `D:\cuex\relay\s1_relay.py` connects only to `127.0.0.1:18080`. Both use standard libraries and base64 line frames for multiplexed TCP. `scripts/s1-tunnel.sh` starts the relay, preserving the demo launcher interface. SSH exit closes all open local streams and respawns after one second. Client timeouts still abort individual streams. An idle SSH-child restart passed, and `/health` returned HTTP 200 again afterward.
+
+Verification on the replacement host:
+
+- Three real JEV gateway flows and four natural-dose gateway variants passed: **7/7**. The dose variants each exercise canned JEV HTTP, heuristic, and the real CUDA JEV engine, including a promise-to-answer negative before the actual dose answer.
+- Short ordinary check: 12 states / 60 judgments, **58 correct (96.67%)**, decide p50/p95 **351.5 / 692.3 ms** through the relay. This short check is not the full 40-state comparison.
+- Remote direct localhost health: 20 requests, p50 **14.70 ms**. Mac relay health warm probe: 19 measured requests after one warm-up, p50 **69.48 ms** / p95 **454.46 ms**. The difference in p50 is **54.78 ms** for relay plus SSH/network, not relay CPU alone. During the short ordinary check the separate health p50/p95 was **55.1 / 129.8 ms**.
+- Remote relay: stdlib compile passed; three simultaneous health channels, keep-alive, clean close, EOF, invalid-frame rejection passed. Mac Node syntax, loopback bind, real HTTP, inference and idle SSH reconnect passed.
+- Natural d1 answers now include `75岁以上从2.5毫克开始`, `高龄要减半起始`, `起始剂量调低，两周后再按血压调`, and `高龄起始剂量需要按说明书调整，现有资料没有具体数据`. The shared narrow dose cue never resolves a mere promise. A result using it appends `+dose-cue` to the backend.
+
+The 1460 ms demo timeout remains unchanged. No model is downloaded to or executed on the Mac. Run evidence stays in `/tmp/cuex-s1-matrix/` and `D:\cuex\logs`; source setup instructions are in `infra/windows/PERSONAL-PC.md` and `S1-RELAY.md`.

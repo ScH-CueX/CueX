@@ -41,14 +41,15 @@ export const ANSHU_PACK: ScenarioPack = {
     ],
   },
   facts: [
-    { id: 'f-population', text: 'ANSHU-3 入组 18 到 80 岁的原发性高血压患者。', source: 'ANSHU-3 方案摘要' },
+    // In the rep's deck order: results first, as reps usually prepare them. The doctor decides in a different order.
     { id: 'f-endpoint', text: '主要终点是 12 周时的诊室收缩压，安舒平组比对照组多降 6.2 mmHg。', source: 'ANSHU-3 主要结果' },
     { id: 'f-safety', text: '不良反应发生率与安慰剂相当。', source: 'ANSHU-3 安全性分析' },
+    { id: 'f-rwe', text: '另有一项覆盖两万多名患者的真实世界研究。', source: '安舒平上市后研究摘要' },
+    { id: 'f-population', text: 'ANSHU-3 入组 18 到 80 岁的原发性高血压患者。', source: 'ANSHU-3 方案摘要' },
     { id: 'f-elderly', text: '75 岁以上患者约占 11%，降压幅度与总体一致。', source: 'ANSHU-3 亚组分析表，第 14 页' },
     { id: 'f-egfr-30-60', text: 'eGFR 30 到 60 的亚组有 412 人，降压幅度与总体一致。', source: 'ANSHU-3 亚组分析表，第 14 页' },
     { id: 'f-egfr-lt30', text: 'eGFR 低于 30 的患者被排除在研究之外，没有证据，说明书不建议使用。', source: '安舒平说明书，禁忌与慎用' },
     { id: 'f-dose-elderly', text: '常规起始剂量每日 5 mg；75 岁以上患者从每日 2.5 mg 起始，两周后按血压调整。', source: '安舒平说明书，用法用量' },
-    { id: 'f-rwe', text: '另有一项覆盖两万多名患者的真实世界研究。', source: '安舒平上市后研究摘要' },
   ],
   lineExamples: {
     opening: [

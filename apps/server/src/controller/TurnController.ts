@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { diffChars } from 'diff';
-import type { ConcernDef, ControllerDispatchEvent, DoctorPoseName, FollowupCandidate, JevDecisionResponse, ServerMessage, TtsPlaybackReport } from '@cuex/protocol';
+import { parseBuffer } from 'music-metadata';
+import type { ConcernDef, ControllerDispatchEvent, DoctorPoseName, FollowupCandidate, JevDecisionResponse, ServerMessage, TtsPlaybackReport, ReviewMoment } from '@cuex/protocol';
 import { encodeSystemOneState, S1_QUESTION_IDS } from '../contracts';
 import type { DoctorLines } from './DoctorLinePrefetch';
 import type { DialogueTurn, JevQuestion, ScenarioPack, SystemOneClient, SystemOneResult, SystemTwo, TtsEngine } from '../contracts';
@@ -16,7 +17,7 @@ export interface ControllerOptions {
   doctorLines: DoctorLines;
 }
 interface HeldCandidate { event: FollowupCandidate; targetPointIds: string[]; abort: AbortController }
-interface SpeechOutput { abort: AbortController; utteranceId: string; transcriptId: string; text: string; start: number; turn: DialogueTurn; chunks: string[]; reported: boolean }
+interface SpeechOutput { abort: AbortController; utteranceId: string; transcriptId: string; text: string; start: number; turn: DialogueTurn; chunks: string[]; reported: boolean; lineKind?: 'opening' | 'retry' | 'closing'; isOpening?: boolean; moment?: ReviewMoment; audioDurationMs: number; fallbackTimer?: ReturnType<typeof setTimeout> }
 
 /** Per-session state machine. Engines never own dialogue or candidate lifecycle. */
 export class TurnController {
@@ -24,6 +25,10 @@ export class TurnController {
   private readonly lines: DoctorLines;
   private readonly retryConcernId?: string;
   private completed = false;
+  private readonly startedAt = Date.now();
+  private ended = false;
+  private openingOutput?: SpeechOutput;
+  private readonly moments: ReviewMoment[] = [];
   private readonly history: DialogueTurn[] = [];
   private readonly candidates: FollowupCandidate[] = [];
   private readonly resolved = new Set<string>();
@@ -75,7 +80,7 @@ export class TurnController {
     const revision = this.revision;
     const line = await this.lines.take(kind, concernId, this.actualHistory());
     if (!this.stopped && revision === this.revision) {
-      await this.speak(line, 'speaking');
+      await this.speak(line, 'speaking', undefined, kind, !this.history.some(turn => turn.who === 'doctor'));
       if (kind === 'closing' && !this.stopped) this.prefetchNextVisit();
     }
   }
@@ -308,6 +313,7 @@ export class TurnController {
     if (this.speech && !this.speech.text) this.interruptDoctor('candidate_withdrawn');
     clearTimeout(this.candidateTimer);
     held.event.phase = 'withdrawn'; held.event.fate = 'withdrawn'; held.event.decidedAtMs = Date.now();
+    this.moments.push({ kind: 'withdrawn', concernId: held.event.targetConcernId, atMs: Date.now() - this.startedAt, repSaid: this.repSpeech.slice(-60), withdrawnText: held.event.draftText, basis: held.event.basis, sourceEvidence: held.event.sourceEvidence, openPointIds: [...this.unresolved] });
     this.emitCandidate(held.event);
     this.dispatch('withdrawing', { type: 'withdraw_question', candidateId: held.event.id }, 0, 0.08);
   }
@@ -342,11 +348,12 @@ export class TurnController {
   }
 
   /** Only successfully emitted audio segments enter doctor history. */
-  private async speak(text: string, pose: 'speaking' | 'asking', candidateId?: string): Promise<void> {
+  private async speak(text: string, pose: 'speaking' | 'asking', candidateId?: string, lineKind?: 'opening' | 'retry' | 'closing', isOpening = false): Promise<void> {
     this.interruptDoctor('turn_switched');
-    const speech: SpeechOutput = { abort: new AbortController(), utteranceId: randomUUID(), transcriptId: randomUUID(), text: '', start: Date.now(), turn: { who: 'doctor', text: '' }, chunks: [], reported: false };
+    const speech: SpeechOutput = { abort: new AbortController(), utteranceId: randomUUID(), transcriptId: randomUUID(), text: '', start: Date.now(), turn: { who: 'doctor', text: '' }, chunks: [], reported: false, lineKind, isOpening, audioDurationMs: 0 };
     this.speech = speech;
     this.outputs.set(speech.utteranceId, speech);
+    if (isOpening) this.openingOutput = speech;
     if (pose === 'asking') this.dispatch('holding', { type: 'idle', candidateId }, 0.95);
     else this.dispatch(pose, { type: 'idle', textToSpeak: text }, 0);
     let chunkIndex = 0;
@@ -364,6 +371,8 @@ export class TurnController {
             const held = this.held;
             this.held = undefined;
             held.event.phase = 'spoken'; held.event.fate = 'asked'; held.event.decidedAtMs = Date.now();
+            speech.moment = { kind: 'interrupted', concernId: held.event.targetConcernId, atMs: Date.now() - this.startedAt, repSaid: this.repSpeech.slice(-60), doctorSaid: '', basis: held.event.basis, sourceEvidence: held.event.sourceEvidence, openPointIds: [...this.unresolved] };
+            this.moments.push(speech.moment);
             this.emitCandidate(held.event);
             this.lastInterruptAt = Date.now();
             if (this.sentence) this.emit({ type: 'asr.transcript', payload: {
@@ -375,11 +384,19 @@ export class TurnController {
             this.provisionalResolved.clear();
             this.dispatch('asking', { type: 'interrupt_speak', textToSpeak: text, candidateId }, 1);
           }
+          if (lineKind === 'closing') {
+            try {
+              const metadata = await parseBuffer(chunk.audio, { mimeType: chunk.mimeType }, { duration: true, skipCovers: true });
+              speech.audioDurationMs += (metadata.format.duration ?? segment.length / 4) * 1000;
+            } catch { speech.audioDurationMs += segment.length / 4 * 1000; }
+            if (speech.abort.signal.aborted || this.stopped) return;
+          }
           speech.chunks.push(sent ? '' : segment);
           this.emit({ type: 'tts.stream_chunk', payload: { sessionId: this.sessionId, utteranceId: speech.utteranceId, chunkIndex: chunkIndex++, isLastChunk: false, audioBase64: chunk.audio.toString('base64') } });
           if (!sent) {
             sent = true; speech.text += segment;
             speech.turn.text = speech.text;
+            if (speech.moment) speech.moment.doctorSaid = speech.text;
             if (!this.history.includes(speech.turn)) this.history.push(speech.turn);
             this.doctorTranscript(speech, segment, false);
           }
@@ -388,6 +405,9 @@ export class TurnController {
       if (speech.abort.signal.aborted || this.stopped) return;
       this.emit({ type: 'tts.stream_chunk', payload: { sessionId: this.sessionId, utteranceId: speech.utteranceId, chunkIndex, isLastChunk: true, audioBase64: '' } });
       this.doctorTranscript(speech, '', true);
+      if (lineKind === 'closing') {
+        speech.fallbackTimer = setTimeout(() => this.endVisit(), Math.ceil(speech.audioDurationMs) + 1500);
+      }
     } catch (error) {
       if (!speech.abort.signal.aborted && !this.stopped) this.error('TTS_ERROR', '语音输出暂时不可用。');
     } finally {
@@ -419,15 +439,30 @@ export class TurnController {
     const speech = this.outputs.get(report.utteranceId);
     if (!speech || speech.reported) return;
     speech.reported = true;
+    clearTimeout(speech.fallbackTimer);
     if (report.status === 'stopped') {
       if (this.speech === speech) this.interruptDoctor();
       speech.text = speech.chunks.slice(0, report.completedChunks).join('');
       speech.turn.text = speech.text;
+      if (speech.moment) speech.moment.doctorSaid = speech.text;
       // Empty updates remove a stopped-before-start line from the frontend as well.
       if (speech.text) this.doctorTranscript(speech, '', true);
       else this.emit({ type: 'asr.transcript', payload: { sessionId: this.sessionId, transcriptId: speech.transcriptId, speaker: 'doctor', text: '', delta: '', isFinal: true, confidence: 1, timeRange: { startMs: speech.start, endMs: Date.now() } } });
     }
     this.outputs.delete(report.utteranceId);
+    if (speech.lineKind === 'closing' && !this.stopped) this.endVisit();
+  }
+
+  private endVisit(): void {
+    if (this.ended || this.stopped || !this.completed) return;
+    this.ended = true;
+    const suggested = this.moments.find(moment => moment.kind === 'interrupted') ?? this.moments.find(moment => moment.kind === 'withdrawn');
+    this.emit({ type: 'visit.ended', payload: {
+      sessionId: this.sessionId, durationMs: Date.now() - this.startedAt, retry: !!this.retryConcernId, doctorOpening: this.openingOutput?.turn.text ?? '',
+      concerns: this.pack.scenario.concerns.map(concern => ({ concernId: concern.id, title: concern.title, points: concern.points.map(point => ({ id: point.id, label: point.label, resolved: this.resolved.has(point.id) })) })),
+      moments: this.moments.map(moment => ({ ...moment, openPointIds: [...moment.openPointIds] })),
+      ...(suggested ? { suggestedRetryConcernId: suggested.concernId } : {}),
+    } });
   }
 
   private actualHistory(): DialogueTurn[] { return [...this.history.filter(t => t.text.trim()).map(t => ({ ...t })), ...(this.sentence.trim() ? [{ who: 'rep' as const, text: this.sentence }] : [])]; }
@@ -440,5 +475,6 @@ export class TurnController {
     this.stopped = true;
     clearTimeout(this.evaluationTimer); clearTimeout(this.candidateTimer);
     this.evaluationAbort?.abort(); this.held?.abort.abort(); this.held = undefined;
+    for (const output of this.outputs.values()) clearTimeout(output.fallbackTimer);
   }
 }

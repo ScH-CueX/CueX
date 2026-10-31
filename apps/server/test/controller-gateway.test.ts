@@ -471,3 +471,94 @@ test('natural elderly dose answer resolves d1 and the doctor closes the visit', 
     assert(!session.candidates.length);
   } finally { await h.close(); }
 });
+
+
+test('closing playback ends the visit once with heard interruption and withdrawal moments, then retry ends separately', async () => {
+  const h = await setup();
+  async function finishLastDoctor(from: number, status: 'finished' | 'stopped' = 'finished') {
+    const final = await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.isFinal, from);
+    assert(final.type === 'asr.transcript');
+    const chunks = h.events.slice(from).filter(e => e.type === 'tts.stream_chunk');
+    const audio = chunks.find(e => e.type === 'tts.stream_chunk' && e.payload.audioBase64);
+    assert(audio?.type === 'tts.stream_chunk');
+    await h.waitFor(e => e.type === 'tts.stream_chunk' && e.payload.utteranceId === audio.payload.utteranceId && e.payload.isLastChunk, from);
+    const sessionId = h.gateway.inspectSessions()[0].sessionId;
+    h.send('tts.playback', { sessionId, utteranceId: audio.payload.utteranceId, completedChunks: chunks.filter(e => e.type === 'tts.stream_chunk' && e.payload.audioBase64).length, playedMs: 10, status });
+    return { final, audio, sessionId };
+  }
+  try {
+    const opening = h.gateway.inspectSessions()[0].history[0].text;
+    await drift(h);
+    await h.waitFor(isPhase('spoken'));
+    await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.isFinal && e.payload.text !== opening);
+    await h.speech('75岁以上约占11%，降压幅度与总体一致。', true);
+    await h.speech('eGFR30到60亚组有412人，结果与总体一致。', true);
+    let from = h.events.length;
+    await h.speech('主要终点和上市后研究还有更多结果，', true);
+    await h.speech('不良反应与安慰剂相当，真实世界覆盖两万多人，华东地区的疗效结果也一样，', true);
+    await h.waitFor(isPhase('ready'), from);
+    await h.speech('我先回答您的人群问题，eGFR低于30这一点我先说明。', true);
+    await h.waitFor(isPhase('withdrawn'), from);
+    from = h.events.length;
+    await h.speech('eGFR低于30被排除，没有证据，说明书不建议使用。', true);
+    await finishLastDoctor(from);
+    const closeFrom = h.events.length;
+    await h.speech('高龄起始剂量需要调整，应核对说明书。', true);
+    const closing = await finishLastDoctor(closeFrom);
+    const ended = await h.waitFor(e => e.type === 'visit.ended', closeFrom);
+    assert(ended.type === 'visit.ended');
+    assert(ended.payload.durationMs > 0);
+    assert.equal(ended.payload.retry, false);
+    assert.equal(ended.payload.doctorOpening, opening);
+    assert(ended.payload.concerns.every(concern => concern.points.every(point => point.resolved)));
+    assert.deepEqual(ended.payload.moments.map(moment => moment.kind), ['interrupted', 'withdrawn']);
+    assert(ended.payload.moments[0].repSaid.includes('不良反应'));
+    assert(ended.payload.moments[0].doctorSaid?.length);
+    assert(ended.payload.moments[0].openPointIds.includes('c1'));
+    assert(ended.payload.moments[1].repSaid.includes('我先回答'));
+    assert(ended.payload.moments[1].withdrawnText?.length);
+    assert.deepEqual(ended.payload.moments[1].openPointIds, ['c3']);
+    assert.equal(ended.payload.suggestedRetryConcernId, 'concern-scope');
+    h.send('tts.playback', { sessionId: closing.sessionId, utteranceId: closing.audio.payload.utteranceId, completedChunks: 99, playedMs: 999, status: 'finished' });
+    from = h.events.length;
+    h.send('session.start', { scenarioId: ANSHU_PACK.scenario.id, mode: 'performance', retry: { concernId: 'concern-dose' } });
+    const retryOpening = await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.isFinal, from);
+    assert(retryOpening.type === 'asr.transcript');
+    const retryCloseFrom = h.events.length;
+    await h.speech('高龄起始剂量需要调整，应核对说明书。', true);
+    await finishLastDoctor(retryCloseFrom, 'stopped');
+    const retryEnded = await h.waitFor(e => e.type === 'visit.ended', retryCloseFrom);
+    assert(retryEnded.type === 'visit.ended');
+    assert.equal(retryEnded.payload.retry, true);
+    assert.equal(retryEnded.payload.doctorOpening, retryOpening.payload.text);
+    assert.equal(retryEnded.payload.moments.length, 0);
+    assert.equal(h.events.filter(e => e.type === 'visit.ended').length, 2);
+    // A third visit that stops before closing produces no summary.
+    const stopFrom = h.events.length;
+    h.send('session.start', { scenarioId: ANSHU_PACK.scenario.id, mode: 'performance' });
+    await h.waitFor(e => e.type === 'session.ready', stopFrom);
+    h.send('session.stop', { sessionId: 'current' });
+    h.send('speech.delta', { text: '这轮先停。', isFinal: true });
+    await h.waitFor(e => e.type === 'session.error' && e.payload.code === 'SESSION_NOT_STARTED', stopFrom);
+    assert.equal(h.events.filter(e => e.type === 'visit.ended').length, 2);
+  } finally { await h.close(); }
+});
+
+
+test('blocked audio device still reaches review after closing duration plus 1500 ms without a playback report', async () => {
+  const h = await setup({}, true, 'concern-dose');
+  try {
+    const from = h.events.length;
+    await h.speech('高龄起始剂量需要调整，应核对说明书。', true);
+    const closing = await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.isFinal, from);
+    const last = h.events.slice(from).find(e => e.type === 'tts.stream_chunk' && e.payload.isLastChunk);
+    assert(last?.type === 'tts.stream_chunk');
+    const sentAt = performance.now();
+    const ended = await h.waitFor(e => e.type === 'visit.ended', from, 2500);
+    assert(ended.type === 'visit.ended');
+    assert(performance.now() - sentAt >= 1400);
+    assert.equal(ended.payload.retry, true);
+    assert(closing.type === 'asr.transcript' && closing.payload.text.length > 0);
+    assert.equal(h.events.filter(e => e.type === 'visit.ended').length, 1);
+  } finally { await h.close(); }
+});

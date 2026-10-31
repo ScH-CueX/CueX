@@ -55,3 +55,9 @@ The reconnecting tunnel is `bash scripts/s1-tunnel.sh`. It owns only its SSH chi
 ## Explicit response cue
 
 For the ANSHU applicability concern, drift asks about overall endpoints/efficacy/safety versus age or renal subgroup details. Responding and drift use the latest speech segment. An explicit turn-back phrase (`我先回答`, `我直接回答`, or `不过我得先说明`) starts a new segment. The local response-cue guard keeps listening and invalidates a pending interruption, but never marks a clinical point answered. Such results name the backend with `+response-cue`; substantive answer probabilities still come from JEV.
+
+## Natural elderly-dose answer
+
+The demo's d1 point accepts a concrete elderly starting dose (`2.5 mg` / `2.5毫克`), a half-dose or lower-dose start, a dose-adjustment instruction, or an explicit lack of data. Promising to answer later does not resolve it. Both engines use the same narrow dose-answer cue after reading the actual rep speech. JEV results that use it append `+dose-cue`; this cue weight is a rule, not a calibrated JEV probability. The fact source remains the pack's `f-dose-elderly`.
+
+The demo transport now uses one persistent `ssh -F ~/.ssh/rtx-home/ssh-config -T rtx-home` exec session with strict host-key checking. `s1-relay.mjs` carries loopback TCP to port 18080; the host rejects native `-L` forwarding. ASR is local to the Mac and has no Windows tunnel forward.
