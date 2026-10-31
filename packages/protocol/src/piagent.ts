@@ -29,8 +29,13 @@ export interface FollowupCandidate {
   fate?: 'asked' | 'withdrawn';
 }
 
+/** What a System 2 job prepares: a follow-up, or one of the doctor lines written live. */
+export type System2Task = 'followup' | 'opening' | 'retry' | 'closing';
+
 export interface PiAgentCandidateUpdate {
   sessionId: string;
   candidate: FollowupCandidate;
+  /** Absent means 'followup'. Line jobs never become follow-up candidates in the UI. */
+  task?: System2Task;
   memoryUpdateDigest?: string;     // PiAgent 记忆更新摘要
 }

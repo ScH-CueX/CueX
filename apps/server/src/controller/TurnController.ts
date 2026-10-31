@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { diffChars } from 'diff';
 import type { ConcernDef, ControllerDispatchEvent, DoctorPoseName, FollowupCandidate, JevDecisionResponse, ServerMessage, TtsPlaybackReport } from '@cuex/protocol';
 import { encodeSystemOneState, S1_QUESTION_IDS } from '../contracts';
+import type { DoctorLines } from './DoctorLinePrefetch';
 import type { DialogueTurn, JevQuestion, ScenarioPack, SystemOneClient, SystemOneResult, SystemTwo, TtsEngine } from '../contracts';
 
 export interface ControllerEngines { system1: SystemOneClient; system2: SystemTwo; tts: TtsEngine }
@@ -12,14 +13,16 @@ export interface ControllerOptions {
   candidateHoldMs?: number;
   minInterruptGapMs?: number;
   retryConcernId?: string;
+  doctorLines: DoctorLines;
 }
 interface HeldCandidate { event: FollowupCandidate; targetPointIds: string[]; abort: AbortController }
 interface SpeechOutput { abort: AbortController; utteranceId: string; transcriptId: string; text: string; start: number; turn: DialogueTurn; chunks: string[]; reported: boolean }
 
 /** Per-session state machine. Engines never own dialogue or candidate lifecycle. */
 export class TurnController {
-  private readonly timing: Required<Omit<ControllerOptions, 'retryConcernId'>>;
-  private readonly opening: string;
+  private readonly timing: Required<Omit<ControllerOptions, 'retryConcernId' | 'doctorLines'>>;
+  private readonly lines: DoctorLines;
+  private readonly retryConcernId?: string;
   private completed = false;
   private readonly history: DialogueTurn[] = [];
   private readonly candidates: FollowupCandidate[] = [];
@@ -50,19 +53,40 @@ export class TurnController {
     private readonly pack: ScenarioPack,
     private readonly engines: ControllerEngines,
     private readonly emit: (event: ServerMessage) => void,
-    options: ControllerOptions = {},
+    options: ControllerOptions,
   ) {
-    const { retryConcernId, ...timing } = options;
+    const { retryConcernId, doctorLines, ...timing } = options;
+    this.lines = doctorLines;
+    this.retryConcernId = retryConcernId;
     this.timing = { debounceMs: 280, minDriftMs: 900, minDriftChars: 35, candidateHoldMs: 650, minInterruptGapMs: 2000, ...timing };
     const retryIndex = pack.scenario.concerns.findIndex(concern => concern.id === retryConcernId);
     if (retryIndex >= 0) {
       this.concernIndex = retryIndex;
       for (const concern of pack.scenario.concerns.slice(0, retryIndex)) for (const point of concern.points) this.resolved.add(point.id);
     }
-    this.opening = retryConcernId && retryIndex >= 0 ? pack.retryOpenings[retryConcernId] ?? pack.doctorOpening : pack.doctorOpening;
   }
 
-  start(): void { void this.speak(this.opening, 'speaking'); }
+  start(): void {
+    if (!this.concern.nextConcernId) this.lines.prefetch('closing', this.concern.id, this.actualHistory());
+    void this.speakLine(this.retryConcernId ? 'retry' : 'opening', this.concern.id);
+  }
+  private async speakLine(kind: 'opening' | 'retry' | 'closing', concernId?: string): Promise<void> {
+    const revision = this.revision;
+    const line = await this.lines.take(kind, concernId, this.actualHistory());
+    if (!this.stopped && revision === this.revision) {
+      await this.speak(line, 'speaking');
+      if (kind === 'closing' && !this.stopped) this.prefetchNextVisit();
+    }
+  }
+  private prefetchNextVisit(): void {
+    const history = this.actualHistory();
+    this.lines.prefetch('opening', this.pack.scenario.concerns[0].id);
+    const retryConcerns = new Set(this.candidates.filter(candidate => candidate.fate).map(candidate => candidate.targetConcernId));
+    for (const concernId of retryConcerns) {
+      const missed = this.pack.scenario.concerns.find(concern => concern.id === concernId)!.points.filter(point => !this.resolved.has(point.id)).map(point => point.id);
+      this.lines.prefetch('retry', concernId, history, missed);
+    }
+  }
   get concern(): ConcernDef { return this.pack.scenario.concerns[this.concernIndex]; }
   private get repSpeech(): string { return this.concernFinalSpeech + this.sentence; }
   private get unresolved(): string[] { return this.concern.points.filter(p => !this.resolved.has(p.id)).map(p => p.id); }
@@ -295,7 +319,7 @@ export class TurnController {
         this.evaluationAbort?.abort();
         clearTimeout(this.evaluationTimer);
         clearTimeout(this.candidateTimer);
-        void this.speak(this.pack.doctorClosing, 'speaking');
+        void this.speakLine('closing', this.concern.id);
       }
       return;
     }
@@ -304,7 +328,9 @@ export class TurnController {
     this.recentSpeech = '';
     this.revision++;
     this.evaluationAbort?.abort();
-    void this.speak(`好，这个说清楚了。${this.concern.points[0].anchorQuestion}`, 'speaking');
+    if (!this.concern.nextConcernId) this.lines.prefetch('closing', this.concern.id, this.actualHistory());
+    // The next concern is a live line too, using the concern retry prompt as its few-shot guidance.
+    void this.speakLine('retry', this.concern.id);
   }
 
   private dispatch(pose: DoctorPoseName, action: ControllerDispatchEvent['action'], readiness = 0, nodAmp?: number): void {
@@ -405,7 +431,7 @@ export class TurnController {
 
   private actualHistory(): DialogueTurn[] { return [...this.history.filter(t => t.text.trim()).map(t => ({ ...t })), ...(this.sentence.trim() ? [{ who: 'rep' as const, text: this.sentence }] : [])]; }
   snapshot() { return { sessionId: this.sessionId, concernId: this.concern.id, resolvedPointIds: [...this.resolved], history: this.actualHistory(), candidates: this.candidates.map(c => ({ ...c })) }; }
-  private emitCandidate(candidate: FollowupCandidate): void { this.emit({ type: 'system2.candidate', payload: { sessionId: this.sessionId, candidate: { ...candidate } } }); }
+  private emitCandidate(candidate: FollowupCandidate): void { this.emit({ type: 'system2.candidate', payload: { sessionId: this.sessionId, task: 'followup', candidate: { ...candidate } } }); }
   private error(code: string, message: string): void { this.emit({ type: 'session.error', payload: { code, message } }); }
   stop(): void {
     if (this.stopped) return;

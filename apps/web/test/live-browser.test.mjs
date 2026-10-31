@@ -16,6 +16,8 @@ let origin;
 let wav;
 const real = process.env.CUEX_WEB_REAL === '1';
 const errors = [];
+// Doctor-line jobs (opening, retry, closing) share system2.candidate; follow-up assertions skip them.
+const isFollowup = event => event.type === 'system2.candidate' && (event.payload.task ?? 'followup') === 'followup';
 
 async function start(command, args, env, ready) {
   const child = spawn(command, args, { cwd: root, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -115,15 +117,15 @@ test('typed live speech receives a doctor interruption before the rep finishes',
   const { page, received, sent } = await pageSession();
   try {
     await sayText(page, pitch);
-    const spoken = await waitEvent(received, event => event.type === 'system2.candidate' && event.payload.candidate.phase === 'spoken');
+    const spoken = await waitEvent(received, event => isFollowup(event) && event.payload.candidate.phase === 'spoken');
     await page.waitForSelector('[data-testid="candidate"][data-phase="spoken"]');
     await waitEvent(received, event => event.type === 'asr.transcript' && event.payload.speaker === 'doctor' && event.observedAt >= spoken.observedAt);
     await page.waitForFunction(() => !document.querySelector('#rep-speech').disabled);
     assert(sent.filter(event => event.type === 'speech.delta').length > 5);
     assert(!sent.some(event => event.type === 'speech.delta' && event.payload.isFinal), 'doctor interrupts before final input');
-    assert.deepEqual([...new Set(received.filter(event => event.type === 'system2.candidate').map(event => event.payload.candidate.phase))], ['retrieving', 'drafting', 'ready', 'spoken']);
+    assert.deepEqual([...new Set(received.filter(isFollowup).map(event => event.payload.candidate.phase))], ['retrieving', 'drafting', 'ready', 'spoken']);
     assert(await page.$eval('[data-testid="transcript"]', element => element.textContent.includes('先停一下') || element.textContent.includes('患者')));
-    const ready = received.find(event => event.type === 'system2.candidate' && event.payload.candidate.phase === 'ready');
+    const ready = received.find(event => isFollowup(event) && event.payload.candidate.phase === 'ready');
     console.log(JSON.stringify({ flow: real ? 'real-engines-typed-interrupt' : 'typed-interrupt', readyToSpokenMs: spoken.observedAt - ready.observedAt, progressiveDeltas: sent.filter(event => event.type === 'speech.delta').length }));
   } finally { await page.close(); }
 });
@@ -132,13 +134,13 @@ test('a ready follow-up is withdrawn after self-correction and point labels reso
   const { page, received } = await pageSession();
   try {
     await sayText(page, pitch);
-    await waitEvent(received, event => event.type === 'system2.candidate' && event.payload.candidate.phase === 'ready');
+    await waitEvent(received, event => isFollowup(event) && event.payload.candidate.phase === 'ready');
     await button(page, '停止说话');
     await sayText(page, '我先回答您的人群问题，75 岁以上患者约占 11%，降压幅度与总体一致。');
     await page.waitForSelector('[data-testid="candidate"][data-phase="withdrawn"]', { timeout: 30000 });
     await page.waitForFunction(() => document.querySelector('[data-testid="point-c1"]')?.getAttribute('data-resolved') === 'true', { timeout: 30000 });
     assert.equal(await page.$eval('[data-phase="withdrawn"] del', element => !!element.textContent.trim()), true);
-    assert(!received.some(event => event.type === 'system2.candidate' && event.payload.candidate.phase === 'spoken'));
+    assert(!received.some(event => isFollowup(event) && event.payload.candidate.phase === 'spoken'));
     const metrics = await (await fetch(`http://127.0.0.1:${fixture.metricsPort}/metrics`)).json();
     assert.equal(metrics.sessions[0].candidates[0].fate, 'withdrawn');
     assert(!metrics.sessions[0].history.some(turn => turn.who === 'doctor' && turn.text.includes(metrics.sessions[0].candidates[0].draftText)));

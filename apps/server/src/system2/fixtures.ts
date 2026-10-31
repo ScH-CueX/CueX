@@ -11,14 +11,18 @@ export const LI_PACK: ScenarioPack = {
       timeConstraintSec: 45, skepticismLevel: 'medium', note: '下午门诊量大，只要数字。',
     },
   },
-  doctorOpening: '你说这个研究结果不错。直接说，老人和肾功能不好的，有数据吗？',
+  lineExamples: {
+    opening: ['你说这个研究结果不错。直接说，老人和肾功能不好的，有数据吗？'],
+    retry: { 'concern-scope': ['再说一遍，老人和肾功能不好的，到底有没有数？'], 'concern-dose': ['高龄起始剂量，要不要调？'] },
+    closing: ['行，我知道了，资料放这儿。'],
+  },
 };
 
 /** Five situations built from the anshu pack. Each one has a different unresolved set and rep speech. */
 export function buildBenchRequests(signal: AbortSignal, pack: ScenarioPack = ANSHU_PACK): FollowupRequest[] {
   const base = { sessionId: 'bench', pack, concernId: 'concern-scope', signal };
   const h = (rep: string) => [
-    { who: 'doctor' as const, text: pack.doctorOpening },
+    { who: 'doctor' as const, text: pack.lineExamples.opening[0] },
     { who: 'rep' as const, text: rep },
   ];
   return [

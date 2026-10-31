@@ -45,12 +45,14 @@ test('the real frontend LiveWSDriver receives opening, partials, verdicts and ca
       onDoctorDispatch: event => { actions.push(event.action.type); notify(); },
       onTranscript: event => { transcripts.push(event.text); notify(); },
       onSystem1Verdict: () => { verdicts++; notify(); },
-      onSystem2Candidate: candidate => { phases.push(candidate.phase); notify(); },
+      onServerEvent: event => {
+        if (event.type === 'system2.candidate' && (!event.payload.task || event.payload.task === 'followup')) { phases.push(event.payload.candidate.phase); notify(); }
+      },
       // Node verifies the actual text/event driver; real browser audio is covered by the web feature test.
       onError: (error, code) => { if (code !== 'AUDIO_PLAYBACK') rejectEvent?.(error); },
     });
     await driver.start();
-    await until(() => transcripts.some(text => text.includes('适用于哪些患者')));
+    await until(() => transcripts.some(text => ANSHU_PACK.lineExamples.opening.some(example => text.startsWith(example))));
     driver.sendSpeechDelta('主要终点是十二周时的诊室收缩压，多降6.2毫米汞柱，', false);
     await until(() => verdicts >= 1);
     // The external server may use production sustained-drift timing.

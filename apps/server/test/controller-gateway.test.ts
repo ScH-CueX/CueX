@@ -8,19 +8,21 @@ import { FakeSystemOne, FakeSystemTwo, TextOnlyAsr, SilentTts } from '../src/fak
 import { ANSHU_PACK } from '../src/scenario/anshu';
 
 type Predicate = (event: ServerMessage) => boolean;
-const isPhase = (phase: string): Predicate => (event) => event.type === 'system2.candidate' && event.payload.candidate.phase === phase;
+const isPhase = (phase: string): Predicate => (event) => event.type === 'system2.candidate' && (!event.payload.task || event.payload.task === 'followup') && event.payload.candidate.phase === phase;
 
 async function setup(overrides: Partial<import('../src/gateway/WebSocketGateway').GatewayOptions> = {}, waitOpening = true, retryConcernId?: string) {
   const gateway = new WebSocketGateway({
     port: 0,
     host: '127.0.0.1',
-    pack: ANSHU_PACK,
+    pack: { ...ANSHU_PACK, lineExamples: { ...ANSHU_PACK.lineExamples, opening: [ANSHU_PACK.lineExamples.opening[0]] } },
     createEngines: async () => {
       if (process.env.CUEX_TEST_REAL_S2 === '1') {
         const { createEngines, readConfig } = await import('../src/config');
         return createEngines({ ...readConfig(), system1: 'real', system2: 'real', asr: 'fake', tts: 'fake' }, ANSHU_PACK);
       }
-      return { system1: new FakeSystemOne(), system2: new FakeSystemTwo(35), asr: new TextOnlyAsr(), tts: new SilentTts() };
+      const system2 = new FakeSystemTwo(35);
+      system2.prepareDoctorLine = undefined as never;
+      return { system1: new FakeSystemOne(), system2, asr: new TextOnlyAsr(), tts: new SilentTts() };
     },
     controller: { debounceMs: 5, minDriftMs: 0, minDriftChars: 30, candidateHoldMs: 120, minInterruptGapMs: 0 },
     ...overrides,
@@ -70,7 +72,7 @@ test('continued pitch prepares, rechecks and interrupts before final speech', as
     await h.waitFor(e => e.type === 'controller.dispatch' && e.payload.action.type === 'interrupt_speak' && !!e.payload.action.candidateId);
     await h.waitFor(isPhase('spoken'));
     await h.waitFor(e => e.type === 'tts.stream_chunk' && e.payload.isLastChunk && h.events.some(isPhase('spoken')));
-    const phases = h.events.filter(e => e.type === 'system2.candidate').map(e => e.payload.candidate.phase).filter((phase, index, all) => index === 0 || phase !== all[index - 1]);
+    const phases = h.events.filter(e => e.type === 'system2.candidate' && (!e.payload.task || e.payload.task === 'followup')).map(e => e.payload.candidate.phase).filter((phase, index, all) => index === 0 || phase !== all[index - 1]);
     assert.deepEqual(phases, ['retrieving', 'drafting', 'ready', 'spoken']);
     const readyIndex = h.events.findIndex(isPhase('ready'));
     const spokenIndex = h.events.findIndex(isPhase('spoken'));
@@ -112,7 +114,7 @@ test('direct answers resolve separate concern points without preparing a candida
     await h.speech('eGFR30到60的亚组有412人，结果与总体一致。', true);
     await h.speech('eGFR低于30被排除在研究外，没有证据，说明书不建议使用。', true);
     await h.waitFor(e => e.type === 'controller.dispatch' && e.payload.concernProgress.concernId === 'concern-dose');
-    assert.equal(h.events.filter(e => e.type === 'system2.candidate').length, 0);
+    assert.equal(h.events.filter(e => e.type === 'system2.candidate' && (!e.payload.task || e.payload.task === 'followup')).length, 0);
     assert(h.events.some(e => e.type === 'controller.dispatch' && e.payload.concernProgress.concernId === 'concern-scope' && e.payload.concernProgress.isFullyResolved));
     const repFinals = h.events.filter(e => e.type === 'asr.transcript' && e.payload.speaker === 'rep' && e.payload.isFinal);
     assert.equal(repFinals.length, 3);
@@ -145,7 +147,7 @@ test('a substantive answer in one point does not resolve other renal points', as
     assert.deepEqual(snapshot.resolvedPointIds, ['c2']);
     await h.speech('我会接下来回答eGFR低于30的患者。', true);
     assert.deepEqual(h.gateway.inspectSessions()[0].resolvedPointIds, ['c2']);
-    assert.equal(h.events.filter(e => e.type === 'system2.candidate').length, 0);
+    assert.equal(h.events.filter(e => e.type === 'system2.candidate' && (!e.payload.task || e.payload.task === 'followup')).length, 0);
   } finally { await h.close(); }
 });
 
@@ -300,18 +302,18 @@ test('retry visit rephrases the concern, resolves the visit and speaks the closi
   try {
     const opening = h.gateway.inspectSessions()[0];
     assert.deepEqual(opening.resolvedPointIds, []);
-    assert.equal(opening.history[0].text, ANSHU_PACK.retryOpenings['concern-scope']);
+    assert.equal(opening.history[0].text, ANSHU_PACK.lineExamples.retry['concern-scope'][0]);
     assert.equal(opening.candidates.length, 0);
     await h.speech('75岁以上患者约占11%，降压幅度与总体一致。', true);
     await h.speech('eGFR30到60的亚组有412人，结果与总体一致。', true);
     await h.speech('eGFR低于30被排除，没有证据，说明书不建议使用。', true);
     await h.waitFor(e => e.type === 'controller.dispatch' && e.payload.concernProgress.concernId === 'concern-dose');
-    await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.text.includes('起始剂量') && e.payload.isFinal);
+    await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.text === ANSHU_PACK.lineExamples.retry['concern-dose'][0] && e.payload.isFinal);
     await h.speech('高龄患者的起始剂量需要调整，应核对说明书。', true);
-    await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.text === ANSHU_PACK.doctorClosing && e.payload.isFinal);
+    await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.text === ANSHU_PACK.lineExamples.closing[0] && e.payload.isFinal);
     const completed = h.gateway.inspectSessions()[0];
     assert.deepEqual(completed.resolvedPointIds, ['c1', 'c2', 'c3', 'd1']);
-    assert.equal(completed.history.at(-1)?.text, ANSHU_PACK.doctorClosing);
+    assert.equal(completed.history.at(-1)?.text, ANSHU_PACK.lineExamples.closing[0]);
     assert.equal(completed.candidates.length, 0);
     const verdictCount = h.events.filter(e => e.type === 'system1.verdict').length;
     const from = h.events.length;
@@ -319,10 +321,82 @@ test('retry visit rephrases the concern, resolves the visit and speaks the closi
     h.ws.send(JSON.stringify({ type: 'ping', payload: { t: Date.now() } }));
     // A restarted dose retry proves prior concerns stay resolved and no old candidates carry over.
     h.send('session.start', { scenarioId: ANSHU_PACK.scenario.id, mode: 'performance', retry: { concernId: 'concern-dose' } });
-    await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.text === ANSHU_PACK.retryOpenings['concern-dose'] && e.payload.isFinal, from);
+    await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.text === ANSHU_PACK.lineExamples.retry['concern-dose'][0] && e.payload.isFinal, from);
     assert.equal(h.events.filter(e => e.type === 'system1.verdict').length, verdictCount);
     const doseRetry = h.gateway.inspectSessions()[0];
     assert.deepEqual(doseRetry.resolvedPointIds, ['c1', 'c2', 'c3']);
     assert.equal(doseRetry.candidates.length, 0);
+  } finally { await h.close(); }
+});
+
+
+test('retry uses the one-use System 2 line prefetched from the heard visit and missed points', async () => {
+  const requests: import('../src/contracts').DoctorLineRequest[] = [];
+  const system2 = new FakeSystemTwo(10);
+  system2.prepareDoctorLine = async (req, phase) => {
+    requests.push(req);
+    phase?.('drafting');
+    return req.kind === 'opening' ? '我们先谈高龄和肾功能患者。' : req.kind === 'retry' ? '刚才的人群问题再来一次，先说明高龄患者。' : '今天这次交流就到这里，感谢你把边界说清楚。';
+  };
+  const h = await setup({ createEngines: () => ({ system1: new FakeSystemOne(), system2, asr: new TextOnlyAsr(), tts: new SilentTts() }) });
+  try {
+    await drift(h);
+    await h.speech('我先回答您的人群问题。', true);
+    await h.waitFor(isPhase('withdrawn'));
+    const from = h.events.length;
+    h.send('session.stop', { sessionId: 'current' });
+    await h.waitFor(e => e.type === 'system2.candidate' && e.payload.task === 'retry' && e.payload.candidate.phase === 'ready', from);
+    const retry = requests.find(req => req.kind === 'retry' && req.concernId === 'concern-scope');
+    assert(retry);
+    assert.deepEqual(retry.missedPointIds, ['c1', 'c2', 'c3']);
+    assert(retry.history.some(turn => turn.who === 'rep' && turn.text.includes('主要终点')));
+    h.send('session.start', { scenarioId: ANSHU_PACK.scenario.id, mode: 'performance', retry: { concernId: 'concern-scope' } });
+    await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.isFinal && e.payload.text === '刚才的人群问题再来一次，先说明高龄患者。', from);
+    assert(!ANSHU_PACK.lineExamples.retry['concern-scope'].includes(h.gateway.inspectSessions()[0].history[0].text));
+    assert.equal(requests.filter(req => req.kind === 'retry' && req.concernId === 'concern-scope').length, 1, 'ready retry should be consumed instead of redrafted');
+  } finally { await h.close(); }
+});
+
+test('slow System 2 opening uses a pack example within the 1200 ms visitor budget', async () => {
+  let signal: AbortSignal | undefined;
+  const system2 = new FakeSystemTwo(10);
+  system2.prepareDoctorLine = async (req, phase) => {
+    signal = req.signal;
+    phase?.('drafting');
+    await new Promise<void>((_resolve, reject) => req.signal.addEventListener('abort', () => reject(new Error('cancelled')), { once: true }));
+    return '不应等到这句。';
+  };
+  const start = performance.now();
+  const h = await setup({ createEngines: () => ({ system1: new FakeSystemOne(), system2, asr: new TextOnlyAsr(), tts: new SilentTts() }) });
+  try {
+    const elapsed = performance.now() - start;
+    const opening = h.gateway.inspectSessions()[0].history[0].text;
+    assert(ANSHU_PACK.lineExamples.opening.includes(opening));
+    assert(elapsed >= 1100 && elapsed < 1800, `opening fallback took ${Math.round(elapsed)} ms`);
+    assert(signal?.aborted);
+    console.log(JSON.stringify({ flow: 'doctor-line-budget', fallbackMs: Math.round(elapsed) }));
+  } finally { await h.close(); }
+});
+
+test('closing is drafted when the last concern starts and is spoken from the ready prefetch', async () => {
+  let closingStarted = false;
+  const system2 = new FakeSystemTwo(10);
+  system2.prepareDoctorLine = async (req, phase) => {
+    phase?.('drafting');
+    if (req.kind === 'closing') { closingStarted = true; return '人群和剂量都说明白了，资料请留下。'; }
+    return req.kind === 'opening' ? '我们先确认这项研究的人群。' : '接下来谈高龄患者的起始剂量。';
+  };
+  const h = await setup({ createEngines: () => ({ system1: new FakeSystemOne(), system2, asr: new TextOnlyAsr(), tts: new SilentTts() }) });
+  try {
+    await h.speech('75岁以上患者约占11%，eGFR30到60亚组有412人。', true);
+    await h.speech('eGFR低于30被排除，没有证据，说明书不建议使用。', true);
+    await h.waitFor(e => e.type === 'system2.candidate' && e.payload.task === 'closing' && e.payload.candidate.phase === 'ready');
+    assert(closingStarted);
+    await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.text === '接下来谈高龄患者的起始剂量。' && e.payload.isFinal);
+    const start = performance.now();
+    await h.speech('高龄起始剂量需要调整，应核对说明书。', true);
+    await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.text === '人群和剂量都说明白了，资料请留下。' && e.payload.isFinal);
+    assert(performance.now() - start < 800, 'ready closing should not spend the fallback budget');
+    assert.equal(h.gateway.inspectSessions()[0].history.at(-1)?.text, '人群和剂量都说明白了，资料请留下。');
   } finally { await h.close(); }
 });
