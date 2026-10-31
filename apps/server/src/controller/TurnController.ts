@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { diffChars } from 'diff';
 import { parseBuffer } from 'music-metadata';
-import type { ConcernDef, ControllerDispatchEvent, DoctorPoseName, FollowupCandidate, JevDecisionResponse, ServerMessage, TtsPlaybackReport, ReviewMoment } from '@cuex/protocol';
+import type { ConcernDef, ControllerDispatchEvent, DoctorPoseName, FollowupCandidate, JevDecisionResponse, ServerMessage, TtsPlaybackReport, ReviewMoment, WithdrawalReason } from '@cuex/protocol';
 import { encodeSystemOneState, S1_QUESTION_IDS } from '../contracts';
 import type { DoctorLines } from './DoctorLinePrefetch';
 import type { DialogueTurn, JevQuestion, ScenarioPack, SystemOneClient, SystemOneResult, SystemTwo, TtsEngine } from '../contracts';
@@ -16,7 +16,7 @@ export interface ControllerOptions {
   retryConcernId?: string;
   doctorLines: DoctorLines;
 }
-interface HeldCandidate { event: FollowupCandidate; targetPointIds: string[]; abort: AbortController }
+interface HeldCandidate { event: FollowupCandidate; targetPointIds: string[]; abort: AbortController; basisRevision: number }
 interface SpeechOutput { abort: AbortController; utteranceId: string; transcriptId: string; text: string; start: number; turn: DialogueTurn; chunks: string[]; reported: boolean; lineKind?: 'opening' | 'retry' | 'closing'; isOpening?: boolean; moment?: ReviewMoment; audioDurationMs: number; fallbackTimer?: ReturnType<typeof setTimeout> }
 
 /** Per-session state machine. Engines never own dialogue or candidate lifecycle. */
@@ -43,6 +43,9 @@ export class TurnController {
   private transcriptId = randomUUID();
   private transcriptStart = Date.now();
   private revision = 0;
+  private basisRevision = 0;
+  private lastCompletedRecheck: { candidateId: string; valid: boolean } = { candidateId: '', valid: false };
+  private outputChecking = false;
   private stopped = false;
   private evaluationAbort?: AbortController;
   private evaluationInFlight = false;
@@ -146,7 +149,7 @@ export class TurnController {
     this.recentSpeech = recent.slice(-80);
     this.revision++;
     // Cancel replaced ASR hypotheses now; additive speech is sampled at the next decision tick.
-    if (previous && !text.startsWith(previous)) this.evaluationAbort?.abort();
+    if (previous && !this.normalizeSpeech(text).startsWith(this.normalizeSpeech(previous))) { this.basisRevision++; this.evaluationAbort?.abort(); }
     this.emit({ type: 'asr.transcript', payload: {
       sessionId: this.sessionId, transcriptId: this.transcriptId, speaker: 'rep', text,
       delta: text.startsWith(previous) ? text.slice(previous.length) : text,
@@ -187,7 +190,7 @@ export class TurnController {
 
   private async evaluate(recheck: boolean): Promise<boolean> {
     if (this.stopped || this.completed || !this.repSpeech.trim()) return false;
-    if (!recheck && this.evaluationInFlight) return false;
+    if (!recheck && (this.evaluationInFlight || this.outputChecking)) return false;
     const revision = this.revision;
     const speechSnapshot = this.repSpeech;
     const segmentId = this.transcriptId;
@@ -205,6 +208,8 @@ export class TurnController {
         ...(recheck && this.held ? { candidate: { targetPointIds: this.held.targetPointIds, triggerCondition: this.held.event.triggerCondition } } : {}),
       }), this.questions(recheck), abort.signal);
       if (abort.signal.aborted || this.stopped || concernId !== this.concern.id) return false;
+      const probability = (id: string) => result.answers[id]?.probabilities.true ?? result.answers[id]?.value ?? 0;
+      if (recheck && this.held) this.lastCompletedRecheck = { candidateId: this.held.event.id, valid: probability(S1_QUESTION_IDS.responding) < 0.60 && probability(S1_QUESTION_IDS.candidateValid) >= 0.5 && probability(S1_QUESTION_IDS.drift) >= 0.65 };
       // Ordinary snapshots remain evidence when more speech is appended. Output checks must be exact.
       if (recheck ? revision !== this.revision : !this.repSpeech.startsWith(speechSnapshot)) return false;
       this.applyDecision(result, recheck, { transcriptId: segmentId, text: segmentText, final: onFinalSegment });
@@ -217,7 +222,7 @@ export class TurnController {
     } finally {
       if (this.evaluationAbort === abort) {
         this.evaluationInFlight = false;
-        if (!this.stopped && revision !== this.revision && concernId === this.concern.id) {
+        if (!this.stopped && !this.outputChecking && revision !== this.revision && concernId === this.concern.id) {
           clearTimeout(this.evaluationTimer);
           this.evaluationTimer = setTimeout(() => { this.evaluationTimer = undefined; void this.evaluate(recheck && this.held?.event.phase === 'ready'); }, 0);
         }
@@ -237,8 +242,9 @@ export class TurnController {
     const responding = probability(S1_QUESTION_IDS.responding) >= 0.60;
     const drifting = !responding && probability(S1_QUESTION_IDS.drift) >= 0.65;
     const targetAnswered = !!this.held && this.held.targetPointIds.some(id => this.resolved.has(id));
-    const invalid = recheck && probability(S1_QUESTION_IDS.candidateValid) < 0.5;
-    const withdraw = !!this.held && (responding || targetAnswered || invalid || this.unresolved.length === 0);
+    const revisedBasis = recheck && !!this.held && this.held.basisRevision !== this.basisRevision && probability(S1_QUESTION_IDS.candidateValid) < 0.5;
+    const withdrawalReason: WithdrawalReason | undefined = targetAnswered || this.unresolved.length === 0 ? 'target_answered' : responding ? 'response_cue' : revisedBasis ? 'basis_revised' : undefined;
+    const withdraw = !!this.held && !!withdrawalReason;
     if (drifting) {
       if (!this.drift) this.drift = { since: Date.now(), chars: this.repSpeech.length, revision: this.revision, observations: 1 };
       else if (this.drift.revision !== this.revision) { this.drift.revision = this.revision; this.drift.observations++; }
@@ -258,7 +264,7 @@ export class TurnController {
       confidence: Math.max(probability(responding ? S1_QUESTION_IDS.responding : S1_QUESTION_IDS.drift), 0.5),
       resolvedPointIds: newlyResolved, diagnosticReason: reason, latencyMs: result.latencyMs, timestamp: Date.now(),
     } });
-    if (withdraw) this.withdrawCandidate();
+    if (withdraw) this.withdrawCandidate(withdrawalReason!);
     if (this.unresolved.length === 0) {
       this.dispatch('listening', { type: 'nod' }, 0, 0.1);
       this.drift = undefined;
@@ -287,7 +293,7 @@ export class TurnController {
     if (this.held || this.stopped || this.completed) return;
     const event: FollowupCandidate = { id: randomUUID(), targetConcernId: this.concern.id, phase: 'retrieving', draftText: '', basis: reason,
       triggerCondition: '目标要点仍未回答，且代表继续偏离', preparedFromMs: Date.now() };
-    const held: HeldCandidate = { event, targetPointIds: this.unresolved, abort: new AbortController() };
+    const held: HeldCandidate = { event, targetPointIds: this.unresolved, abort: new AbortController(), basisRevision: this.basisRevision };
     this.held = held;
     this.candidates.push(event);
     this.emitCandidate(event);
@@ -305,7 +311,7 @@ export class TurnController {
       if (this.held !== held || held.abort.signal.aborted || this.stopped) return;
       const openPoints = new Set(this.unresolved);
       const targets = draft.targetPointIds.filter(id => openPoints.has(id));
-      if (!targets.length) { this.withdrawCandidate(); return; }
+      if (!targets.length) { this.withdrawCandidate('target_answered'); return; }
       if (!draft.text.trim()) throw new Error('Invalid follow-up draft');
       held.targetPointIds = targets;
       Object.assign(event, { draftText: draft.text, basis: draft.basis, triggerCondition: draft.triggerCondition, sourceEvidence: draft.sourceEvidence, phase: 'ready', readyAtMs: Date.now() });
@@ -314,25 +320,27 @@ export class TurnController {
       this.candidateTimer = setTimeout(() => { void this.evaluate(true); }, this.timing.candidateHoldMs);
     } catch (error) {
       if (held.abort.signal.aborted || this.stopped) return;
-      if (this.held === held) this.withdrawCandidate();
+      if (this.held === held) { this.held = undefined; held.abort.abort(); this.dispatch('listening', { type: 'idle' }); }
       this.error('SYSTEM2_ERROR', '追问准备暂时不可用，请继续回答。');
     }
   }
 
-  private withdrawCandidate(): void {
+  private withdrawCandidate(withdrawalReason: WithdrawalReason): void {
     const held = this.held;
     if (!held) return;
     this.held = undefined;
     held.abort.abort();
     if (this.speech && !this.speech.text) this.interruptDoctor('candidate_withdrawn');
     clearTimeout(this.candidateTimer);
+    held.event.withdrawalReason = withdrawalReason;
     held.event.phase = 'withdrawn'; held.event.fate = 'withdrawn'; held.event.decidedAtMs = Date.now();
-    this.moments.push({ kind: 'withdrawn', concernId: held.event.targetConcernId, atMs: Date.now() - this.startedAt, repSaid: this.repSpeech.slice(-60), withdrawnText: held.event.draftText, basis: held.event.basis, sourceEvidence: held.event.sourceEvidence, openPointIds: [...this.unresolved] });
+    this.moments.push({ kind: 'withdrawn', withdrawalReason, concernId: held.event.targetConcernId, atMs: Date.now() - this.startedAt, repSaid: this.repSpeech.slice(-60), withdrawnText: held.event.draftText, basis: held.event.basis, sourceEvidence: held.event.sourceEvidence, openPointIds: [...this.unresolved] });
     this.emitCandidate(held.event);
     this.dispatch('withdrawing', { type: 'withdraw_question', candidateId: held.event.id }, 0, 0.08);
   }
 
   private advanceConcern(): void {
+    if (this.held) this.withdrawCandidate('concern_changed');
     const nextIndex = this.pack.scenario.concerns.findIndex(c => c.id === this.concern.nextConcernId);
     if (nextIndex < 0) {
       if (this.pack.scenario.concerns.every(concern => concern.points.every(point => this.resolved.has(point.id)))) {
@@ -380,7 +388,21 @@ export class TurnController {
           if (speech.abort.signal.aborted || this.stopped) return;
           if (candidateId && this.held?.event.id === candidateId) {
             // TTS may take hundreds of milliseconds. Re-check again with the audio ready to send.
-            const checked = await this.evaluate(true);
+            let checked = false;
+            const deadline = Date.now() + 1500;
+            this.outputChecking = true;
+            this.lastCompletedRecheck = { candidateId: '', valid: false };
+            try {
+              while (!checked && Date.now() < deadline && !speech.abort.signal.aborted && this.held?.event.id === candidateId) {
+                const readout = this.evaluate(true);
+                let timer: ReturnType<typeof setTimeout> | undefined;
+                const result = await Promise.race([readout, new Promise<false>(resolve => { timer = setTimeout(() => resolve(false), Math.max(0, deadline - Date.now())); })]);
+                clearTimeout(timer);
+                checked = result;
+                if (!checked && Date.now() >= deadline) this.evaluationAbort?.abort();
+              }
+              if (!checked && Date.now() >= deadline) checked = this.lastCompletedRecheck?.candidateId === candidateId && this.lastCompletedRecheck.valid;
+            } finally { this.outputChecking = false; }
             if (!checked || speech.abort.signal.aborted || this.held?.event.id !== candidateId || this.held.targetPointIds.some(id => this.resolved.has(id))) return;
             const held = this.held;
             this.held = undefined;
@@ -427,8 +449,7 @@ export class TurnController {
     } finally {
       if (this.speech === speech) {
         this.speech = undefined;
-        if (candidateId && this.held?.event.id === candidateId && !speech.text) this.withdrawCandidate();
-        this.dispatch('listening', { type: 'idle' });
+        this.dispatch(this.held?.event.phase === 'ready' ? 'holding' : 'listening', { type: 'idle' }, this.held?.event.phase === 'ready' ? 0.7 : 0);
       }
     }
   }

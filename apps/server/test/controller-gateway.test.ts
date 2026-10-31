@@ -517,6 +517,7 @@ test('closing playback ends the visit once with heard interruption and withdrawa
     assert(ended.payload.moments[0].openPointIds.includes('c1'));
     assert(ended.payload.moments[1].repSaid.includes('我先回答'));
     assert(ended.payload.moments[1].withdrawnText?.length);
+    assert.equal(ended.payload.moments[1].withdrawalReason, 'response_cue');
     assert.deepEqual(ended.payload.moments[1].openPointIds, ['c3']);
     assert.equal(ended.payload.suggestedRetryConcernId, 'concern-scope');
     h.send('tts.playback', { sessionId: closing.sessionId, utteranceId: closing.audio.payload.utteranceId, completedChunks: 99, playedMs: 999, status: 'finished' });
@@ -617,5 +618,44 @@ test('recognized c1 survives a long microphone pitch and c2 c3 complete the conc
     callbacks.onFinal('eGFR低于30研究没有纳入，没有证据，说明书不建议使用。');
     await h.waitFor(e => e.type === 'controller.dispatch' && e.payload.concernProgress.concernId === 'concern-dose', from);
     assert.deepEqual(h.gateway.inspectSessions()[0].resolvedPointIds, ['c1', 'c2', 'c3']);
+  } finally { await h.close(); }
+});
+
+
+test('continuous microphone updates do not withdraw a still-valid question while its audio is prepared', async () => {
+  let callbacks!: import('../src/contracts').AsrCallbacks;
+  let delayed = false;
+  const base = new FakeSystemOne();
+  const h = await setup({ createEngines: () => ({
+    system1: { backend: 'slow-output-check', health: () => base.health(), async decide(state, questions, signal) {
+      if (questions.candidateValid && !delayed) { delayed = true; await new Promise<void>(resolve => setTimeout(resolve, 40)); }
+      return base.decide(state, questions, signal);
+    } }, system2: new FakeSystemTwo(10), tts: new SilentTts(), asr: { backend: 'controlled-asr', async open(_opts, cb) { callbacks = cb; return { write() {}, end() {} }; } },
+  }) });
+  try {
+    h.send('audio.chunk', { format: 'pcm16', sampleRate: 16000, channels: 1, data: Buffer.alloc(4).toString('base64'), timestamp: Date.now() });
+    while (!callbacks) await new Promise<void>(resolve => setImmediate(resolve));
+    callbacks.onPartial('主要终点是收缩压，多降六点二毫米汞柱，');
+    await h.waitFor(e => e.type === 'system1.verdict');
+    let text = '主要终点是收缩压，多降六点二毫米汞柱，而且不良反应与安慰剂相当，还有两万多人上市后研究的结果可以介绍，';
+    callbacks.onPartial(text);
+    await h.waitFor(isPhase('ready'));
+    const updating = setInterval(() => { text += '更多主要终点和不良反应结果，'; callbacks.onPartial(text); }, 8);
+    await new Promise<void>(resolve => setTimeout(resolve, 100));
+    clearInterval(updating);
+    await h.waitFor(isPhase('spoken'));
+    assert(!h.events.some(isPhase('withdrawn')));
+    let from = h.events.length;
+    await h.speech('75岁以上约占11%，eGFR30到60亚组412人。', true);
+    await h.speech('eGFR低于30被排除，没有证据，说明书不建议使用。', true);
+    await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.isFinal, from);
+    from = h.events.length;
+    await h.speech('高龄起始剂量需要调整，应核对说明书。', true);
+    const closingAudio = await h.waitFor(e => e.type === 'tts.stream_chunk' && e.payload.isLastChunk, from);
+    assert(closingAudio.type === 'tts.stream_chunk');
+    h.send('tts.playback', { sessionId: h.gateway.inspectSessions()[0].sessionId, utteranceId: closingAudio.payload.utteranceId, completedChunks: 99, playedMs: 10, status: 'finished' });
+    const ended = await h.waitFor(e => e.type === 'visit.ended', from);
+    assert(ended.type === 'visit.ended');
+    assert(!ended.payload.moments.some(moment => moment.kind === 'withdrawn'));
   } finally { await h.close(); }
 });
