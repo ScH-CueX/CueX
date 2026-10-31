@@ -17,6 +17,7 @@
     "@earendil-works/pi-ai": "1.4.0",
     "diff": "8.0.2",
     "msedge-tts": "2.1.1",
+    "music-metadata": "11.12.1",
     "sherpa-onnx-node": "2.0.1",
     "ws": "^8.18.0"
   },
