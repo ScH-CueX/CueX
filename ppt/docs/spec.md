@@ -1,24 +1,41 @@
-# CueX pitch brief
+# CueX 五页路演叙事规格
 
-User brief, 2026-11-01 Asia/Shanghai. Team: 记性好了一点. Captain: 路皓然. Teammate: 任逸康. Track: AI + 医疗健康, 信达生物「销售培训 · 医药代表智能演练助手」.
+更新：2026-11-01（Asia/Shanghai）。团队：记性好了一点。队长：路皓然。队员：任逸康。赛道：AI + 医疗健康；信达生物「销售培训 · 医药代表智能演练助手」。
 
-Audience: hackathon judges and an in-person audience, 3 minute talk including roughly 45 seconds of video; 2 minute Q&A follows. Make the product legible from the back of a room. Five pages maximum.
+## 时长与交付
 
-Delivery: PDF with exact 10.25 : 2.87 aspect ratio. Design a 2050 × 574 content canvas. PDF page 10.25 × 2.87 inches. open-slide is the authoring and presentation framework. Its 16:9 preview may letterbox the wide content; the submission exporter must export only the wide content without that letterbox. Source project lives in `ppt/`; all media comes from root `assets/`.
+面向黑客松评委与现场观众，3 分钟讲述与演示，随后 2 分钟问答。主稿最多 5 页。页面内容 2050 × 574，PDF 精确 10.25 × 2.87 英寸。open-slide 原生舞台 1920 × 1080 可留边，PDF 只导出 `.cuex-wide`。
 
-Filename: CueX-记性好了一点-PPT.pdf. Video: AI+医疗健康-记性好了一点-视频.mp4. ZIP later: AI+医疗健康-CueX-路皓然.zip.
+文件名：`CueX-记性好了一点-PPT.pdf`。视频：`AI+医疗健康-记性好了一点-视频.mp4`。后续 ZIP：`AI+医疗健康-CueX-路皓然.zip`。
 
-Core content:
-- CueX, 医药代表的临场应对训练.
-- Problem: 背熟资料，仍可能接不住医生的追问。训练停止原稿、听懂关切、重选信息、准确回应。
-- Experience: 回应关切时继续听；持续偏离时追问；主动补答时撤销尚未说出口的追问。
-- Architecture: System 1 高频小判断；System 2 并行准备；Controller 输出前复核。候选与真实对话分离。
-- Loop: 演练、具体片段复盘、减少辅助、变式重练。Long-term independent ability is the direction, not a proven educational result.
+讲述 135 秒，分配 30 / 10 / 30 / 20 / 45 秒。独立产品视频 45 秒，放在第二页之后，总计 180 秒。PPT 采用用户最新确认的 1 页概述与痛点 + 3 页产品方案 + 1 页商业愿景；视频演示产品过程，P3/P4分别解释机制与训练闭环。
 
-Present only evidence-backed implementation status. Main currently has a deterministic 68-second demonstration. The realtime branch has further engine implementations and tests; do not imply the recorded demonstration is a live model benchmark. Clinical study ANSHU-3 and its numbers are fictional demo data. Do not invent clinical efficacy, users, revenue, educational outcomes, or latency.
+## 五页叙事：1 + 3 + 1
 
-Two representative pages per direction before full-deck selection: cover + how the core interaction works. Equal content across directions. Cover includes team and the two names. Do not put the captain phone number on public design previews; it belongs in submission contact information, separate from the public visuals.
+| 页 | 核心信息 | 视觉与必要文字 |
+| --- | --- | --- |
+| 1 | 公开研究、具体痛点、CueX 要练的能力 | CueX 与团队；两条 ZS/UMU 公开线索；具体转向：介绍降压效果 → 高龄/肾功能不佳患者追问 → 先回答适用范围与证据范围。 |
+| 2 | 产品定义与视频入口 | AI 临场演练助手；听、追问、撤销、复盘再练；无脸真实 UI 紧裁切；明确 45 秒视频提示。 |
+| 3 | 并行机制 | 恢复已确认的真正 WebGL 橙紫粒子双通路、线框核、细环门；判断与准备并行，Controller 在输出前复核。 |
+| 4 | 训练闭环 | 放大一个实际撤销事件；连接真实辅助档位，再进入提前追问的变式重练。不另设独立撤销页。 |
+| 5 | 商业与四端愿景 | 中央立体 X 的四端以真正 WebGL 体积粒子流连接社交/演讲/销售/客服；每端一个 4–6 字场景，销售突出“医药代表起步”。标题区浓缩“药企试点 → 团队订阅 + 场景服务”。潜在付费方与待验证计划放口播。 |
 
-Shared imagery: actual product screenshots under assets/captures (main agent will provide home.png, live-holding.png, live-withdrawn.png, review.png). Brand: assets/brand/cuex-symbol.svg, extracted from the original film; do not invent a different logo. Fonts: assets/fonts/NotoSansSC-VF.ttf, NotoSerifSC-VF.ttf, InstrumentSerif-Regular.ttf.
+## 已确认事实边界
 
-Readable wide-screen type: hero 72–100 px, body 28–36 px, labels 20–24 px at 2050 × 574. Keep text concise and margins at least 54 px. No page numbering inside slides; the framework owns navigation.
+- 团队没有真实访谈、试用或客户接触。当前研究是公开资料与竞品桌面研究，不能包装成一手需求验证。
+- 公开依据及完整链接统一引用 [research-basis.md](research-basis.md)，该文件由主线程维护。ZS 支持经理/同事的时间投入；UMU 支持动态医生追问与事后反馈。不能声称竞品只会固定问答或行业首创。
+- 小组试点、付费方、团队订阅、场景内容扩展均为待验证计划。不加价格、已有客户、合同、收入、市场规模或教育效果数字。
+- 医药以外场景均是拓展愿景，不表示已交付或已验证跨场景能力。
+- 录制片段不作为实时模型性能基准。ANSHU-3 与临床数字是虚构训练材料，不是临床建议。事实边界写入讲稿与文档，不添加技术性免责声明页脚。
+
+## 视觉与实现约束
+
+继续使用已确认的浅色诊室配色、衬线字体、原始琥珀/薰衣草双色立体 X。不重开视觉方向选择，不把前端改为深色。禁止石膏头像/人脸特写；真实 UI 只用无脸紧裁切。图片和字体来自根目录 `assets/`。
+
+每页一个立即可理解的视觉、一条中心信息与少量语义标签。中文英雄标题约 72–100 px，正文 28–36 px，必要标签 20–28 px。不得增加整段解释、技术页脚或内嵌页码。
+
+所有页面均提供可独立理解的静态终态；动画有界，打印与 reduced-motion 完整显示内容。讲稿只写入主入口的 `notes`。队长电话 [private-contact-removed] 只保留在提交联系信息/notes，不放大到公开截图。
+
+## 当前制作状态
+
+以上 1 + 3 + 1 为用户最新确认结构，覆盖上一轮独立商业页的分配。完成静态/动画/打印检查后直接按既定脚本导出，并核对五页页框、离线资源与逐页栅格图。

@@ -1,3 +1,7 @@
+# Current update: light clinic film
+
+The user has now requested a light design throughout the video. Current source of truth: cinematic-spec.md and Cinematic45.tsx. The historical direction below remains a motion reference; its dark stage is superseded. All source assets stay in root assets/.
+
 # Cinematic revision — current production direction
 
 The user rejected the first walkthrough cut and PPT concepts: they lack the original film's visual motion and product-promotion character. The user asked to return to the old film's visual language, prefer visual expression to text, use serif type, and give the X more depth. Autonomous video creation remains authorized.

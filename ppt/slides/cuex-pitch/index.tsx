@@ -8,6 +8,7 @@ import withdrawnQuote from '../../../assets/captures/live-answered-candidate-quo
 import completeAnswer from '../../../assets/captures/live-answered-active-utterance.png';
 import reviewTimeline from '../../../assets/captures/review-timeline.png';
 import assistControls from '../../../assets/captures/live-cue-green-assist-controls.png';
+import answeredDecisions from '../../../assets/captures/live-answered-decisions.png';
 import serif from '../../../assets/fonts/NotoSerifSC-VF.ttf';
 import instrument from '../../../assets/fonts/InstrumentSerif-Regular.ttf';
 
@@ -51,6 +52,8 @@ const css = `
 .cuex-final-motion .cx-withdrawn{animation:cx-enter .85s cubic-bezier(.2,.7,.2,1) 2.8s both}
 .cuex-final-motion .cx-green-cue{animation:cx-green 1.8s ease-out 2.8s both}
 .cuex-final-motion .cx-review-line{stroke-dasharray:1000;animation:cx-script 2.4s ease-out .4s both}
+.cuex-final-motion .cx-cover-concern{stroke-dasharray:1000;animation:cx-script .9s ease-out 1.2s both}
+.cuex-final-motion .cx-cover-response{stroke-dasharray:1000;animation:cx-script 1.2s ease-out 2.2s both}
 .cuex-final-motion[data-cuex-page="interruption"] .cx-concern-topic{animation:cx-enter .65s ease-out 1.05s both}
 .cuex-final-motion[data-cuex-page="interruption"] .cx-concern-path{stroke-dasharray:1000;animation:cx-script .9s cubic-bezier(.2,.7,.2,1) 1.35s both}
 .cuex-final-motion[data-cuex-page="interruption"] .cx-concern-cut{animation:cx-cut .45s ease-out 1.95s both}
@@ -61,6 +64,7 @@ const css = `
 .cuex-final-motion[data-cuex-page="withdraw"] .cx-causal-relay{stroke-dasharray:1000;animation:cx-script .95s ease-out 1.9s both}
 .cuex-final-motion[data-cuex-page="practice"] .cx-less-assist{animation:cx-enter .75s ease-out 1.2s both}
 .cuex-final-motion[data-cuex-page="practice"] .cx-next-practice{animation:cx-enter .75s ease-out 2.2s both}
+.cuex-final-motion .cx-vision-line{stroke-dasharray:1000;animation:cx-script 1.8s ease-out 1.1s both}
 @keyframes cx-leave-script{0%,65%{opacity:.55}100%{opacity:.18}}
 @keyframes cx-enter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 @keyframes cx-x{from{opacity:0;transform:perspective(1200px) rotateY(-16deg) rotateZ(-4deg) scale(.96)}to{opacity:1;transform:perspective(1200px) rotateY(0deg) rotateZ(0deg) scale(1)}}
@@ -113,24 +117,34 @@ function SmallMark() {
 }
 
 const Cover: Page = () => <Wide name="cover">
-  <At style={{ left: 70, top: 43, fontSize: 23, color: muted }}>AI + 医疗健康　信达生物 · 销售培训</At>
-  <At className="cx-enter" style={{ left: 64, top: 78, fontFamily: 'var(--osd-font-display)', fontSize: 190, lineHeight: 1, letterSpacing: -3 }}>Cue</At>
-  <At className="cx-enter" style={{ left: 72, top: 315, fontSize: 31, lineHeight: 1.4, color: muted }}>医药代表的</At>
-  <At className="cx-enter" style={{ left: 66, top: 365, fontSize: 77, fontWeight: 550, lineHeight: 1.2 }}>临场应对训练</At>
-  <At style={{ left: 72, top: 504, fontSize: 24 }}>记性好了一点　　路皓然 / 任逸康</At>
+  <At style={{ left: 64, top: 52, fontFamily: 'var(--osd-font-display)', fontSize: 112, lineHeight: 1 }}>Cue</At>
+  <At style={{ left: 223, top: 62, width: 94, height: 94 }}><img src={symbol} alt="X" style={{ width: 94, height: 94 }} /></At>
+  <At className="cx-enter" style={{ left: 390, top: 60, fontSize: 68, lineHeight: 1.2, fontWeight: 550 }}>背熟资料，也要接住追问。</At>
+  <At style={{ left: 64, top: 182, fontSize: 29, color: '#455D49' }}>医药代表的临场应对训练</At>
+  <At style={{ left: 64, top: 241, fontSize: 22, color: muted }}>公开资料</At>
+  <At style={{ left: 64, top: 288, fontSize: 30, color: '#405A46' }}>人工陪练占用经理同事时间</At>
+  <At style={{ left: 494, top: 296, fontSize: 20, color: '#A25E35' }}>ZS</At>
+  <At style={{ left: 64, top: 376, fontSize: 30, color: '#405A46' }}>医生追问要求临场调整</At>
+  <At style={{ left: 494, top: 384, fontSize: 20, color: '#75639E' }}>UMU</At>
+  <At style={{ left: 64, top: 510, fontSize: 24, color: muted }}>记性好了一点　　路皓然 / 任逸康</At>
 
-  <At style={{ left: 648, top: -31, width: 624, height: 624 }}>
-    <img className="cx-x" src={dimensionalX} alt="CueX 的琥珀色与薰衣草色立体 X" style={{ width: 624, height: 624, filter: 'drop-shadow(18px 25px 16px #39463723)' }} />
-  </At>
-
-  <At className="cx-enter" style={{ left: 1358, top: 174, width: 620, fontSize: 56, lineHeight: 1.55, color: '#34473A' }}>
-    从背熟资料，<br />到接住变化。
-  </At>
-  <svg aria-label="两条对话线交汇后继续向前" viewBox="0 0 640 100" style={{ position: 'absolute', left: 1347, top: 365, width: 640, height: 100 }}>
-    <path className="cx-script" pathLength="1000" d="M12 25 C150 25 184 78 320 78 S495 25 628 25" stroke="#C26B3D" strokeWidth="2" fill="none" />
-    <path className="cx-script" pathLength="1000" d="M12 78 C150 78 184 25 320 25 S495 78 628 78" stroke="#8A79BA" strokeWidth="2" fill="none" />
-    <circle cx="628" cy="25" r="4" fill="#C26B3D" /><circle cx="628" cy="78" r="4" fill="#8A79BA" />
+  <At style={{ left: 720, top: 235, fontSize: 24, color: muted }}>医药代表</At>
+  <At style={{ left: 720, top: 280, fontSize: 36, color: '#506252' }}>介绍降压效果</At>
+  <At className="cx-enter" style={{ left: 1330, top: 180, fontSize: 23, color: '#9B512A' }}>医生</At>
+  <At className="cx-enter" style={{ left: 1330, top: 218, fontSize: 32, lineHeight: 1.3, color: '#A34D26' }}>高龄、肾功能不好的<br />患者呢？</At>
+  <At style={{ left: 1704, top: 318, fontSize: 23, color: '#6A7569' }}>继续照稿讲</At>
+  <svg aria-label="从公开训练痛点到具体临场转向：原本介绍降压效果，医生追问高龄和肾功能不佳患者，回答先转向适用范围" viewBox="0 0 2050 574" style={{ position: 'absolute', inset: 0, width: 2050, height: 574 }}>
+    <g stroke="#8A9885" strokeWidth="1.5" fill="none" strokeLinejoin="round"><path d="M1004 264 H1046 L1064 283 V336 H1004Z M1046 264 V283 H1064" /><path d="M1015 294 H1052 M1015 305 H1052 M1015 316 H1045" /></g>
+    <path className="cx-script" pathLength="1000" d="M720 357 H1120" stroke="#5E7360" strokeWidth="3.5" strokeLinecap="round" fill="none" />
+    <path d="M1144 357 H1958" stroke="#738078" strokeWidth="1.8" strokeDasharray="4 12" opacity=".25" fill="none" />
+    <path className="cx-cover-concern" pathLength="1000" d="M1635 318 C1440 318 1290 340 1132 357" stroke="#C16B3A" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+    <path d="M1132 319 V396 M1150 347 1135 357 1151 366" stroke="#C16B3A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    <circle cx="1635" cy="318" r="4" fill="#C16B3A" />
+    <path className="cx-cover-response" pathLength="1000" d="M1132 357 C1222 357 1260 445 1395 445 H1952" stroke="#7660A4" strokeWidth="3.5" strokeLinecap="round" fill="none" />
+    <path d="M1938 436 1954 445 1938 454" stroke="#7660A4" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
   </svg>
+  <At style={{ left: 1590, top: 392, fontSize: 32, color: '#66508F' }}>先回答适用范围</At>
+  <At style={{ left: 1380, top: 477, fontSize: 25, color: '#66508F' }}>先说明这些人群的证据范围</At>
 </Wide>;
 
 const Interruption: Page = () => <Wide name="interruption">
@@ -373,7 +387,6 @@ function ThreeStreams() {
   return <div data-3d-scene data-waitfor="[data-3d-ready='true']" style={{ position: 'absolute', inset: 0, width: 2050, height: 574, pointerEvents: 'none', zIndex: 0 }}>
     <div data-3d-fallback data-3d-ready={status === 'fallback' ? 'true' : undefined} style={{ display: status === 'ready' ? 'none' : 'block' }}>
       <StreamsFallback />
-      {status === 'fallback' && <At style={{ left: 64, top: 474, fontSize: 20, color: '#805637' }}>三维渲染不可用 · 当前为静态机制示意</At>}
     </div>
     <canvas ref={canvasRef} role="img" aria-label="原视频粒子流三维机制：快速判断流、围绕线框核心的慢准备流、细环输出复核门与撤销粒子" data-3d-ready={status === 'ready' ? 'true' : undefined} style={{ position: 'absolute', inset: 0, width: 2050, height: 574, display: status === 'ready' ? 'block' : 'none' }} />
   </div>;
@@ -443,7 +456,178 @@ const Practice: Page = () => <Wide name="practice">
     <path d="M431 100 446 108 431 116" stroke="#7A659E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
   </svg>
   <At className="cx-next-practice" style={{ left: 1740, top: 439, fontSize: 28, color: '#665387' }}>再练一次</At>
-  <At style={{ left: 64, bottom: 28, fontSize: 23, color: muted }}>记性好了一点　路皓然 / 任逸康</At>
+</Wide>;
+
+// Product bridge for the 1 + 3 + 1 narrative; the film plays after page 2.
+// The standalone interruption/withdrawal/business pages remain authoring material.
+const ProductBridge: Page = () => <Wide name="product-bridge">
+  <SmallMark />
+  <At className="cx-enter" style={{ left: 64, top: 49, fontSize: 74, lineHeight: 1.2, fontWeight: 550 }}>AI 临场演练助手</At>
+  <At style={{ left: 68, top: 151, fontSize: 31, color: '#536652' }}>面向医药代表的沟通训练</At>
+  <At style={{ left: 70, top: 258, fontSize: 48, color: '#42634B' }}>听</At>
+  <At style={{ left: 262, top: 258, fontSize: 48, color: '#B45F30' }}>追问</At>
+  <At style={{ left: 506, top: 258, fontSize: 48, color: '#7863A1' }}>撤销</At>
+  <svg aria-hidden viewBox="0 0 700 90" style={{ position: 'absolute', left: 64, top: 250, width: 700, height: 90 }}>
+    <path d="M92 45 H168 M322 45 H416" stroke="#A3AE9F" strokeWidth="1.5" fill="none" />
+  </svg>
+  <At style={{ left: 70, top: 360, fontSize: 34, color: '#455C49' }}>复盘，再练一次</At>
+  <svg aria-label="接下来播放产品视频" viewBox="0 0 64 64" style={{ position: 'absolute', left: 68, top: 446, width: 64, height: 64 }}>
+    <circle cx="32" cy="32" r="29" fill="none" stroke="#B56A3C" strokeWidth="1.8" /><path d="M26 20 45 32 26 44Z" fill="#B56A3C" />
+  </svg>
+  <At style={{ left: 151, top: 459, fontSize: 33, color: '#8E542F' }}>45 秒产品演示</At>
+
+  <At style={{ left: 1010, top: 112, fontSize: 28, color: '#455D49' }}>演练中：撤销未出口的追问</At>
+  <At className="cx-plane" style={{ left: 1008, top: 160, width: 978, height: 108, overflow: 'hidden', background: '#EEF0E8' }}>
+    <img src={answeredDecisions} alt="产品演练界面的真实裁切：已撤销状态和划去的候选追问" style={{ position: 'absolute', width: 2183.44, left: -1123.53, top: -144.05, height: 'auto' }} />
+  </At>
+  <At style={{ left: 1010, top: 317, fontSize: 28, color: '#455D49' }}>复盘后：回到具体片段</At>
+  <At style={{ left: 1008, top: 365, width: 978, height: 150, overflow: 'hidden', background: '#F6F7F0' }}>
+    <img src={reviewTimeline} alt="产品复盘时间线的真实无头像裁切" style={{ position: 'absolute', width: 2529.41, left: -1376.70, top: 0, height: 'auto' }} />
+  </At>
+</Wide>;
+
+const CommercialPath: Page = () => <Wide name="commercial-path">
+  <SmallMark />
+  <At className="cx-enter" style={{ left: 64, top: 49, fontSize: 74, lineHeight: 1.2, fontWeight: 550 }}>先服务新人，再验证团队价值。</At>
+  <At style={{ left: 68, top: 184, fontSize: 25, color: muted }}>首个目标用户</At>
+  <At style={{ left: 64, top: 226, fontSize: 44, color: '#314E3C' }}>新人医药代表</At>
+  <At style={{ left: 716, top: 184, fontSize: 25, color: muted }}>潜在付费方</At>
+  <At style={{ left: 712, top: 226, fontSize: 44, color: '#314E3C' }}>药企培训部门</At>
+  <At style={{ left: 1450, top: 177, fontSize: 25, color: muted }}>试点关注</At>
+  <At style={{ left: 1450, top: 218, fontSize: 28, lineHeight: 1.5, color: '#445B49' }}>回应相关性<br />独立完成度<br />教练投入</At>
+  <At style={{ left: 68, top: 358, fontSize: 25, color: muted }}>计划</At>
+  <At className="cx-enter" style={{ left: 64, top: 416, fontSize: 40, color: '#A65C32' }}>小组试点</At>
+  <At className="cx-enter" style={{ left: 716, top: 416, fontSize: 40, color: '#6F5C96' }}>团队订阅</At>
+  <At className="cx-enter" style={{ left: 1450, top: 416, fontSize: 40, color: '#6F5C96' }}>场景内容扩展</At>
+  <svg aria-label="待验证的商业计划：小组试点、团队订阅、场景内容扩展" viewBox="0 0 2050 574" style={{ position: 'absolute', inset: 0, width: 2050, height: 574 }}>
+    <path className="cx-review-line" pathLength="1000" d="M280 444 H662 M930 444 H1392" stroke="#8C9A86" strokeWidth="2" fill="none" />
+    <path d="M649 437 663 444 649 451 M1379 437 1393 444 1379 451" stroke="#8C9A86" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+  </svg>
+</Wide>;
+
+function VisionParticles() {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const active = useIsActivePage();
+  const [status, setStatus] = useState<'loading' | 'ready' | 'fallback'>('loading');
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    let renderer: THREE.WebGLRenderer | undefined;
+    let disposed = false, healthy = true, raf = 0;
+    const scene = new THREE.Scene();
+    const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)'), print = window.matchMedia('print');
+    const geometry = <T extends THREE.BufferGeometry>(g: T): T => { geometries.add(g); return g; };
+    const material = <T extends THREE.Material>(m: T): T => { materials.add(m); return m; };
+    const pt = (x: number, y: number, z = 0) => new THREE.Vector3(x - 1025, 287 - y, z);
+    const clamp = (v: number) => Math.max(0, Math.min(1, v));
+    const fract = (v: number) => v - Math.floor(v);
+    const fail = (reason?: unknown) => { healthy = false; cancelAnimationFrame(raf); canvas.dataset.animationState = 'fallback'; canvas.dataset.error3d = reason instanceof Error ? reason.message : String(reason ?? 'WebGL unavailable'); if (!disposed) setStatus('fallback'); };
+    const lost = (event: Event) => { event.preventDefault(); fail('WebGL context lost'); };
+    let freeze = () => {};
+    canvas.addEventListener('webglcontextlost', lost);
+    setStatus('loading'); delete canvas.dataset.error3d;
+    try {
+      renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(2); renderer.setSize(2050, 574, false); renderer.setClearColor(0, 0);
+      renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.NoToneMapping;
+      canvas.dataset.webgl = 'webgl2'; canvas.dataset.visual = 'four-ended-volumetric-particle-x';
+      const camera = new THREE.PerspectiveCamera(32, 2050 / 574, 1, 3000);
+      const gold = new THREE.Color(0xa3481c).toArray(), purple = new THREE.Color(0x5c4292).toArray();
+      let seed = 1527;
+      const rand = () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+      const count = 360 * 2 * 4 + 560;
+      const g = geometry(new THREE.BufferGeometry());
+      const positions = new Float32Array(count * 3), colors = new Float32Array(count * 3), sizes = new Float32Array(count), alphas = new Float32Array(count);
+      g.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+      g.setAttribute('aColor', new THREE.BufferAttribute(colors, 3));
+      g.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+      g.setAttribute('aAlpha', new THREE.BufferAttribute(alphas, 1).setUsage(THREE.DynamicDrawUsage));
+      const random = Float32Array.from({ length: count * 4 }, () => rand());
+      const shader = material(new THREE.ShaderMaterial({
+        transparent: true, depthWrite: false, blending: THREE.NormalBlending,
+        uniforms: { uScale: { value: 574 * 2 / (2 * Math.tan(THREE.MathUtils.degToRad(16))) } },
+        vertexShader: `attribute vec3 aColor;attribute float aSize;attribute float aAlpha;uniform float uScale;varying vec3 vColor;varying float vAlpha;void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);gl_Position=projectionMatrix*mv;gl_PointSize=aSize*uScale/max(1.,-mv.z);vColor=aColor;vAlpha=aAlpha;}`,
+        fragmentShader: `varying vec3 vColor;varying float vAlpha;void main(){float d=length(gl_PointCoord-.5)*2.;float a=pow(clamp(1.-d,0.,1.),1.05)*vAlpha;if(a<.003)discard;gl_FragColor=vec4(vColor,a);\n#include <colorspace_fragment>\n}`,
+      }));
+      const cloud = new THREE.Points(g, shader); cloud.frustumCulled = false; scene.add(cloud);
+      const paths = [
+        new THREE.CatmullRomCurve3([pt(919, 212), pt(856, 174, 28), pt(742, 209, -20), pt(618, 230)], false, 'centripetal'),
+        new THREE.CatmullRomCurve3([pt(1154, 184), pt(1222, 162, -26), pt(1320, 214, 24), pt(1428, 230)], false, 'centripetal'),
+        new THREE.CatmullRomCurve3([pt(897, 479), pt(823, 500, 25), pt(724, 456, -26), pt(618, 447)], false, 'centripetal'),
+        new THREE.CatmullRomCurve3([pt(1160, 485), pt(1232, 506, -24), pt(1332, 453, 28), pt(1428, 447)], false, 'centripetal'),
+      ];
+      const luts = paths.map(curve => { const data = new Float32Array(400 * 6); for (let i = 0; i < 400; i++) { curve.getPointAt(i / 399).toArray(data, i * 6); curve.getTangentAt(i / 399).toArray(data, i * 6 + 3); } return data; });
+      const sample = (arm: number, u: number, position: THREE.Vector3, tangent: THREE.Vector3) => {
+        const f = clamp(u) * 399, i = Math.floor(f), j = Math.min(399, i + 1), t = f - i, lut = luts[arm];
+        position.set(lut[i * 6] + (lut[j * 6] - lut[i * 6]) * t, lut[i * 6 + 1] + (lut[j * 6 + 1] - lut[i * 6 + 1]) * t, lut[i * 6 + 2] + (lut[j * 6 + 2] - lut[i * 6 + 2]) * t);
+        tangent.set(lut[i * 6 + 3] + (lut[j * 6 + 3] - lut[i * 6 + 3]) * t, lut[i * 6 + 4] + (lut[j * 6 + 4] - lut[i * 6 + 4]) * t, 0).normalize();
+      };
+      const inner = new THREE.Mesh(geometry(new THREE.IcosahedronGeometry(40, 1)), material(new THREE.MeshBasicMaterial({ color: 0x66519f, wireframe: true, transparent: true, opacity: 0.2, depthWrite: false })));
+      const outer = new THREE.Mesh(geometry(new THREE.IcosahedronGeometry(63, 0)), material(new THREE.MeshBasicMaterial({ color: 0x66519f, wireframe: true, transparent: true, opacity: 0.13, depthWrite: false })));
+      inner.position.copy(pt(1038, 340, -12)); outer.position.copy(inner.position); scene.add(inner, outer);
+      const p0 = new THREE.Vector3(), tangent = new THREE.Vector3();
+      const crossStart = [pt(919, 212, 3), pt(897, 479, -3)], crossEnd = [pt(1160, 485, -3), pt(1154, 184, 3)];
+      const draw = (time: number, frozen: boolean) => {
+        const arc = frozen ? 0 : Math.sin(Math.PI * time / 12);
+        camera.position.set(arc * 12, arc * 6, 1001); camera.lookAt(0, 0, 0);
+        for (let arm = 0; arm < 4; arm++) {
+          const amberArm = arm === 0 || arm === 3, color = amberArm ? gold : purple, speed = arm === 3 ? 0.19 : amberArm ? 0.16 : 0.115;
+          for (let i = 0; i < 360; i++) {
+            const base = (arm * 720 + i * 2) * 4, a = random[base], b = random[base + 1], c = random[base + 2], d = random[base + 3];
+            for (let trail = 0; trail < 2; trail++) {
+              const index = arm * 720 + i * 2 + trail, u = fract(a + time * speed) - trail * 0.009;
+              sample(arm, u, p0, tangent);
+              const radius = (11 + 10 * Math.sin(Math.PI * clamp(u))) * (0.35 + b * 0.65), angle = b * 35 + time * (amberArm ? 0.8 : -0.65);
+              p0.x += tangent.y * Math.cos(angle) * radius; p0.y -= tangent.x * Math.cos(angle) * radius; p0.z += Math.sin(angle) * radius * 1.5;
+              positions.set([p0.x, p0.y, p0.z], index * 3); colors.set(color, index * 3); sizes[index] = (3.6 + d * 3.2) * (1 - trail * 0.25);
+              alphas[index] = (arm === 3 ? 0.93 : 0.78) * (1 - trail * 0.3) * (0.3 + 0.7 * clamp(u / 0.05)) * clamp((1 - u) / 0.06);
+            }
+          }
+        }
+        for (let i = 0; i < 560; i++) {
+          const index = 2880 + i, lane = i < 280 ? 0 : 1, r = index * 4, a = random[r], b = random[r + 1], c = random[r + 2], d = random[r + 3], u = fract(a + time * 0.08);
+          p0.copy(crossStart[lane]).lerp(crossEnd[lane], u); const spread = (b - .5) * 30;
+          p0.x += spread; p0.y += (lane === 0 ? -1 : 1) * spread; p0.z += (c - .5) * 45;
+          positions.set([p0.x, p0.y, p0.z], index * 3); colors.set(lane === 0 ? gold : purple, index * 3); sizes[index] = 3.3 + d * 3.1; alphas[index] = 0.5 * clamp(u / .08) * clamp((1-u)/.08);
+        }
+        inner.rotation.set(time * .23, time * .32, .2); outer.rotation.set(-time * .17, time * .22, -.1);
+        for (const attribute of Object.values(g.attributes)) attribute.needsUpdate = true;
+        renderer!.render(scene, camera); canvas.dataset['3dReady'] = 'true'; canvas.dataset.frameTime = time.toFixed(3); canvas.dataset.particles = String(count);
+      };
+      const frozen = () => !active || reduce.matches || print.matches || Boolean(canvas.closest('[data-osd-freeze-motion]'));
+      freeze = () => { cancelAnimationFrame(raf); if (disposed) return; try { draw(12, true); canvas.dataset.animationState = 'frozen'; } catch (e) { fail(e); } };
+      const began = performance.now();
+      const tick = (now: number) => { if (disposed) return; if (frozen()) { freeze(); return; } const time = Math.max(0, Math.min(12, (now - began) / 1000)); try { draw(time, time === 12); } catch (e) { fail(e); return; } canvas.dataset.animationState = time === 12 ? 'settled' : 'running'; if (time < 12) raf = requestAnimationFrame(tick); };
+      if (frozen()) freeze(); else { draw(0, false); canvas.dataset.animationState = 'running'; raf = requestAnimationFrame(tick); }
+      if (healthy) setStatus('ready');
+    } catch (e) { fail(e); }
+    const onMedia = () => { if (reduce.matches || print.matches) freeze(); };
+    reduce.addEventListener('change', onMedia); print.addEventListener('change', onMedia); window.addEventListener('beforeprint', freeze);
+    return () => { disposed = true; cancelAnimationFrame(raf); canvas.removeEventListener('webglcontextlost', lost); reduce.removeEventListener('change', onMedia); print.removeEventListener('change', onMedia); window.removeEventListener('beforeprint', freeze); geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); renderer?.renderLists.dispose(); renderer?.dispose(); scene.clear(); };
+  }, [active]);
+  return <div data-vision-3d data-waitfor="[data-3d-ready='true']" style={{ position: 'absolute', left: 598, top: 130, width: 854, height: 410, overflow: 'hidden', zIndex: 0, pointerEvents: 'none' }}>
+    <svg data-3d-ready={status === 'fallback' ? 'true' : undefined} data-3d-mode="static-fallback" aria-label="粒子 X 的静态替代图" viewBox="0 0 2050 574" style={{ display: status === 'ready' ? 'none' : 'block', position: 'absolute', left: -598, top: -130, width: 2050, height: 574 }}>
+      <path d="M919 212 C820 145 740 225 618 230 M1160 485 C1240 550 1300 447 1428 447" stroke="#A3481C" strokeWidth="4" strokeDasharray="1 6" fill="none" />
+      <path d="M1154 184 C1240 130 1320 225 1428 230 M897 479 C810 540 730 450 618 447" stroke="#5C4292" strokeWidth="4" strokeDasharray="1 6" fill="none" />
+    </svg>
+    <canvas ref={ref} data-3d-ready={status === 'ready' ? 'true' : undefined} role="img" aria-label="真实三维橙紫粒子 X：四个有纵深的粒子流分别连接社交、演讲、客服和销售" style={{ display: status === 'ready' ? 'block' : 'none', position: 'absolute', left: -598, top: -130, width: 2050, height: 574 }} />
+  </div>;
+}
+
+const ExpansionVision: Page = () => <Wide name="expansion-vision">
+  <At className="cx-enter" style={{ left: 64, top: 49, fontSize: 72, lineHeight: 1.2, fontWeight: 550 }}>从医药代表，走向更多重要对话。</At>
+  <At style={{ left: 1450, top: 56, fontSize: 22, color: muted }}>商业计划</At>
+  <At style={{ left: 1450, top: 94, fontSize: 26, lineHeight: 1.3, color: '#53674F' }}>药企试点 → 团队订阅 + 场景服务</At>
+  <VisionParticles />
+  <At style={{ left: 770, top: 78, width: 520, height: 520, zIndex: 1 }}>
+    <img className="cx-x" src={dimensionalX} alt="四个端点向外连接的 CueX 立体 X" style={{ width: 520, height: 520, filter: 'drop-shadow(13px 20px 12px #39463720)' }} />
+  </At>
+  <At className="cx-vision-label" style={{ left: 200, top: 170, width: 390, textAlign: 'right', zIndex: 2 }}><p style={{ fontSize: 48, lineHeight: 1.2 }}>社交</p><p style={{ marginTop: 14, fontSize: 30, color: '#60705F' }}>陌生人破冰</p></At>
+  <At className="cx-vision-label" style={{ left: 1458, top: 170, width: 500, zIndex: 2 }}><p style={{ fontSize: 48, lineHeight: 1.2 }}>演讲</p><p style={{ marginTop: 14, fontSize: 30, color: '#60705F' }}>即席问答</p></At>
+  <At className="cx-vision-label" style={{ left: 200, top: 365, width: 390, textAlign: 'right', zIndex: 2 }}><p style={{ fontSize: 48, lineHeight: 1.2 }}>客服</p><p style={{ marginTop: 14, fontSize: 30, color: '#60705F' }}>异议与投诉</p></At>
+  <At className="cx-vision-label" style={{ left: 1458, top: 365, width: 500, zIndex: 2 }}><p style={{ fontSize: 48, lineHeight: 1.2, fontWeight: 600, color: '#9F542C' }}>销售</p><p style={{ marginTop: 14, fontSize: 32, fontWeight: 550, color: '#9F542C' }}>医药代表起步</p></At>
+  <At className="cx-vision-label" style={{ left: 64, top: 510, fontSize: 24, color: muted, zIndex: 2 }}>记性好了一点　　路皓然 / 任逸康</At>
 </Wide>;
 
 export const transition: SlideTransition = {
@@ -453,13 +637,13 @@ export const transition: SlideTransition = {
 };
 export const meta: SlideMeta = { title: 'CueX · 医药代表的临场应对训练', createdAt: '2026-10-31T20:58:49.719Z' };
 
-// Speaking allocation: 18 + 22 + 30 + 35 + 30 = 135 s. Separate film after page 2: 45 s. Total: 180 s.
+// Speaking allocation: 30 + 10 + 30 + 20 + 45 = 135 s. Film after page 2: 45 s. Total: 180 s.
 export const notes: (string | undefined)[] = [
-  '【18 秒；累计 0:18】大家好，我们是“记性好了一点”，路皓然和任逸康。CueX 面向医药代表的临场应对训练。我们关心的是：准备好的知识，如何在医生改变问题时，变成准确的回应。从背熟资料到接住变化，是我们想练的这一小步。',
-  '【22 秒；累计 0:40】背熟资料，并不意味着能接住追问。代表还在顺着原稿介绍降压效果，医生却问：高龄、肾功能不好的患者呢？继续照稿讲，就会绕开关切。我们要练的是停下原稿，先说明这些人群的证据范围，再选择合适的信息回应。接下来用四十五秒，看 CueX 如何给出这种变化。\n【视觉说明，不朗读】路径仅示意演示对话的转向，不是音频波形或测量数据。\n【此处播放独立 45 秒产品片；片尾累计 1:25。视频不计入本页 22 秒。】',
-  '【30 秒；累计 1:55】CueX 的判断和准备同时发生。上方的 System 1 持续做小判断，关注代表是否回应了关切；下方的 System 2 并行准备可能用到的追问。候选准备完成，不等于已经进入对话。到输出之前，Controller 再检查一次：应该继续听、真的追问，还是撤销。两条通路在这里汇合，让系统既有所准备，也能给代表自行修正的空间。当前画面是机制说明，演示回放并不是实时模型性能基准。',
-  '【35 秒；累计 2:30】左上这句追问已经准备好，但还没进入对话。右侧是代表完整的主动补答：研究排除了这一人群，目前没有证据，说明书也不建议使用。补答到达后，系统更新判断，原追问的依据失效，于是左下这句话被撤销。不是等系统说完再纠正，而是输出之前就重新核对。这三处都是实际演示中的原文裁切。当前演示为确定性回放，ANSHU-3 及临床数字是虚构训练材料，不代表真实临床建议或实时模型性能。',
-  '【30 秒；累计 3:00】复盘先定位到刚才这个具体事件：你主动补答，候选追问被撤销。下一次先减少辅助，再让医生更早提问，重新练习听懂关切和调整回应。画面从这次的事件直接接到下一次练习。我们希望最终留下的是独立应对能力，而不是对提示的依赖；这是长期方向，还不能声称训练效果已经验证。CueX，让下一次更靠自己。谢谢。\n【提交联系信息，不朗读】队长：路皓然；电话：[private-contact-removed]；队员：任逸康；团队：记性好了一点；赛道：AI + 医疗健康。',
+  '【30 秒；累计 0:30】我们是“记性好了一点”，路皓然和任逸康。CueX 面向医药代表的临场应对训练。公开资料提示，人工陪练需要经理和同事投入时间，而医生的具体追问又要求临场调整。比如代表正在介绍降压效果，医生却关心高龄、肾功能不好的患者。我们要练的，就是停下原稿，先回应这些人群的证据范围，再选择相关信息。\n【研究边界，不朗读】依据见 ppt/docs/research-basis.md。ZS 与 UMU 是公开供应商资料，不是团队的一手访谈或独立效果研究；团队没有真实访谈、试用或客户接触。图中路径为对话转向示意，不是测量音频。',
+  '【10 秒；累计 0:40】这就是 CueX：一位能听、能追问、也能撤销追问的 AI 临场演练助手。接下来四十五秒，直接看产品。\n【此处播放独立 45 秒视频；片尾累计 1:25。视频不计入本页 10 秒。】\n【素材边界，不朗读】演示素材不作为实时模型性能基准；ANSHU-3 及临床数字属于虚构训练材料，不代表临床建议或已验证的教育效果。',
+  '【30 秒；累计 1:55】刚才的交互背后，是两条同时运行的通路。System 1 持续做小判断，跟踪代表有没有回应当前关切；System 2 并行准备可能需要的追问。候选准备完成，并不等于已经进入对话。Controller 在输出前重新核对：继续听、追问，还是撤销。这个分离让系统可以提前准备，也给代表自行修正的空间。',
+  '【20 秒；累计 2:15】训练不止于完成一段对话。先在复盘中定位这次主动补答与追问撤销，再减少辅助，让医生更早提问，练习能否自行完成调整。我们希望把具体片段带进下一次练习，逐步减少对提示的依赖。\n【事实边界，不朗读】以上是训练流程与设计目标，不是已经证实的教育效果。',
+  '【45 秒；累计 3:00】最后是商业与愿景。药企培训部门是潜在付费方，我们计划从药企小组试点开始，验证团队订阅和场景服务。试点先看回应相关性、少提示后的独立完成度与教练投入，再决定下一步。这个 X 的四端，是未来的拓展方向：社交练陌生人破冰，演讲练即席问答，销售从医药代表起步，客服练异议与投诉。当前只聚焦医药训练，其他都是愿景。先把这个起点做好，再走向更多重要对话。谢谢。\n【事实边界，不朗读】没有真实访谈、试用或客户接触记录；付费方、订阅与场景服务仍待验证，没有价格、合同、收入或效果数字可披露。\n【提交联系信息，不朗读】队长：路皓然；电话：[private-contact-removed]；队员：任逸康；团队：记性好了一点；赛道：AI + 医疗健康。',
 ];
 
-export default [Cover, Interruption, TwoStreams, Withdraw, Practice] satisfies Page[];
+export default [Cover, ProductBridge, TwoStreams, Practice, ExpansionVision] satisfies Page[];

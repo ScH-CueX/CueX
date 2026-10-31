@@ -8,7 +8,7 @@ import {ConversationLine} from '../scenes/Prologue';
 import {ArchField, type ArchBeats} from '../three/ArchField';
 import {cameraPose, FOV, project, type Vec} from '../three/camera';
 import {DimensionalX} from '../three/DimensionalX';
-import {C, EASE, FONT, H, W, mix, ramp} from '../theme';
+import {LIGHT_C as C, EASE, FONT, H, W, mix, ramp} from '../theme';
 
 export const CINEMA_TOTAL=1350;
 export const CINEMA_SHOTS=[
@@ -26,7 +26,7 @@ const BrandCorner: React.FC=()=> <div style={{position:'absolute',zIndex:20,left
 const Plane:React.FC<{src?:string;video?:string;frame:number;shift?:number;scale?:number;opacity?:number;offsetY?:number}>=({src,video,frame,shift=0,scale=.66,opacity=1,offsetY=30})=>{
   const p=ramp(frame,0,42,EASE.inOut);
   return <div style={{position:'absolute',zIndex:0,inset:0,perspective:1800,perspectiveOrigin:'50% 50%',opacity:opacity*ramp(frame,0,12,EASE.inOut),clipPath:'inset(180px 36px 120px 36px)'}}>
-    <div style={{position:'absolute',width:1920,height:1080,overflow:'hidden',borderRadius:12,background:'#ecede8',transformOrigin:'50% 50%',transform:`translate(${shift}px,${offsetY+(1-p)*70}px) rotateY(${mix(-7,-2,p)}deg) rotateX(${mix(5,0,p)}deg) scale(${scale})`,boxShadow:'0 38px 90px rgba(0,0,0,.34)'}}>
+    <div style={{position:'absolute',width:1920,height:1080,overflow:'hidden',borderRadius:12,background:'#ecede8',transformOrigin:'50% 50%',transform:`translate(${shift}px,${offsetY+(1-p)*70}px) rotateY(${mix(-7,-2,p)}deg) rotateX(${mix(5,0,p)}deg) scale(${scale})`,border:'1px solid #9DA99C55',boxShadow:'0 26px 70px rgba(26,33,30,.14)'}}>
       {src?<Img src={staticFile(src)} style={{width:1920,maxWidth:'none'}}/>:null}
       {video?<OffthreadVideo src={staticFile(video)} muted style={{width:1920,height:1080}}/>:null}
     </div>
@@ -36,7 +36,7 @@ const Plane:React.FC<{src?:string;video?:string;frame:number;shift?:number;scale
 export const Opening:React.FC=()=>{
   const f=useCurrentFrame();
   return <AbsoluteFill>
-    <ConversationLine frame={f*1.25}/>
+    <ConversationLine frame={f*1.25} palette={C} light/>
     <div style={{position:'absolute',left:0,right:0,top:285,textAlign:'center'}}>
       <RevealText text="对话，不会按准备稿来。" frame={f} start={8} stagger={1.4} style={{fontFamily:FONT.serif,fontSize:88,fontWeight:600,color:C.paper}}/>
       <div style={{fontFamily:FONT.display,fontSize:118,color:C.paper,marginTop:28,opacity:ramp(f,45,72),display:'flex',alignItems:'baseline',justifyContent:'center',gap:4}}>Cue<Img src={staticFile('brand/cuex-symbol-dimensional.svg')} style={{width:84,height:84}}/></div>
@@ -66,7 +66,7 @@ const FlowLabel:React.FC<{frame:number;anchor:Vec;text:string;sub:string;color:s
 export const Parallel:React.FC=()=>{
   const f=useCurrentFrame();const start=cameraPose(0,210);
   return <AbsoluteFill>
-    <ThreeCanvas width={W} height={H} dpr={1} linear flat gl={{antialias:true,alpha:true}} camera={{fov:FOV,near:.1,far:100,position:start.pos}}><ArchField frame={f} dur={210} beats={FLOW_BEATS}/></ThreeCanvas>
+    <ThreeCanvas width={W} height={H} dpr={1} linear flat gl={{antialias:true,alpha:true}} camera={{fov:FOV,near:.1,far:100,position:start.pos}}><ArchField frame={f} dur={210} beats={FLOW_BEATS} light/></ThreeCanvas>
     <div style={{position:'absolute',left:0,right:0,top:100,textAlign:'center',fontFamily:FONT.serif,fontSize:68,color:C.paper}}>同时发生。</div>
     <FlowLabel frame={f} anchor={[-.8,1.45,0]} dx={-240} dy={-160} text="System 1" sub="判断" color={C.cue}/>
     <FlowLabel frame={f} anchor={[-.2,-1.5,0]} dx={55} dy={65} text="System 2" sub="准备" color={C.deep}/>
@@ -126,7 +126,7 @@ export const CINEMA_UNITS=Object.fromEntries(CINEMA_SHOTS.map(shot=>{
   const Content=CINEMA_COMPONENTS[shot.id];
   const Unit:React.FC=()=>{
     const globalFrame=shot.from+useCurrentFrame();
-    return <AbsoluteFill><Backdrop intensity={.8} frame={globalFrame}/><Content/>{shot.id!=='brand'?<BrandCorner/>:null}<Grain opacity={.025} frame={globalFrame}/></AbsoluteFill>;
+    return <AbsoluteFill><Backdrop intensity={.8} frame={globalFrame} light/><Content/>{shot.id!=='brand'?<BrandCorner/>:null}<Grain opacity={.018} frame={globalFrame} blendMode="multiply"/></AbsoluteFill>;
   };
   return [shot.id,Unit];
 })) as Record<ShotId,React.FC>;

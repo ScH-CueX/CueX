@@ -1,11 +1,15 @@
-# Direction review pending
+# 1 + 3 + 1 最终叙事
 
-Three directions, two representative pages each, have been authored and rendered with open-slide:
+更新：2026-11-01。沿用已确认浅色诊室、全衬线、立体双色 X 与原片粒子语言，不重新选择方向。
 
-- A / dir-clinic: 诊室里的停顿.
-- B / dir-crossing: 两道思考的交点.
-- C / dir-editorial: 一句话，接住变化.
+主入口：`ppt/slides/cuex-pitch/index.tsx`。用户最新分配覆盖上一轮独立商业页结构：
 
-Source: ppt/slides/<id>/index.tsx. PNG previews: assets/qa/dir-<name>-1.png and -2.png. PDF previews: ppt/out/<id>-方向预览.pdf. PDF page dimensions verified as 738 × 206.88 pt = 10.25 × 2.87 in. Each preview has two pages.
+- P1：公开资料与具体痛点合并，项目/团队可见，并呈现明确的临场转向。
+- P2：产品定义、无脸 UI 紧裁切、45 秒视频入口。
+- P3：恢复真正 WebGL 粒子双通路机制。
+- P4：恢复具体事件到减少辅助、变式重练的闭环。
+- P5：真正 WebGL 粒子四端 X，标题区压缩商业计划，四个场景表达拓展愿景。
 
-These are direction previews, not the final submission deck. No user direction selection has been received. After selection, complete up to five pages and export the required final filename. Do not mark direction-approved until the user selects or explicitly skips the gate.
+讲述 30 / 10 / 30 / 20 / 45 秒；第二页后视频 45 秒。全部公开来源与商业假设边界引用 `research-basis.md`，事实边界在非朗读备注中保留。
+
+本轮结构已明确要求直接完成静态/动画/打印与最终导出检查。最终 PDF 每页必须为 738 × 206.64 pt，HTML 所用资源需全部内联。旧 `dir-*` 仅保留为探索存档。

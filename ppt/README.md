@@ -1,6 +1,6 @@
 # CueX 路演材料
 
-使用用户指定的 [open-slide](https://github.com/open-slide/open-slide)，锁定 `@open-slide/core` 2.3.1。此目录单独使用 npm 和 React 19，避免影响 Web / Remotion 现有的 React 18 工作区。
+本目录使用 open-slide（`@open-slide/core` 2.3.1）、React 19 与独立 npm 依赖。主稿是 `slides/cuex-pitch/index.tsx`，内容为 2050 × 574；open-slide 的 1920 × 1080 舞台只用于居中预览。
 
 ```sh
 cd ppt
@@ -8,20 +8,32 @@ npm ci
 npm run dev
 ```
 
-浏览器打开 http://localhost:5180 。当前 `dir-clinic`、`dir-crossing`、`dir-editorial` 是三个设计方向，每个仅两页代表稿，尚未选定最终路演版本。
+打开 [五页主稿](http://localhost:5180/s/cuex-pitch?p=1)，按 Enter 进入窗口演示。主稿的 `notes` 是逐页讲稿，讲述 135 秒；第二页后单独播放 45 秒产品视频，总计 180 秒。
 
-目录与视频工程对应：`slides/` 是 open-slide 入口，`src/` 留给后续共享逻辑，`scripts/` 放导出脚本，`docs/` 放制作依据，`out/` 是生成的交付文件。所有图片、字体、标识均来自根目录 `assets/`。
+## 当前五页叙事：1 + 3 + 1
 
-## 超宽屏导出
+1. 一页概述与痛点：CueX/团队、ZS/UMU 公开线索，以及“介绍降压效果 → 医生追问 → 先回应适用范围”的具体转向。
+2. 产品定义与视频入口：听、追问、撤销、复盘再练；无脸真实 UI 紧裁切。此页后播放独立 45 秒视频。
+3. 产品机制：恢复真正 WebGL 粒子双通路，说明并行判断、候选准备与输出前复核。
+4. 训练闭环：具体撤销事件 → 真实辅助档位 → 提前追问的变式重练。
+5. 商业愿景：中央立体 X 与真正 WebGL 粒子四臂连接社交、演讲、销售、客服；销售突出医药代表起步。标题区浓缩“药企试点 → 团队订阅 + 场景服务”。
 
-设计内容是 2050 × 574。open-slide 的预览舞台仍是 1920 × 1080，内容以宽屏居中展示。PDF 导出只取 `.cuex-wide` 内容，页面精确为 10.25 × 2.87 英寸，保持主会场大屏的比例，不包含预览留边。
+本轮按用户最新的 1 + 3 + 1 结构定稿。逐页讲述 30 / 10 / 30 / 20 / 45 秒，共 135 秒；第二页后视频 45 秒，总计 180 秒。潜在付费方与待验证商业计划放在末页口播，研究与素材边界放在非朗读备注中。
 
-保持开发服务器运行，在另一个终端执行：
+## 事实口径与素材
+
+公开研究与商业假设的唯一依据见 [docs/research-basis.md](docs/research-basis.md)。团队没有真实访谈、试用或客户接触。公开供应商案例不等于独立成效证据；不写市场规模、价格、客户、收入或效果数字。UMU 等公开方案已存在动态追问/打断与反馈，不能把竞品说成只会固定问答。
+
+所有图像、字体与品牌素材来自根目录 `assets/`。主稿不显示石膏头像，也不显示技术性免责声明页脚。事实边界保留在 `notes` 与制作文档。独立转向、撤销和商业路径页代码仍在同一入口内，作为未加入主 `Page[]` 的素材保存；原始 `dir-clinic`、`dir-crossing`、`dir-editorial` 保持历史存档。
+
+## 最终导出
+
+开发服务器保持运行，执行：
 
 ```sh
-node scripts/export-pdf.mjs dir-clinic 2
+node scripts/export-pdf.mjs cuex-pitch 5 'CueX-记性好了一点-PPT'
 ```
 
-导出脚本需要 Playwright 与 Chrome。可通过 `CUEX_PLAYWRIGHT_PATH` 指向本机已有 Playwright 包。导出 HTML 会内嵌所用字体和图像，PDF 保留文字，可离线打开。
+输出 `out/CueX-记性好了一点-PPT.pdf`、同名离线 HTML 与 `-page-size.json` 校正记录。HTML 内嵌所用图像和字体；WebGL 画布冻结后转为 PNG，DOM 文字保留。导出器以 pdf-lib 将每页页框精确校正为 738 × 206.64 pt，即 10.25 × 2.87 英寸，不缩放内容。
 
-方向选定后补齐至最多 5 页，并导出 `CueX-记性好了一点-PPT.pdf`。三分钟路演中预留约 45 秒播放视频，其余约 2 分 15 秒用于讲述。
+导出前先通过 TypeScript 检查与浏览器静态/动态检查；导出后用 `pdfinfo` 核对全部五页，并用 Poppler 渲染逐页复核。QA 图位于根目录 `assets/qa/ppt-final/`。

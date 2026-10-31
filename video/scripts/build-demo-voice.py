@@ -39,7 +39,7 @@ for shot, start, frames, sid in SHOTS:
         raise RuntimeError(f'{sid}: {duration:.2f}s does not fit {window:.2f}s. Shorten the line before rendering.')
     target = Path(staging.name) / f'{sid}.wav'
     subprocess.run(['ffmpeg','-y','-v','error','-i',str(raw),'-af',f'atempo={speed:.5f},loudnorm=I=-16:TP=-1.5:LRA=7,afade=t=in:d=0.02,afade=t=out:st={max(0,duration/speed-.06):.3f}:d=0.06','-ar','48000','-ac','1',str(target)], check=True)
-    manifest.append({'id':sid,'shot':shot,'model':model,'voice':'Ming built-in 灵小柔','text':text,'fromFrame':int(start)+8,'shotFrames':int(frames),'sourceDuration':duration,'synthesisMs':synthesis_ms,'speed':speed,'file':f'audio/narration/{sid}.wav','sourceFile':raw.name,'sha256':hashlib.sha256(target.read_bytes()).hexdigest(),'source':'Windows GPU service over the authorized SSH tunnel; synthetic narration'})
+    manifest.append({'id':sid,'shot':shot,'model':model,'voice':'Ming built-in 灵小柔','text':text,'fromFrame':int(start)+8,'shotFrames':int(frames),'sourceDuration':duration,'synthesisMs':synthesis_ms,'speed':speed,'file':f'audio/narration/{sid}.wav','sourceFile':raw.name,'sha256':hashlib.sha256(target.read_bytes()).hexdigest(),'source':'Windows GPU service over the authorized SSH command bridge; synthetic narration'})
     print(sid, round(duration,2), 'seconds', 'synthesis', synthesis_ms, 'ms', flush=True)
 for clip in manifest:
     shutil.copy2(Path(staging.name) / Path(clip['file']).name, OUT / Path(clip['file']).name)

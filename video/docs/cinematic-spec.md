@@ -2,7 +2,7 @@
 
 Mode: autonomous creative production, selected by the user. Target: hackathon judges and medical-representative training users. Deliver MP4, 1920×1080, 30 fps, about 45 seconds, <=300 MB; BGM and no-BGM versions from the same timeline.
 
-The reference is CueX's original 90-second film: `video/src/Promo.tsx`, `video/src/three/ArchField.tsx`, and `video/out/sheet-old.jpg`. No Gallery card variant was selected. Preserve its particle streams, wireframe core/gate, dimensional X, serif typography and deliberate pauses. The actual frontend remains a light clinic interface. The film can use the original dark stage around real light UI captures. Avoid solid 3D tubes, paragraphs of explanation and separate provenance/disclaimer footers.
+The reference is CueX's original 90-second film: `video/src/Promo.tsx`, `video/src/three/ArchField.tsx`, and `video/out/sheet-old.jpg`. No Gallery card variant was selected. Preserve its particle streams, wireframe core/gate, dimensional X, serif typography and deliberate pauses. The actual frontend remains a light clinic interface. The entire 45-second film now uses the same light clinic palette as the product. Use dark ink typography and darker orange/violet/green pigments with normal alpha blending; preserve the original film’s motion and depth. The user explicitly superseded the earlier dark-stage direction. Avoid solid 3D tubes, paragraphs of explanation and separate provenance/disclaimer footers.
 
 | Time | Product information | Primary visual | Supporting text |
 | --- | --- | --- | --- |

@@ -17,6 +17,13 @@ export const C = {
   ok: '#7FE3C3',
 };
 
+// Same semantic roles as the original film: ink is the stage, paper is foreground.
+export const LIGHT_C = {
+  ...C, ink:'#ECEDE7', ink2:'#E3E7DF', paper:'#1A211E', soft:'#526056',
+  dim:'#68716B', faint:'#9BA69A', line:'rgba(26,33,30,0.12)',
+  cue:'#AA4C23', deep:'#685397', ok:'#2F7058',
+};
+
 export const FONT = {
   sans: '"CueX Serif SC", "Songti SC", serif',
   serif: '"CueX Serif SC", "Songti SC", serif',

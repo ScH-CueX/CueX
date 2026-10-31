@@ -23,4 +23,8 @@ Replay derives cues from the existing timeline. After integrating the realtime b
 
 ## Delivery workflow
 
-Use the dedicated branch `codex/cuex-cinematic-brand`; never push these changes to main. Fetch upstream before implementation checkpoints and before pushing. Commit subjects use `feat(scope): …` / `fix(scope): …`, with concrete dash-separated body items matching the user's example. Preserve unrelated existing lockfile and .claude work.
+Develop on `codex/cuex-cinematic-brand`. The user has now explicitly authorized merging this branch and `feat/realtime-poc` into main after integration checks, with README updates. Fetch upstream before implementation checkpoints and before pushing. Commit subjects use `feat(scope): …` / `fix(scope): …`, with concrete dash-separated body items matching the user's example. Preserve unrelated existing lockfile and .claude work.
+
+## Final media direction
+
+The user subsequently requested a light design throughout the video, matching the frontend and PPT. Keep the original particle motion, wireframe depth and serif typography while adapting pigments and contrast for the light stage. The presentation uses the final 1+3+1 structure: one research/problem page, three product pages including the video, and one commercial/expansion page with the X’s four particle branches. All source visual assets remain in root assets/.

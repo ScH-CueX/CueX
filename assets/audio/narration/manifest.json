@@ -13,7 +13,7 @@
     "file": "audio/narration/problem.wav",
     "sourceFile": "problem-ming-source.wav",
     "sha256": "7b9452724d89afbcf0b5e944e56b452d5b2e03f1d7f2a669b691290512f72216",
-    "source": "Windows GPU service over the authorized SSH tunnel; synthetic narration"
+    "source": "Windows GPU service over the authorized SSH command bridge; synthetic narration"
   },
   {
     "id": "enter",
@@ -29,7 +29,7 @@
     "file": "audio/narration/enter.wav",
     "sourceFile": "enter-ming-source.wav",
     "sha256": "54b7a64110722eda9f3589a69a45d8f6f215c94695bd553b875765a9078712c3",
-    "source": "Windows GPU service over the authorized SSH tunnel; synthetic narration"
+    "source": "Windows GPU service over the authorized SSH command bridge; synthetic narration"
   },
   {
     "id": "interrupt",
@@ -45,7 +45,7 @@
     "file": "audio/narration/interrupt.wav",
     "sourceFile": "interrupt-ming-source.wav",
     "sha256": "78a1c5a9e81db4856a590afb25e37769699e33932fcd14a8c8141adeae59d4ae",
-    "source": "Windows GPU service over the authorized SSH tunnel; synthetic narration"
+    "source": "Windows GPU service over the authorized SSH command bridge; synthetic narration"
   },
   {
     "id": "withdraw",
@@ -61,7 +61,7 @@
     "file": "audio/narration/withdraw.wav",
     "sourceFile": "withdraw-ming-source.wav",
     "sha256": "efaae242baf7870a7cdd32a31b08541635ca43bc58919242c935446bcd9007d3",
-    "source": "Windows GPU service over the authorized SSH tunnel; synthetic narration"
+    "source": "Windows GPU service over the authorized SSH command bridge; synthetic narration"
   },
   {
     "id": "review",
@@ -77,7 +77,7 @@
     "file": "audio/narration/review.wav",
     "sourceFile": "review-ming-source.wav",
     "sha256": "a1b31845901fbb27bf1e4157460e0aa3b56c7150d875e9e461a2543a5def7ef6",
-    "source": "Windows GPU service over the authorized SSH tunnel; synthetic narration"
+    "source": "Windows GPU service over the authorized SSH command bridge; synthetic narration"
   },
   {
     "id": "brand",
@@ -93,6 +93,6 @@
     "file": "audio/narration/brand.wav",
     "sourceFile": "brand-ming-source.wav",
     "sha256": "f83789b7adf032de99ca932ad8b72bd7e0c792cabff8cd8bcb0941687175cfd3",
-    "source": "Windows GPU service over the authorized SSH tunnel; synthetic narration"
+    "source": "Windows GPU service over the authorized SSH command bridge; synthetic narration"
   }
 ]

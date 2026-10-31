@@ -1,7 +1,7 @@
 import React, {useMemo} from 'react';
 import * as THREE from 'three';
 import {useThree} from '@react-three/fiber';
-import {C, EASE, H, clamp01, mix, ramp} from '../theme';
+import {C, LIGHT_C, EASE, H, clamp01, mix, ramp} from '../theme';
 import {FOV, Vec, cameraPose} from './camera';
 
 // Colors are written as-is; the canvas uses linear output and no tone mapping.
@@ -11,10 +11,6 @@ const hex = (h: string): Vec => {
   const n = parseInt(h.slice(1), 16);
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
 };
-const PAPER = hex(C.paper);
-const CUE = hex(C.cue);
-const DEEP = hex(C.deep);
-const OK = hex(C.ok);
 
 const rng = (seed: number) => () => {
   seed |= 0;
@@ -86,6 +82,9 @@ const material = new THREE.ShaderMaterial({
     }`,
 });
 
+const lightMaterial = material.clone();
+lightMaterial.blending = THREE.NormalBlending;
+
 type Buffers = {pos: Float32Array; col: Float32Array; size: Float32Array; alpha: Float32Array};
 
 const usePoints = (count: number) =>
@@ -149,14 +148,14 @@ export const candidateB = (frame: number, beats: ArchBeats): Vec | null => {
   return s2Point(mix(0.5, 0.8, p));
 };
 
-const Card: React.FC<{at: Vec | null; color: string; opacity: number; scale?: number}> = ({at, color, opacity, scale = 1}) => {
+const Card: React.FC<{at: Vec | null; color: string; opacity: number; scale?: number; light?:boolean}> = ({at, color, opacity, scale = 1, light=false}) => {
   const edges = useMemo(() => new THREE.EdgesGeometry(new THREE.PlaneGeometry(0.62, 0.36)), []);
   if (!at || opacity <= 0) return null;
   return (
     <group position={at} scale={scale}>
       <mesh>
         <planeGeometry args={[0.62, 0.36]} />
-        <meshBasicMaterial color={color} transparent opacity={0.14 * opacity} depthWrite={false} blending={THREE.AdditiveBlending} />
+        <meshBasicMaterial color={color} transparent opacity={0.14 * opacity} depthWrite={false} blending={light?THREE.NormalBlending:THREE.AdditiveBlending} />
       </mesh>
       <lineSegments geometry={edges}>
         <lineBasicMaterial color={color} transparent opacity={opacity} />
@@ -165,7 +164,10 @@ const Card: React.FC<{at: Vec | null; color: string; opacity: number; scale?: nu
   );
 };
 
-export const ArchField: React.FC<{frame: number; dur: number; beats: ArchBeats}> = ({frame, dur, beats}) => {
+export const ArchField: React.FC<{frame: number; dur: number; beats: ArchBeats; light?:boolean}> = ({frame, dur, beats, light=false}) => {
+  const palette=light?LIGHT_C:C;
+  const PAPER=hex(palette.paper),CUE=hex(palette.cue),DEEP=hex(palette.deep),OK=hex(palette.ok);
+  const pointMaterial=light?lightMaterial:material;
   const camera = useThree((s) => s.camera);
   const {pos, target} = cameraPose(frame, dur);
   camera.position.set(...pos);
@@ -186,7 +188,7 @@ export const ArchField: React.FC<{frame: number; dur: number; beats: ArchBeats}>
     const [a, b, c, d] = R.dust.map((t) => t[i]);
     const x = -14 + a * 28 + Math.sin(frame * 0.004 + d * 40) * 0.4;
     const y = -7 + b * 14 + Math.cos(frame * 0.003 + a * 30) * 0.3;
-    put(dust.b, i, x, y, -12 + c * 16, PAPER, 0.025 + d * 0.035, (0.12 + d * 0.25) * reveal);
+    put(dust.b, i, x, y, -12 + c * 16, PAPER, 0.025 + d * 0.035, (0.12 + d * 0.25) * reveal * (light?.1:1));
   }
   commit(dust.geo);
 
@@ -270,29 +272,29 @@ export const ArchField: React.FC<{frame: number; dur: number; beats: ArchBeats}>
   return (
     <>
       {[dust, input, s1, s2, out, burst].map((p, i) => (
-        <points key={i} geometry={p.geo} material={material} frustumCulled={false} />
+        <points key={i} geometry={p.geo} material={pointMaterial} frustumCulled={false} />
       ))}
 
       {pulses.map(({p, s, o}, k) => (
         <mesh key={k} position={p} scale={s}>
           <ringGeometry args={[0.95, 1, 64]} />
-          <meshBasicMaterial color={C.cue} transparent opacity={o} depthWrite={false} blending={THREE.AdditiveBlending} />
+          <meshBasicMaterial color={palette.cue} transparent opacity={o} depthWrite={false} blending={light?THREE.NormalBlending:THREE.AdditiveBlending} />
         </mesh>
       ))}
 
       <mesh position={CORE} rotation={[frame * 0.011, frame * 0.017, 0]}>
         <icosahedronGeometry args={[0.42, 1]} />
-        <meshBasicMaterial color={C.deep} wireframe transparent opacity={0.65 * reveal} />
+        <meshBasicMaterial color={palette.deep} wireframe transparent opacity={0.65 * reveal} />
       </mesh>
       <mesh position={CORE} rotation={[-frame * 0.008, -frame * 0.012, 0.4]}>
         <icosahedronGeometry args={[0.7, 0]} />
-        <meshBasicMaterial color={C.deep} wireframe transparent opacity={0.22 * reveal} />
+        <meshBasicMaterial color={palette.deep} wireframe transparent opacity={0.22 * reveal} />
       </mesh>
 
       <group position={GATE} rotation={[0, Math.PI / 2 - 0.75, 0]} scale={1 + flash * 0.25}>
         <mesh>
           <torusGeometry args={[0.62, 0.014, 8, 160]} />
-          <meshBasicMaterial color={C.paper} transparent opacity={(0.65 + flash * 0.35) * reveal} />
+          <meshBasicMaterial color={palette.paper} transparent opacity={(0.65 + flash * 0.35) * reveal} />
         </mesh>
         <group rotation={[0, 0, frame * 0.01]}>
           {Array.from({length: 24}, (_, k) => {
@@ -300,19 +302,19 @@ export const ArchField: React.FC<{frame: number; dur: number; beats: ArchBeats}>
             return (
               <mesh key={k} position={[Math.cos(a) * 0.8, Math.sin(a) * 0.8, 0]} rotation={[0, 0, a]}>
                 <planeGeometry args={[0.08, 0.012]} />
-                <meshBasicMaterial color={C.paper} transparent opacity={0.4 * reveal} side={THREE.DoubleSide} />
+                <meshBasicMaterial color={palette.paper} transparent opacity={0.4 * reveal} side={THREE.DoubleSide} />
               </mesh>
             );
           })}
         </group>
         <mesh>
           <circleGeometry args={[0.6, 64]} />
-          <meshBasicMaterial color={C.paper} transparent opacity={flash * 0.18} side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} />
+          <meshBasicMaterial color={palette.paper} transparent opacity={flash * 0.18} side={THREE.DoubleSide} depthWrite={false} blending={light?THREE.NormalBlending:THREE.AdditiveBlending} />
         </mesh>
       </group>
 
-      <Card at={aAt} color={frame >= beats.aGate - 6 ? C.paper : C.deep} opacity={1} scale={1 - clamp01((frame - beats.aGate + 4) / 6) * 0.6} />
-      <Card at={bAt} color={frame < beats.bStop ? C.deep : C.ok} opacity={bOpacity} />
+      <Card light={light} at={aAt} color={frame >= beats.aGate - 6 ? palette.paper : palette.deep} opacity={1} scale={1 - clamp01((frame - beats.aGate + 4) / 6) * 0.6} />
+      <Card light={light} at={bAt} color={frame < beats.bStop ? palette.deep : palette.ok} opacity={bOpacity} />
     </>
   );
 };
