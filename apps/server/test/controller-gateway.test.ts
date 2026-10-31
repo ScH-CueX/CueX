@@ -495,10 +495,13 @@ test('closing playback ends the visit once with heard interruption and withdrawa
     await h.speech('eGFR30到60亚组有412人，结果与总体一致。', true);
     let from = h.events.length;
     await h.speech('主要终点和上市后研究还有更多结果，', true);
-    await h.speech('不良反应与安慰剂相当，真实世界覆盖两万多人，华东地区的疗效结果也一样，', true);
+    const pitchSegment = '不良反应与安慰剂相当，真实世界覆盖两万多人，华东地区的疗效结果也一样，';
+    await h.speech(pitchSegment, false);
     await h.waitFor(isPhase('ready'), from);
-    await h.speech('我先回答您的人群问题，eGFR低于30这一点我先说明。', true);
+    await h.speech(pitchSegment + '我先回答', false);
     await h.waitFor(isPhase('withdrawn'), from);
+    const correctionSegment = '我先回答您的人群问题，eGFR低于30这一点我先说明。';
+    await h.speech(pitchSegment + correctionSegment, true);
     from = h.events.length;
     await h.speech('eGFR低于30被排除，没有证据，说明书不建议使用。', true);
     await finishLastDoctor(from);
@@ -515,7 +518,9 @@ test('closing playback ends the visit once with heard interruption and withdrawa
     assert(ended.payload.moments[0].repSaid.includes('不良反应'));
     assert(ended.payload.moments[0].doctorSaid?.length);
     assert(ended.payload.moments[0].openPointIds.includes('c1'));
-    assert(ended.payload.moments[1].repSaid.includes('我先回答'));
+    assert(ended.payload.moments[1].repSaid.startsWith('我先回答'));
+    assert.equal(ended.payload.moments[1].repSaid, correctionSegment);
+    assert(!ended.payload.moments[1].repSaid.includes('不良反应'));
     assert(ended.payload.moments[1].withdrawnText?.length);
     assert.equal(ended.payload.moments[1].withdrawalReason, 'response_cue');
     assert.deepEqual(ended.payload.moments[1].openPointIds, ['c3']);

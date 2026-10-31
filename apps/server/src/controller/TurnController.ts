@@ -29,6 +29,8 @@ export class TurnController {
   private ended = false;
   private openingOutput?: SpeechOutput;
   private readonly moments: ReviewMoment[] = [];
+  private readonly withdrawnSegments = new Map<ReviewMoment, { transcriptId: string; reason: WithdrawalReason }>();
+  private lastRepSegment = { transcriptId: '', text: '', isFinal: true };
   private readonly history: DialogueTurn[] = [];
   private readonly candidates: FollowupCandidate[] = [];
   private readonly resolved = new Set<string>();
@@ -146,6 +148,12 @@ export class TurnController {
       else if (isFinal) { this.committedResolved.add(id); this.provisionalResolved.delete(id); }
     }
     this.sentence = text;
+    this.lastRepSegment = { transcriptId: this.transcriptId, text, isFinal };
+    for (const [moment, segment] of this.withdrawnSegments) {
+      if (segment.transcriptId !== this.transcriptId) continue;
+      moment.repSaid = this.withdrawnRepText(text, segment.reason);
+      if (isFinal) this.withdrawnSegments.delete(moment);
+    }
     this.recentSpeech = recent.slice(-80);
     this.revision++;
     // Cancel replaced ASR hypotheses now; additive speech is sampled at the next decision tick.
@@ -325,6 +333,14 @@ export class TurnController {
     }
   }
 
+  private withdrawnRepText(text: string, reason: WithdrawalReason): string {
+    if (reason === 'response_cue') {
+      const cue = [...text.matchAll(/我先回答|我直接回答|抱歉[，,]?我|不过我(?:得|要)?先说明|回到您(?:的)?问题/g)].at(-1);
+      if (cue?.index !== undefined) text = text.slice(cue.index);
+    }
+    return text.trim().slice(0, 60);
+  }
+
   private withdrawCandidate(withdrawalReason: WithdrawalReason): void {
     const held = this.held;
     if (!held) return;
@@ -334,7 +350,9 @@ export class TurnController {
     clearTimeout(this.candidateTimer);
     held.event.withdrawalReason = withdrawalReason;
     held.event.phase = 'withdrawn'; held.event.fate = 'withdrawn'; held.event.decidedAtMs = Date.now();
-    this.moments.push({ kind: 'withdrawn', withdrawalReason, concernId: held.event.targetConcernId, atMs: Date.now() - this.startedAt, repSaid: this.repSpeech.slice(-60), withdrawnText: held.event.draftText, basis: held.event.basis, sourceEvidence: held.event.sourceEvidence, openPointIds: [...this.unresolved] });
+    const moment: ReviewMoment = { kind: 'withdrawn', withdrawalReason, concernId: held.event.targetConcernId, atMs: Date.now() - this.startedAt, repSaid: this.withdrawnRepText(this.lastRepSegment.text, withdrawalReason), withdrawnText: held.event.draftText, basis: held.event.basis, sourceEvidence: held.event.sourceEvidence, openPointIds: [...this.unresolved] };
+    this.moments.push(moment);
+    if (!this.lastRepSegment.isFinal) this.withdrawnSegments.set(moment, { transcriptId: this.lastRepSegment.transcriptId, reason: withdrawalReason });
     this.emitCandidate(held.event);
     this.dispatch('withdrawing', { type: 'withdraw_question', candidateId: held.event.id }, 0, 0.08);
   }
@@ -407,7 +425,7 @@ export class TurnController {
             const held = this.held;
             this.held = undefined;
             held.event.phase = 'spoken'; held.event.fate = 'asked'; held.event.decidedAtMs = Date.now();
-            speech.moment = { kind: 'interrupted', concernId: held.event.targetConcernId, atMs: Date.now() - this.startedAt, repSaid: this.repSpeech.slice(-60), doctorSaid: '', basis: held.event.basis, sourceEvidence: held.event.sourceEvidence, openPointIds: [...this.unresolved] };
+            speech.moment = { kind: 'interrupted', concernId: held.event.targetConcernId, atMs: Date.now() - this.startedAt, repSaid: this.lastRepSegment.text.slice(-60), doctorSaid: '', basis: held.event.basis, sourceEvidence: held.event.sourceEvidence, openPointIds: [...this.unresolved] };
             this.moments.push(speech.moment);
             this.emitCandidate(held.event);
             this.lastInterruptAt = Date.now();
