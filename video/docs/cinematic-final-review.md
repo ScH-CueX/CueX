@@ -1,3 +1,5 @@
+> 后续字幕版：本文件保留全片基础审查；当前字幕版本及新成片哈希、边界与音轨回归结论见 [captions-review.md](captions-review.md)。
+
 # CueX cinematic 45 — 独立成片终检
 
 审查日期：2026-11-01。模式：自主创作；没有点名 Gallery 卡片或变体。审查者未参与制作。当前依据为 **`cinematic-spec.md` 的统一浅色版本及 `LIGHT_C`**、`video-shotcraft/references/final-review.md` 与 `aesthetic-rules.md`。用户的统一浅色要求已经取代早期暗舞台方向；下方暗色版记录只作历史。

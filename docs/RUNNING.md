@@ -32,7 +32,7 @@ pnpm --filter @cuex/web preview
 pnpm video:demo
 ```
 
-当前宣传片合成名 `CueXCinematic45`；`CueXDemo45` 是已被用户否决的讲解片草稿，`CueXPromo` 是保留的原始 90 秒工程。输出 `video/out/AI+医疗健康-记性好了一点-视频.mp4`。渲染读取本地素材和配音，不在渲染时调用语音服务。旁白字幕依据已校验的音频自动生成并默认内嵌；可编辑的 SRT 位于 assets/captions/。
+当前宣传片合成名 `CueXCinematic45`；`CueXDemo45` 是已被用户否决的讲解片草稿，`CueXPromo` 是保留的原始 90 秒工程。输出 `video/out/AI+医疗健康-记性好了一点-视频.mp4`。渲染读取本地素材和配音，不在渲染时调用语音服务。旁白字幕依据已校验的音频自动生成并默认内嵌；可编辑的 SRT 位于 assets/captions/，供后续剪辑使用；当前 MP4 已内嵌字幕，无需另行加载。
 
 更新前端后，先启动 Web，再执行 `node scripts/capture-product.mjs` 与 `node scripts/record-product.mjs`，更新实际页面素材。浏览器采集需要 Playwright 和 Chrome。可设置 `CUEX_PLAYWRIGHT_PATH`，渲染可设置 `REMOTION_BROWSER` 指向本机 Chrome 可执行文件。
 

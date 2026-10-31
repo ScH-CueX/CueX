@@ -1,11 +1,13 @@
 {
   "date": "2026-11-01",
-  "variant": "cinematic-light-1",
-  "method": "Both soundtracks rendered from the same composition; the dry variant copies the master H264 stream and keeps its independently rendered narration/SFX audio.",
+  "variant": "cinematic-light-captions-3",
+  "method": "New captioned visual stream shared by both versions; original unchanged BGM and no-BGM audio streams preserved.",
   "videoSha256": {
-    "AI+医疗健康-记性好了一点-视频.mp4": "bc0a4f550f0fd939abdd6ed0da69aead5b1d2d211d5a35bcfaeb7cab0e769920",
-    "AI+医疗健康-记性好了一点-视频-无配乐.mp4": "bc0a4f550f0fd939abdd6ed0da69aead5b1d2d211d5a35bcfaeb7cab0e769920"
+    "AI+医疗健康-记性好了一点-视频.mp4": "42eee919815b9883faa87864f7412c20cd564048803016257b8b6f234086d9e8",
+    "AI+医疗健康-记性好了一点-视频-无配乐.mp4": "42eee919815b9883faa87864f7412c20cd564048803016257b8b6f234086d9e8"
   },
-  "dryAudioBefore": "4ba12e89372ea9a612c0e6fe5eeff24074cf969bfa3c0e7542c92735dfdb5fc6",
-  "dryAudioAfter": "4ba12e89372ea9a612c0e6fe5eeff24074cf969bfa3c0e7542c92735dfdb5fc6"
+  "audioSha256": {
+    "AI+医疗健康-记性好了一点-视频.mp4": "512cd8442546d7753adfd3a93752416e6f86b610a39e64229a3b3d4e782a75cf",
+    "AI+医疗健康-记性好了一点-视频-无配乐.mp4": "4ba12e89372ea9a612c0e6fe5eeff24074cf969bfa3c0e7542c92735dfdb5fc6"
+  }
 }
