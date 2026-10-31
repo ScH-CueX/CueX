@@ -1,98 +1,65 @@
-/**
- * Web Audio 麦克风录音采集器
- * 16kHz 单声道 PCM 采集与基础音量检测
- */
-
 export interface AudioCaptureCallbacks {
   onAudioChunk?: (base64Pcm: string, timestamp: number) => void;
   onVolumeChange?: (rms: number) => void;
   onError?: (err: Error) => void;
 }
 
+/** Mono PCM16LE at 16 kHz. AudioWorklet keeps capture off the UI thread. */
 export class AudioCapture {
   private audioCtx: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
-  private processor: ScriptProcessorNode | null = null;
-  private isCapturing = false;
-  private callbacks: AudioCaptureCallbacks = {};
+  private processor: AudioWorkletNode | null = null;
+  private generation = 0;
 
   async start(callbacks: AudioCaptureCallbacks): Promise<boolean> {
-    if (this.isCapturing) return true;
-    this.callbacks = callbacks;
-
+    this.stop();
+    const generation = this.generation;
+    let stream: MediaStream | undefined;
+    let ctx: AudioContext | undefined;
     try {
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-
-      this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({
-        sampleRate: 16000,
-      });
-
-      const source = this.audioCtx.createMediaStreamSource(this.mediaStream);
-      // Buffer size 4096 at 16kHz gives ~256ms chunk
-      this.processor = this.audioCtx.createScriptProcessor(4096, 1, 1);
-
-      this.processor.onaudioprocess = (e) => {
-        if (!this.isCapturing) return;
-        const inputData = e.inputBuffer.getChannelData(0);
-        
-        // 1. RMS Volume Level
-        let sum = 0;
-        for (let i = 0; i < inputData.length; i++) {
-          sum += inputData[i] * inputData[i];
-        }
-        const rms = Math.min(1, Math.sqrt(sum / inputData.length) * 4);
-        this.callbacks.onVolumeChange?.(rms);
-
-        // 2. Float32 to 16-bit PCM ArrayBuffer
-        const pcm16 = new Int16Array(inputData.length);
-        for (let i = 0; i < inputData.length; i++) {
-          const s = Math.max(-1, Math.min(1, inputData[i]));
-          pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-        }
-
-        // 3. Base64 encode
-        const bytes = new Uint8Array(pcm16.buffer);
+      if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) throw new Error('请在 localhost 或 HTTPS 页面使用麦克风。');
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      if (generation !== this.generation) { stream.getTracks().forEach(track => track.stop()); return false; }
+      ctx = new AudioContext({ sampleRate: 16000 });
+      this.mediaStream = stream;
+      this.audioCtx = ctx;
+      await ctx.audioWorklet.addModule(new URL('./pcm-capture.worklet.js', import.meta.url));
+      if (generation !== this.generation) return false;
+      await ctx.resume();
+      const processor = new AudioWorkletNode(ctx, 'cuex-pcm-capture');
+      this.processor = processor;
+      processor.port.onmessage = ({ data }: MessageEvent<{ pcm: ArrayBuffer; rms: number }>) => {
+        if (generation !== this.generation) return;
+        callbacks.onVolumeChange?.(data.rms);
+        const bytes = new Uint8Array(data.pcm);
         let binary = '';
-        for (let i = 0; i < bytes.byteLength; i++) {
-          binary += String.fromCharCode(bytes[i]);
-        }
-        const base64 = btoa(binary);
-
-        this.callbacks.onAudioChunk?.(base64, Date.now());
+        for (const byte of bytes) binary += String.fromCharCode(byte);
+        callbacks.onAudioChunk?.(btoa(binary), Date.now());
       };
-
-      source.connect(this.processor);
-      this.processor.connect(this.audioCtx.destination);
-      this.isCapturing = true;
+      ctx.createMediaStreamSource(stream).connect(processor);
+      processor.connect(ctx.destination);
       return true;
-    } catch (err: any) {
-      console.warn('[AudioCapture] Mic access rejected or unavailable:', err);
-      this.callbacks.onError?.(err);
-      this.stop();
+    } catch (error) {
+      stream?.getTracks().forEach(track => track.stop());
+      if (ctx && ctx.state !== 'closed') void ctx.close();
+      if (generation === this.generation) {
+        this.stop();
+        callbacks.onError?.(error instanceof Error ? error : new Error(String(error)));
+      }
       return false;
     }
   }
 
   stop(): void {
-    this.isCapturing = false;
+    this.generation++;
     if (this.processor) {
+      this.processor.port.onmessage = null;
       this.processor.disconnect();
       this.processor = null;
     }
-    if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach((track) => track.stop());
-      this.mediaStream = null;
-    }
-    if (this.audioCtx && this.audioCtx.state !== 'closed') {
-      this.audioCtx.close();
-      this.audioCtx = null;
-    }
+    this.mediaStream?.getTracks().forEach(track => track.stop());
+    this.mediaStream = null;
+    if (this.audioCtx && this.audioCtx.state !== 'closed') void this.audioCtx.close();
+    this.audioCtx = null;
   }
 }

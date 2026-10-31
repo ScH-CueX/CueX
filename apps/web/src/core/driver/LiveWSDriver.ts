@@ -1,5 +1,6 @@
 import type { IConversationDriver, DriverStatus, DriverCallbacks } from './IConversationDriver';
-import type { ServerMessage, ClientMessage, ControllerDispatchEvent, FollowupCandidate, JevDecisionResponse, AsrTranscriptDelta } from '@cuex/protocol';
+import type { ServerMessage, ClientMessage } from '@cuex/protocol';
+import { StreamAudioPlayer } from '../audio/StreamAudioPlayer';
 
 export interface LiveWSDriverOptions {
   serverUrl?: string;
@@ -12,167 +13,148 @@ export class LiveWSDriver implements IConversationDriver {
   private _status: DriverStatus = 'idle';
   private callbacks: DriverCallbacks = {};
   private ws: WebSocket | null = null;
-  private serverUrl: string;
-  private scenarioId: string;
-  private mode: 'performance' | 'learning';
-  private pingTimer: number | null = null;
+  private sessionId?: string;
+  private pingTimer?: number;
+  private connectTimer?: number;
+  private doctorPending = false;
+  private readonly onOffline = () => this.fail('网络已断开，请恢复网络后重新连接。');
+  private readonly player = new StreamAudioPlayer({
+    onReport: payload => this.sendMessage({ type: 'tts.playback', payload }),
+    onPlayingChange: playing => this.callbacks.onAudioPlayingChange?.(playing),
+    onError: error => this.callbacks.onError?.(error, 'AUDIO_PLAYBACK'),
+  });
 
-  constructor(options: LiveWSDriverOptions = {}) {
-    this.serverUrl = options.serverUrl || (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws/session';
-    this.scenarioId = options.scenarioId || 'anshu-hypertension-01';
-    this.mode = options.mode || 'performance';
-  }
+  constructor(private readonly options: LiveWSDriverOptions = {}) {}
+  get status(): DriverStatus { return this._status; }
 
-  get status(): DriverStatus {
-    return this._status;
-  }
-
-  async init(callbacks: DriverCallbacks): Promise<void> {
-    this.callbacks = callbacks;
-    this.setStatus('idle');
-  }
+  async init(callbacks: DriverCallbacks): Promise<void> { this.callbacks = callbacks; }
+  unlockAudio(): Promise<void> { return this.player.unlock(); }
 
   async start(): Promise<void> {
-    if (this._status === 'running' || this._status === 'connecting') return;
+    if (this.ws) return;
     this.setStatus('connecting');
-
+    window.addEventListener('offline', this.onOffline);
     try {
-      this.ws = new WebSocket(this.serverUrl);
-      this.ws.binaryType = 'arraybuffer';
-
-      this.ws.onopen = () => {
-        this.setStatus('running');
-        this.sendMessage({
-          type: 'session.start',
-          payload: { scenarioId: this.scenarioId, mode: this.mode },
-        });
-        this.startHeartbeat();
+      const url = this.options.serverUrl ?? `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/session`;
+      const ws = new WebSocket(url);
+      this.ws = ws;
+      this.connectTimer = window.setTimeout(() => {
+        if (this.ws === ws && this._status === 'connecting') this.fail('连接超时，请确认后端已启动后重连。');
+      }, 10000);
+      ws.onopen = () => {
+        if (this.ws !== ws) return;
+        this.sendMessage({ type: 'session.start', payload: { scenarioId: this.options.scenarioId ?? 'anshu-hypertension-01', mode: this.options.mode ?? 'performance' } });
+        this.pingTimer = window.setInterval(() => this.sendMessage({ type: 'ping', payload: { t: Date.now() } }), 15000);
       };
-
-      this.ws.onmessage = (event) => {
-        try {
-          const msg: ServerMessage = JSON.parse(event.data);
-          this.handleServerMessage(msg);
-        } catch (e) {
-          console.warn('[LiveWSDriver] Failed to parse server message:', e);
-        }
+      ws.onmessage = event => {
+        if (this.ws !== ws) return;
+        try { this.handleServerMessage(JSON.parse(event.data) as ServerMessage); }
+        catch { this.callbacks.onError?.(new Error('收到无法读取的服务端消息，请重新连接。'), 'INVALID_SERVER_MESSAGE'); }
       };
-
-      this.ws.onerror = (e) => {
-        console.error('[LiveWSDriver] WebSocket error:', e);
-        this.setStatus('error');
-        this.callbacks.onError?.(new Error('WebSocket connection error'));
+      ws.onerror = () => { if (this.ws === ws) this.fail('无法连接后端，请确认服务已启动后重连。'); };
+      ws.onclose = () => {
+        if (this.ws !== ws) return;
+        this.player.abort();
+        this.ws = null;
+        this.clearTimers();
+        if (this._status !== 'error') this.fail('连接已断开，请重新连接。');
       };
-
-      this.ws.onclose = () => {
-        this.stopHeartbeat();
-        this.setStatus('idle');
-      };
-    } catch (err: any) {
-      this.setStatus('error');
-      this.callbacks.onError?.(err);
-    }
+    } catch { this.fail('无法连接后端，请确认服务地址后重连。'); }
   }
 
-  pause(): void {
-    // Live sessions generally do not pause server-side streams, but can flag UI
-    this.setStatus('paused');
-  }
-
-  resume(): void {
-    if (this._status === 'paused') {
-      this.setStatus('running');
-    }
-  }
+  // Live input cannot pause the server. The view exposes stop/reconnect instead.
+  pause(): void {}
+  resume(): void {}
 
   async stop(): Promise<void> {
-    this.stopHeartbeat();
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.sendMessage({
-        type: 'session.stop',
-        payload: { sessionId: 'current' },
-      });
-      this.ws.close();
-    }
+    this.clearTimers();
+    this.player.abort();
+    this.sendMessage({ type: 'session.stop', payload: { sessionId: this.sessionId ?? 'current' } });
+    const ws = this.ws;
     this.ws = null;
+    ws?.close();
+    this.sessionId = undefined;
+    this.doctorPending = false;
     this.setStatus('idle');
   }
 
   destroy(): void {
-    this.stop();
+    void this.stop();
+    this.player.destroy();
     this.callbacks = {};
   }
 
+  interruptDoctor(): void {
+    const active = this.player.active || this.doctorPending;
+    this.player.abort(); // Sends tts.playback synchronously, before interruption or rep input.
+    this.doctorPending = false;
+    if (active) this.sendMessage({ type: 'user.interrupted_doctor', payload: { timestamp: Date.now() } });
+  }
+
   sendAudioChunk(base64Pcm: string, timestamp: number): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.sendMessage({
-        type: 'audio.chunk',
-        payload: {
-          format: 'pcm16',
-          sampleRate: 16000,
-          channels: 1,
-          data: base64Pcm,
-          timestamp,
-        },
-      });
-    }
+    if (this._status !== 'running') return;
+    this.sendMessage({ type: 'audio.chunk', payload: { format: 'pcm16', sampleRate: 16000, channels: 1, data: base64Pcm, timestamp } });
   }
 
   sendSpeechDelta(text: string, isFinal: boolean): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.sendMessage({
-        type: 'speech.delta',
-        payload: { text, isFinal },
-      });
-    }
+    if (this._status !== 'running') return;
+    this.interruptDoctor();
+    this.sendMessage({ type: 'speech.delta', payload: { text, isFinal } });
   }
 
-  private sendMessage(msg: ClientMessage) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(msg));
-    }
+  private sendMessage(msg: ClientMessage): void {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
   }
 
-  private handleServerMessage(msg: ServerMessage) {
+  private handleServerMessage(msg: ServerMessage): void {
+    this.callbacks.onServerEvent?.(msg);
     switch (msg.type) {
+      case 'session.ready':
+        this.sessionId = msg.payload.sessionId;
+        window.clearTimeout(this.connectTimer);
+        this.setStatus('running');
+        break;
       case 'controller.dispatch':
+        if (msg.payload.action.textToSpeak) this.doctorPending = true;
         this.callbacks.onDoctorDispatch?.(msg.payload);
         break;
-      case 'asr.transcript':
-        this.callbacks.onTranscript?.(msg.payload);
+      case 'asr.transcript': this.callbacks.onTranscript?.(msg.payload); break;
+      case 'system1.verdict': this.callbacks.onSystem1Verdict?.(msg.payload); break;
+      case 'system2.candidate': this.callbacks.onSystem2Candidate?.(msg.payload.candidate); break;
+      case 'tts.stream_chunk':
+        this.player.enqueue(msg.payload);
+        if (msg.payload.isLastChunk) this.doctorPending = false;
         break;
-      case 'system1.verdict':
-        this.callbacks.onSystem1Verdict?.(msg.payload);
+      case 'tts.abort':
+        this.player.abort(msg.payload.utteranceId);
+        this.doctorPending = false;
         break;
-      case 'system2.candidate':
-        this.callbacks.onSystem2Candidate?.(msg.payload.candidate);
-        break;
-      case 'session.error':
-        this.callbacks.onError?.(new Error(msg.payload.message));
-        break;
-      default:
-        break;
-    }
-  }
-
-  private setStatus(s: DriverStatus) {
-    this._status = s;
-    this.callbacks.onStatusChange?.(s);
-  }
-
-  private startHeartbeat() {
-    this.stopHeartbeat();
-    this.pingTimer = window.setInterval(() => {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({ type: 'ping', t: Date.now() }));
+      case 'session.error': this.callbacks.onError?.(new Error(msg.payload.message), msg.payload.code); break;
+      default: {
+        const unhandled: never = msg;
+        void unhandled;
       }
-    }, 15000);
+    }
   }
 
-  private stopHeartbeat() {
-    if (this.pingTimer !== null) {
-      clearInterval(this.pingTimer);
-      this.pingTimer = null;
-    }
+  private fail(message: string): void {
+    this.player.abort();
+    const ws = this.ws;
+    this.ws = null;
+    ws?.close();
+    this.clearTimers();
+    this.setStatus('error');
+    this.callbacks.onError?.(new Error(message), 'CONNECTION_ERROR');
+  }
+
+  private setStatus(status: DriverStatus): void {
+    this._status = status;
+    this.callbacks.onStatusChange?.(status);
+  }
+
+  private clearTimers(): void {
+    window.removeEventListener('offline', this.onOffline);
+    window.clearInterval(this.pingTimer);
+    window.clearTimeout(this.connectTimer);
   }
 }
