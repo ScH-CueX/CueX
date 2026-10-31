@@ -34,3 +34,10 @@ assets/qa/
 assets/captures/raw/
 .firecrawl/
 .taste-skill/
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# TypeScript incremental build info
+*.tsbuildinfo

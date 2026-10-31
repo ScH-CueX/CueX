@@ -1,0 +1,1139 @@
+{
+  "description": "40 hand-labeled Chinese ANSHU demo states. 6 binary questions per state; labels distinguish intent from substantive answer. This is a development set, not a held-out benchmark.",
+  "cases": [
+    {
+      "id": "population-range",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "这项研究入组的是18到80岁的原发性高血压患者。",
+        "recentSpeech": "这项研究入组的是18到80岁的原发性高血压患者。",
+        "candidate": {
+          "targetPointIds": [
+            "c1",
+            "c2"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "endpoint",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "主要终点是12周时的诊室收缩压，多降6.2毫米汞柱。",
+        "recentSpeech": "主要终点是12周时的诊室收缩压，多降6.2毫米汞柱。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": false,
+        "drift": true,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "safety",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "不良反应发生率和安慰剂相当。",
+        "recentSpeech": "不良反应发生率和安慰剂相当。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": false,
+        "drift": true,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "regional",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "我们在华东地区的上市后研究显示疗效很好。",
+        "recentSpeech": "我们在华东地区的上市后研究显示疗效很好。",
+        "candidate": {
+          "targetPointIds": [
+            "c1",
+            "c2"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": false,
+        "drift": true,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "promise-hard",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "我先回答您的人群问题，",
+        "recentSpeech": "我先回答您的人群问题，",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "age-mention-only",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "75岁以上的患者，这个亚组我接下来说明。",
+        "recentSpeech": "75岁以上的患者，这个亚组我接下来说明。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "age-number",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "75岁以上患者约占11%，降压幅度与总体一致。",
+        "recentSpeech": "75岁以上患者约占11%，降压幅度与总体一致。",
+        "candidate": {
+          "targetPointIds": [
+            "c1",
+            "c2"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": true,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "renal-middle",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "eGFR在30到60之间的亚组有412人，降压幅度和总体一致。",
+        "recentSpeech": "eGFR在30到60之间的亚组有412人，降压幅度和总体一致。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": true,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "two-points",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "75岁以上患者约占11%，eGFR30到60亚组有412人，降压幅度和总体一致。",
+        "recentSpeech": "75岁以上患者约占11%，eGFR30到60亚组有412人，降压幅度和总体一致。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": true,
+        "resolved_c2": true,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "renal-low",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "eGFR低于30的患者被排除在研究之外，目前没有证据，说明书不建议使用。",
+        "recentSpeech": "eGFR低于30的患者被排除在研究之外，目前没有证据，说明书不建议使用。",
+        "candidate": {
+          "targetPointIds": [
+            "c1",
+            "c2"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": true,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "all",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "75岁以上患者占11%，eGFR30到60有412人，降压幅度和总体一致。eGFR低于30未纳入，不建议使用。",
+        "recentSpeech": "75岁以上患者占11%，eGFR30到60有412人，降压幅度和总体一致。eGFR低于30未纳入，不建议使用。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": true,
+        "resolved_c2": true,
+        "resolved_c3": true,
+        "candidateValid": false
+      }
+    },
+    {
+      "id": "rwe-after-answer",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "75岁以上约占11%，eGFR30到60亚组412人。另有一项覆盖两万多名患者的真实世界研究。",
+        "recentSpeech": "另有一项覆盖两万多名患者的真实世界研究。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": false,
+        "drift": true,
+        "resolved_c1": true,
+        "resolved_c2": true,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "self-correction",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "75岁以上约占11%，eGFR30到60亚组412人。真实世界研究覆盖两万人。不过我得先说明：eGFR低于30的患者被排除，没有证据，不建议使用。",
+        "recentSpeech": "不过我得先说明：eGFR低于30的患者被排除，没有证据，说明书不建议使用。",
+        "candidate": {
+          "targetPointIds": [
+            "c1",
+            "c2"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": true,
+        "resolved_c2": true,
+        "resolved_c3": true,
+        "candidateValid": false
+      }
+    },
+    {
+      "id": "promise-renal",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "肾功能这部分我马上回答您，先看eGFR低于30的人群。",
+        "recentSpeech": "肾功能这部分我马上回答您，先看eGFR低于30的人群。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "age-repeat-question",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "您问75岁以上患者研究里有多少，结论适用吗？我先找一下。",
+        "recentSpeech": "您问75岁以上患者研究里有多少，结论适用吗？我先找一下。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "age-overclaim",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "高龄患者肯定都能用，我们产品很安全。",
+        "recentSpeech": "高龄患者肯定都能用，我们产品很安全。",
+        "candidate": {
+          "targetPointIds": [
+            "c1",
+            "c2"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "renal-overclaim",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "eGFR低于30也完全可以放心使用。",
+        "recentSpeech": "eGFR低于30也完全可以放心使用。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "no-data-yet",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "75岁以上的比例我还没查到，稍后提供。",
+        "recentSpeech": "75岁以上的比例我还没查到，稍后提供。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "chinese-ratio",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "七十五岁以上患者占百分之十一。",
+        "recentSpeech": "七十五岁以上患者占百分之十一。",
+        "candidate": {
+          "targetPointIds": [
+            "c1",
+            "c2"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": true,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "chinese-count",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "eGFR三十到六十的患者有四百一十二人。",
+        "recentSpeech": "eGFR三十到六十的患者有四百一十二人。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": true,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "low-not-enrolled",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "eGFR小于30者未纳入研究，说明书不推荐使用。",
+        "recentSpeech": "eGFR小于30者未纳入研究，说明书不推荐使用。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": true,
+        "candidateValid": false
+      }
+    },
+    {
+      "id": "low-only-intent",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "关于eGFR低于30能不能用，我先回答这个问题。",
+        "recentSpeech": "关于eGFR低于30能不能用，我先回答这个问题。",
+        "candidate": {
+          "targetPointIds": [
+            "c1",
+            "c2"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "mid-only-intent",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "eGFR30到60这一组，我接下来给您具体数据。",
+        "recentSpeech": "eGFR30到60这一组，我接下来给您具体数据。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "age-result",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "75岁以上患者降压幅度与总体一致。",
+        "recentSpeech": "75岁以上患者降压幅度与总体一致。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": true,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "mid-result",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "eGFR30至60的亚组降压幅度与总体一致。",
+        "recentSpeech": "eGFR30至60的亚组降压幅度与总体一致。",
+        "candidate": {
+          "targetPointIds": [
+            "c1",
+            "c2"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": true,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "low-evidence-only",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "eGFR低于30这一组目前没有证据。",
+        "recentSpeech": "eGFR低于30这一组目前没有证据。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": true,
+        "candidateValid": false
+      }
+    },
+    {
+      "id": "low-exclusion-only",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "eGFR低于30的患者被排除在研究之外。",
+        "recentSpeech": "eGFR低于30的患者被排除在研究之外。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": true,
+        "candidateValid": false
+      }
+    },
+    {
+      "id": "mid-not-low",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "eGFR30–60亚组412人，结论和总体一致，低于30这部分我稍后再说。",
+        "recentSpeech": "eGFR30–60亚组412人，结论和总体一致，低于30这部分我稍后再说。",
+        "candidate": {
+          "targetPointIds": [
+            "c1",
+            "c2"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": true,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "age-not-renal",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "75岁以上约占11%。肾功能数据我还没有拿到。",
+        "recentSpeech": "75岁以上约占11%。肾功能数据我还没有拿到。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": true,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "renal-not-age",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "eGFR30到60有412人，eGFR低于30不建议使用。高龄比例稍后补。",
+        "recentSpeech": "eGFR30到60有412人，eGFR低于30不建议使用。高龄比例稍后补。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": true,
+        "resolved_c3": true,
+        "candidateValid": false
+      }
+    },
+    {
+      "id": "empty",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "",
+        "recentSpeech": "",
+        "candidate": {
+          "targetPointIds": [
+            "c1",
+            "c2"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": false,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "greeting",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "好的，陈主任。",
+        "recentSpeech": "好的，陈主任。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": false,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "broad-population",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "研究人群包括原发性高血压患者，年龄上限是80岁。",
+        "recentSpeech": "研究人群包括原发性高血压患者，年龄上限是80岁。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "age-with-safety",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "七十五岁以上患者约占11%，这些患者降压幅度与总体一致，不良反应率与安慰剂相当。",
+        "recentSpeech": "七十五岁以上患者约占11%，这些患者降压幅度与总体一致，不良反应率与安慰剂相当。",
+        "candidate": {
+          "targetPointIds": [
+            "c1",
+            "c2"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": true,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "marketing",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "这个品牌市场份额很高，很多医院都在用。",
+        "recentSpeech": "这个品牌市场份额很高，很多医院都在用。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": false,
+        "drift": true,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "general-efficacy",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "安舒平降压效果很突出，指南推荐力度也很强。",
+        "recentSpeech": "安舒平降压效果很突出，指南推荐力度也很强。",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": false,
+        "drift": true,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "correct-after-drift",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "主要终点多降6.2。抱歉，我直接回答：eGFR低于30没有证据，说明书不建议使用。",
+        "recentSpeech": "抱歉，我直接回答：eGFR低于30没有证据，说明书不建议使用。",
+        "candidate": {
+          "targetPointIds": [
+            "c1",
+            "c2"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": true,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "partial-mid",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "eGFR在30到60之间的亚组有",
+        "recentSpeech": "eGFR在30到60之间的亚组有",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "partial-age",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "75岁以上的患者约占",
+        "recentSpeech": "75岁以上的患者约占",
+        "candidate": {
+          "targetPointIds": [
+            "c3"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": false,
+        "resolved_c2": false,
+        "resolved_c3": false,
+        "candidateValid": true
+      }
+    },
+    {
+      "id": "full-demo",
+      "state": {
+        "concernId": "concern-scope",
+        "concern": "适用范围",
+        "unresolvedPointIds": [
+          "c1",
+          "c2",
+          "c3"
+        ],
+        "repSpeechSinceConcern": "入组18到80岁。主要终点多降6.2。不良反应和安慰剂相当。75岁以上约占11%，eGFR30到60有412人，降压幅度与总体一致。另外真实世界研究两万多人。不过eGFR低于30被排除，没有证据，说明书不建议使用。",
+        "recentSpeech": "不过我得先说明：eGFR低于30的患者被排除，没有证据，说明书不建议使用。",
+        "candidate": {
+          "targetPointIds": [
+            "c1",
+            "c2"
+          ],
+          "triggerCondition": "目标要点尚未实质回答"
+        }
+      },
+      "expected": {
+        "responding": true,
+        "drift": false,
+        "resolved_c1": true,
+        "resolved_c2": true,
+        "resolved_c3": true,
+        "candidateValid": false
+      }
+    }
+  ]
+}

@@ -19,7 +19,7 @@ For the minimum-assistance mode, the user proposed a screen-perimeter light insp
 
 The light has no pointer events and does not change layout, background, content, keyboard focus or button hit areas. A concise screen-reader status accompanies phase changes. The mode selector remains available; the minimal mode removes the detailed text tray.
 
-The current demonstration derives its cues from the existing replay states. It does not pretend that the unconnected main-branch live driver is producing those cues. A live adapter can later feed the same semantic phases.
+Replay derives cues from the existing timeline. After integrating the realtime branch, the same phases also consume the live session's TrainingFrame; disconnected sessions show no cue. This keeps the peripheral language shared without fabricating live status from replay time.
 
 ## Delivery workflow
 

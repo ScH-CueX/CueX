@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { ViewKey } from '@/components/layout/Navbar';
 import { DoctorCanvas } from '@/components/r3f/DoctorCanvas';
 import { ClinicalScaffoldingHUD, type ScaffoldingLevel } from '@/components/ClinicalScaffoldingHUD';
@@ -7,22 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   META,
-  UTTERANCES,
-  CONCERN,
-  JUDGMENTS,
-  CANDIDATES,
   MOMENTS,
   NODS,
-  stateAt,
   fmt,
   fmtD,
 } from '@/lib/scenario';
-import type { DoctorStateName } from '@/lib/types';
 import { Play, Pause, Eye, EyeOff, Radio } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ReplayDriver } from '@/core/driver/ReplayDriver';
-import { LiveWSDriver } from '@/core/driver/LiveWSDriver';
-import type { IConversationDriver } from '@/core/driver/IConversationDriver';
+import { useLiveSession } from '@/core/session/useLiveSession';
+import { replayFrame, liveFrame, phaseLabels, actionLabels } from '@/core/session/trainingFrame';
+import { LiveInputControls } from '@/components/LiveInputControls';
 
 const D = META.duration;
 const JUMP: Record<string, number> = { listen: 9.0, ask: 26.2, withdraw: 51.4 };
@@ -48,34 +42,22 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
   const [nodTrigger, setNodTrigger] = useState<number>(0);
   const [driverType, setDriverType] = useState<'replay' | 'live'>('replay');
 
-  const driverRef = useRef<IConversationDriver | null>(null);
+  const live = useLiveSession(driverType === 'live');
+  const [elapsed, setElapsed] = useState(0);
   const lastTimeRef = useRef<number>(Date.now());
   const nodCheckedRef = useRef<Set<number>>(new Set());
 
-  // 1. 初始化会话驱动器 (Driver Layer)
   useEffect(() => {
-    if (driverType === 'replay') {
-      const replay = new ReplayDriver();
-      replay.init({
-        onDoctorDispatch: () => {},
-      });
-      driverRef.current = replay;
-    } else {
-      const live = new LiveWSDriver();
-      live.init({
-        onDoctorDispatch: () => {},
-      });
-      live.start();
-      driverRef.current = live;
-    }
-
-    return () => {
-      driverRef.current?.destroy();
-    };
-  }, [driverType]);
+    if (driverType !== 'live' || !live.session.startedAt) return;
+    const tick = () => setElapsed((Date.now() - live.session.startedAt!) / 1000);
+    tick();
+    const timer = window.setInterval(tick, 250);
+    return () => window.clearInterval(timer);
+  }, [driverType, live.session.startedAt]);
 
   // 2. 点头检测
   useEffect(() => {
+    if (driverType !== 'replay') return;
     for (const nodT of NODS) {
       if (Math.abs(t - nodT) < 0.25 && !nodCheckedRef.current.has(nodT)) {
         nodCheckedRef.current.add(nodT);
@@ -84,7 +66,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
         nodCheckedRef.current.delete(nodT);
       }
     }
-  }, [t]);
+  }, [t, driverType]);
 
   // 3. 时间轴主循环
   useEffect(() => {
@@ -113,56 +95,23 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
     return () => cancelAnimationFrame(rafId);
   }, [playing, driverType]);
 
-  // 状态计算
-  const currentStatePeriod = useMemo(() => stateAt(t), [t]);
-  const currentStateName = currentStatePeriod.state;
-  const currentCandidate = useMemo(
-    () => (currentStatePeriod.candidate ? CANDIDATES.find((c) => c.id === currentStatePeriod.candidate) : null),
-    [currentStatePeriod]
-  );
-
-  let readiness = 0;
-  if (currentStateName === 'holding' && currentCandidate) {
-    readiness = Math.min(
-      1,
-      Math.max(0, (t - currentCandidate.readyAt) / (currentCandidate.decidedAt - currentCandidate.readyAt))
-    );
-  }
-
-  // 对话列表
-  const startedUtterances = useMemo(() => UTTERANCES.filter((u) => u.start <= t), [t]);
-  const activeUtterance = startedUtterances[startedUtterances.length - 1] || null;
-  const pastUtterances = useMemo(() => startedUtterances.slice(0, -1).slice(-3), [startedUtterances]);
-
-  // 发言流式进度
-  const activeUtteranceProgress = useMemo(() => {
-    if (!activeUtterance) return 0;
-    const stop = activeUtterance.cutAt ?? activeUtterance.end;
-    if (activeUtterance.cutAt && t >= activeUtterance.cutAt) return 1;
-    return Math.min(1, Math.max(0, (t - activeUtterance.start) / (stop - activeUtterance.start - 0.2)));
-  }, [activeUtterance, t]);
-
-  // Jev 与 PiAgent 状态
-  const latestJudgment = useMemo(() => {
-    return [...JUDGMENTS].reverse().find((j) => j.t <= t) || null;
-  }, [t]);
-
-  const candidateInFocus = useMemo(() => {
-    return [...CANDIDATES].reverse().find((c) => t >= c.preparedFrom) || null;
-  }, [t]);
-
-  const candidatePhase = useMemo(() => {
-    if (!candidateInFocus) return 'none';
-    if (t < candidateInFocus.readyAt) return 'prep';
-    if (t < candidateInFocus.decidedAt) return 'ready';
-    return candidateInFocus.fate;
-  }, [candidateInFocus, t]);
+  const frame = driverType === 'live' ? liveFrame(live.session) : replayFrame(t);
+  const currentStateName = frame.state;
+  const readiness = frame.readiness;
+  const activeUtterance = frame.utterances[frame.utterances.length - 1] ?? null;
+  const pastUtterances = frame.utterances.slice(0, -1).slice(-3);
+  const activeUtteranceProgress = frame.activeProgress;
+  const latestJudgment = frame.judgment;
+  const candidatesInView = driverType === 'live' ? frame.candidates : frame.candidates.slice(-1);
+  const candidateInFocus = frame.candidates[frame.candidates.length - 1];
+  const clock = driverType === 'live' ? elapsed : t;
+  const connected = live.session.status === 'running';
 
   const seek = useCallback((targetTime: number) => {
     setT(Math.min(D, Math.max(0, targetTime)));
   }, []);
 
-  const edgePhase: EdgeCuePhase = scaffoldingLevel !== 'minimal' || driverType !== 'replay'
+  const edgePhase: EdgeCuePhase = scaffoldingLevel !== 'minimal' || (driverType === 'live' && !connected)
     ? 'quiet'
     : currentStateName === 'withdrawing' ? 'resolved'
     : currentStateName === 'asking' || currentStateName === 'holding' ? 'focus'
@@ -171,17 +120,17 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
 
   return (
     <div data-ui="training" className="flex flex-col min-h-[calc(100vh-3.5rem)] bg-ground text-ink select-none">
-      <CueEdgeLight phase={edgePhase} paused={!playing} />
+      <CueEdgeLight phase={edgePhase} paused={driverType === 'replay' && !playing} />
       {/* 极简顶栏 */}
       <div className="w-full border-b border-line bg-surface/80 px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2 text-ink-2">
-          <span className="font-semibold text-ink">心内科门诊</span>
+          <span className="font-semibold text-ink">{driverType === 'live' ? live.session.scenario?.sceneTitle ?? '实时训练' : '心内科门诊'}</span>
           <span className="text-line">/</span>
-          <span>{META.study}</span>
+          <span>{frame.study}</span>
           {driverType === 'live' && (
-            <Badge variant="held" className="gap-1 animate-pulse">
+            <Badge variant={connected ? 'resolved' : 'secondary'} className="gap-1" role="status" data-testid="connection-status">
               <Radio className="w-3 h-3" />
-              <span>实时后端连接</span>
+              <span>{connected ? '已连接' : live.session.status === 'connecting' ? '正在连接' : live.session.status === 'error' ? '连接失败' : '已断开'}</span>
             </Badge>
           )}
         </div>
@@ -200,7 +149,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
             <button
               type="button"
               aria-pressed={driverType === 'live'}
-              onClick={() => setDriverType('live')}
+              onClick={() => { if (driverType !== 'live') { live.connect(); setDriverType('live'); } }}
               title="连接真实 TypeScript WebSocket 后端"
             >
               实时连线
@@ -221,10 +170,10 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
           <Button
             variant="default"
             size="sm"
-            onClick={() => onNavigate('review')}
+            onClick={() => { if (driverType === 'live') live.stop(); else onNavigate('review'); }}
             className="h-8 text-xs"
           >
-            结束并复盘
+            {driverType === 'live' ? '结束连线' : '结束并复盘'}
           </Button>
         </div>
       </div>
@@ -237,9 +186,9 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
           <div className="border border-line bg-surface/50 p-5 rounded-[2px] space-y-5">
             <div>
               <span className="font-doctor text-2xl font-bold tracking-tight text-ink block">
-                {META.doctor.name}
+                {frame.doctor.name}
               </span>
-              <span className="text-xs text-ink-3 tracking-wide">{META.doctor.role}</span>
+              <span className="text-xs text-ink-3 tracking-wide">{frame.doctor.role}</span>
             </div>
 
             {/* 关切张力刻度线 */}
@@ -247,18 +196,21 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
               <div className="flex items-center justify-between text-xs text-ink-3">
                 <span className="font-medium text-ink">关切要点</span>
                 <span className="font-mono text-[11px]">
-                  {CONCERN.points.filter((p) => t >= p.answeredAt).length}/{CONCERN.points.length}
+                  {frame.points.filter(point => point.done).length}/{frame.points.length}
                 </span>
               </div>
 
+              <p className="text-sm font-medium" data-testid="concern-title">{frame.concernTitle}</p>
               <div className="space-y-2">
-                {CONCERN.points.map((p) => {
-                  const isDone = t >= p.answeredAt;
+                {frame.points.map((p) => {
+                  const isDone = p.done;
                   return (
                     <div
                       key={p.id}
+                      data-testid={`point-${p.id}`}
+                      data-resolved={isDone}
                       className={cn(
-                        'flex items-center justify-between p-2 rounded-[2px] transition-all duration-300',
+                        'flex items-center justify-between p-2 rounded-[2px] transition-colors duration-300',
                         isDone
                           ? 'bg-resolved-tint/60 text-resolved border-l-2 border-resolved font-medium'
                           : 'bg-ground-2/40 text-ink-3'
@@ -281,6 +233,12 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
             currentSec={t}
             level={scaffoldingLevel}
             onLevelChange={setScaffoldingLevel}
+            liveContext={driverType === 'live' ? {
+              concern: frame.concernTitle,
+              points: frame.points.filter(point => !point.done).map(point => point.label),
+              sourceEvidence: candidateInFocus?.sourceEvidence,
+              tactic: latestJudgment?.verdict === 'drift' ? '先回应医生当前的问题，再补充其他研究结果。' : undefined,
+            } : undefined}
           />
         </div>
 
@@ -291,10 +249,13 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
             readiness={readiness}
             framing="stage"
             bust={false}
-            nodTrigger={nodTrigger}
+            nodTrigger={driverType === 'live' ? live.session.nod : nodTrigger}
             className="w-full h-full absolute inset-0"
           />
 
+          <span className="absolute left-4 top-4 text-sm text-ink-2" role="status" data-testid="doctor-state">
+            {{ listening: '在听', speaking: '在说', asking: '追问', holding: '想插话', withdrawing: '已放下' }[currentStateName]}
+          </span>
           {/* 身体与光影指示条 */}
           {currentStateName === 'holding' && (
             <div className="absolute top-4 right-4 z-10 flex items-center gap-1.5 bg-held-tint/80 border border-held/50 px-2.5 py-1 rounded-[2px] animate-pulse">
@@ -313,7 +274,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
 
         {/* 右列：双声部对谈现场，以字号和字重区别角色 */}
         <div data-capture="transcript" className="lg:col-span-4 flex flex-col justify-between border border-line bg-surface rounded-[2px] p-5 shadow-sm">
-          <div className="space-y-5">
+          <div className="space-y-5" role="log" aria-label="对谈现场" aria-live="polite" aria-relevant="additions text" data-testid="transcript">
             <div className="flex items-center justify-between border-b border-line pb-2">
               <span className="text-xs font-bold text-ink-3 uppercase tracking-widest">对谈现场</span>
               <span className="text-[11px] text-ink-3 font-mono">LIVE TRANSCRIPT</span>
@@ -337,6 +298,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
               })}
             </div>
 
+            {!activeUtterance && driverType === 'live' && <p className="text-sm text-ink-3">{connected ? '等待医生开场，你也可以直接回应。' : '连接后开始对谈。'}</p>}
             {/* 当前正在进行的语句 */}
             {activeUtterance && (
               <div className="pt-3 border-t border-line space-y-1">
@@ -369,8 +331,8 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
           </div>
 
           <div className="pt-4 border-t border-line/60 flex items-center justify-between text-[11px] text-ink-3">
-            <span>陈主任 / 医药代表</span>
-            <span className="font-mono">{fmtD(t)}</span>
+            <span>{frame.doctor.name} / 医药代表</span>
+            <span className="font-mono">{fmtD(clock)}</span>
           </div>
         </div>
       </div>
@@ -404,39 +366,47 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
                     {latestJudgment ? latestJudgment.read : '倾听中'}
                   </span>
                 </div>
+                {driverType === 'live' && latestJudgment && <p className="text-ink-3">{actionLabels[latestJudgment.action ?? 'listen']} · {latestJudgment.latencyMs?.toFixed(0)} ms</p>}
               </div>
+
 
               {/* System 2: 候选追问生命周期悬珠 */}
               <div className="bg-ground-2/40 border border-line p-3 rounded-[2px] space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-ink">System 2 · 候选追问 (PiAgent)</span>
-                  {candidateInFocus && (
-                    <Badge variant={candidatePhase === 'withdrawn' ? 'resolved' : candidatePhase === 'ready' ? 'held' : 'secondary'}>
-                      {candidatePhase === 'ready' && '已就绪 · 未说出'}
-                      {candidatePhase === 'withdrawn' && '已撤销 · 依据失效'}
-                      {candidatePhase === 'asked' && '已问出'}
-                      {candidatePhase === 'prep' && '检索中'}
-                    </Badge>
-                  )}
                 </div>
-
-                {candidateInFocus ? (
-                  <p className="font-doctor text-xs text-ink-2 bg-surface p-2 rounded-[2px] border border-line">
-                    {candidatePhase === 'withdrawn' ? (
-                      <del className="text-ink-3">{candidateInFocus.text}</del>
-                    ) : (
-                      <span>{candidateInFocus.text}</span>
-                    )}
-                  </p>
-                ) : (
-                  <span className="text-ink-3 text-xs">暂无追问候选</span>
-                )}
+                {candidatesInView.length ? candidatesInView.map(candidate => (
+                  <div key={candidate.id} className="space-y-2 border-t border-line pt-2" data-testid="candidate" data-phase={candidate.phase}>
+                    <Badge variant={candidate.phase === 'withdrawn' ? 'resolved' : candidate.phase === 'ready' ? 'held' : 'secondary'}>
+                      {phaseLabels[candidate.phase]}
+                    </Badge>
+                    {candidate.text && <p className="font-doctor text-sm text-ink-2 bg-surface p-2 rounded-[2px] border border-line">
+                      {candidate.phase === 'withdrawn' ? <del className="text-ink-3">{candidate.text}</del> : candidate.text}
+                    </p>}
+                    {driverType === 'live' && <p className="text-ink-3 leading-relaxed">{candidate.basis}</p>}
+                  </div>
+                )) : <span className="text-ink-3 text-xs">暂无追问候选</span>}
               </div>
             </div>
           </div>
         </div>
       )}
 
+      {driverType === 'live' ? (
+        <LiveInputControls
+          connected={connected}
+          connecting={live.session.status === 'connecting'}
+          error={live.session.error}
+          mic={live.mic}
+          volume={live.volume}
+          sending={live.sending}
+          onReconnect={live.connect}
+          onToggleMic={live.toggleMic}
+          onSendText={live.sendText}
+          onFinishText={live.finishText}
+          onStop={live.stop}
+        />
+      ) : <>
       {/* 底部控制台与时刻轴 */}
       <div className="sticky bottom-0 z-30 w-full border-t border-line bg-surface/95 backdrop-blur-md px-4 sm:px-6 py-2.5">
         <div className="max-w-[1440px] mx-auto flex flex-col sm:flex-row items-center gap-4">
@@ -482,6 +452,18 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
 
             <div
               className="relative h-2 w-full bg-ground-3 rounded-[2px] cursor-pointer group flex items-center"
+              role="slider"
+              tabIndex={0}
+              aria-label="回放进度"
+              aria-valuemin={0}
+              aria-valuemax={D}
+              aria-valuenow={Math.round(t)}
+              onKeyDown={event => {
+                if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+                  event.preventDefault();
+                  seek(event.key === 'Home' ? 0 : event.key === 'End' ? D : t + (event.key === 'ArrowRight' ? 1 : -1));
+                }
+              }}
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const pos = (e.clientX - rect.left) / rect.width;
@@ -500,6 +482,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
           </div>
         </div>
       </div>
+      </>}
     </div>
   );
 };
