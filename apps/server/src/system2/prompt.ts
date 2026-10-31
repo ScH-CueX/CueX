@@ -14,20 +14,33 @@ export type RetrievalMode = 'inline' | 'tool';
 
 const MAX_PROFILE_CHARS = 2000;
 
-export function buildSystemPrompt(pack: ScenarioPack, mode: RetrievalMode, doctorRecord?: DoctorRecord): string {
-  const { doctor, productName } = pack.scenario;
+/** Persona part shared by every System 2 prompt: who the doctor is, and the impression left by recent reps. */
+export function personaParts(pack: ScenarioPack, doctorRecord?: DoctorRecord): string[] {
+  const { doctor } = pack.scenario;
   const profile = doctorRecord?.profile.trim().slice(0, MAX_PROFILE_CHARS) ?? '';
   const memory = doctorRecord ? memoryBullets(doctorRecord.memory) : [];
+  const parts = [
+    profile
+      ? `你是${doctor.name}，${doctor.department}${doctor.title}。人物档案如下。`
+      : `你是${doctor.name}，${doctor.department}${doctor.title}。${STYLE_TEXT[doctor.style] ?? ''}。${doctor.note}`,
+  ];
+  if (profile) parts.push(`<人物档案>\n${profile}\n</人物档案>`);
+  // Demo policy: every visitor is a new rep, so the impressions steer what the doctor presses on and are never quoted.
+  if (memory.length > 0) parts.push(`<你对近来来访代表的印象>\n${memory.map((m) => `- ${m.replace(/^\d{4}-\d{2}-\d{2}\s*/, '')}`).join('\n')}\n</你对近来来访代表的印象>`);
+  return parts;
+}
+
+export function factsBlock(pack: ScenarioPack): string {
+  return `<资料>\n${pack.facts.map((f) => `- ${formatFact(f)}`).join('\n')}\n</资料>`;
+}
+
+export function buildSystemPrompt(pack: ScenarioPack, mode: RetrievalMode, doctorRecord?: DoctorRecord): string {
+  const { productName } = pack.scenario;
   const steps =
     mode === 'tool'
       ? '先调用 lookup_facts 查资料（可查多次），再调用一次 submit_followup 提交。不要输出别的文字。'
       : '完成后只调用一次 submit_followup 提交，不要输出别的文字。';
-  const intro = profile
-    ? `你是${doctor.name}，${doctor.department}${doctor.title}。人物档案如下。`
-    : `你是${doctor.name}，${doctor.department}${doctor.title}。${STYLE_TEXT[doctor.style] ?? ''}。${doctor.note}`;
-  const parts = [intro];
-  if (profile) parts.push(`<人物档案>\n${profile}\n</人物档案>`);
-  if (memory.length > 0) parts.push(`<往次拜访的记忆>\n${memory.map((m) => `- ${m}`).join('\n')}\n</往次拜访的记忆>`);
+  const parts = personaParts(pack, doctorRecord);
   parts.push(
     `你正在门诊听医药代表介绍${productName}。代表还没答到你的关切时，你要先备好一句追问，等合适时机再说。`,
     '',
@@ -36,7 +49,7 @@ export function buildSystemPrompt(pack: ScenarioPack, mode: RetrievalMode, docto
     '2. 这句话要能直接念出来：范围写“30 到 60”，比较写“低于”“以上”，不用符号、括号和引号，不用书面语。',
     '3. 只能依据“资料”里的事实，指标、人群和数字用资料里的原词，不换说法。资料里没有的数字和结论一律不要说，也不要替代表回答。',
     '4. 追问要对准“尚未回答的要点”，不要重复代表已经说过的内容。',
-    '5. 记忆只决定追问的角度和语气，例如上次没答清的要点可以追得更紧。记忆不是事实来源，不要复述日期。',
+    '5. 印象只决定追问的角度和语气，例如没答清的要点可以追得更紧。印象不是事实来源，不要复述日期，也不要说“上次”“上回”这类话：眼前的代表是第一次见你。',
     `6. ${steps}`,
   );
   return parts.join('\n');

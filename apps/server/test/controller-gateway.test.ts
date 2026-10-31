@@ -433,3 +433,41 @@ test('next concern is already drafted and a later visitor retry replaces the pre
     assert(!retryRequests[1].history.some(turn => turn.text.includes('第一位')));
   } finally { await h.close(); }
 });
+
+
+test('visitor reads the product briefing and sourced facts before starting the visit', async () => {
+  const h = await setup();
+  try {
+    const response = await fetch(`http://127.0.0.1:${h.gateway.port}/briefing`);
+    assert.equal(response.status, 200);
+    const briefing = await response.json() as import('@cuex/protocol').BriefingResponse;
+    assert.deepEqual(Object.keys(briefing).sort(), ['doctor', 'facts', 'packTitle', 'productName', 'studyName']);
+    assert.deepEqual(Object.keys(briefing.doctor).sort(), ['department', 'name', 'title']);
+    assert.equal(briefing.productName, ANSHU_PACK.scenario.productName);
+    assert.equal(briefing.packTitle, ANSHU_PACK.scenario.packTitle);
+    assert.equal(briefing.studyName, ANSHU_PACK.scenario.studyName);
+    assert.deepEqual(briefing.facts, ANSHU_PACK.facts);
+    assert(briefing.facts.some(fact => fact.id === 'f-dose-elderly' && fact.text.includes('2.5')));
+    assert(!JSON.stringify(briefing).includes('anchorQuestion'));
+    await h.speech('我先回答您的人群问题。', true);
+    assert(h.events.some(e => e.type === 'system1.verdict'));
+  } finally { await h.close(); }
+});
+
+
+test('natural elderly dose answer resolves d1 and the doctor closes the visit', async () => {
+  const { createSystemOne } = await import('../src/system1/index');
+  const h = await setup({ createEngines: () => ({ system1: createSystemOne(ANSHU_PACK), system2: new FakeSystemTwo(10), asr: new TextOnlyAsr(), tts: new SilentTts() }) }, true, 'concern-dose');
+  try {
+    const from = h.events.length;
+    const answer = '75岁以上患者从每日2.5毫克开始，两周后按照血压调整。';
+    await h.speech(answer, true);
+    await h.waitFor(e => e.type === 'system1.verdict' && e.payload.resolvedPointIds.includes('d1'), from);
+    await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.isFinal, from);
+    const session = h.gateway.inspectSessions()[0];
+    assert(session.completed);
+    assert(session.resolvedPointIds.includes('d1'));
+    assert(session.history.at(-1)?.who === 'doctor');
+    assert(!session.candidates.length);
+  } finally { await h.close(); }
+});
