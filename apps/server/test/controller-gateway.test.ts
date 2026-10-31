@@ -14,7 +14,7 @@ async function setup(overrides: Partial<import('../src/gateway/WebSocketGateway'
   const gateway = new WebSocketGateway({
     port: 0,
     host: '127.0.0.1',
-    pack: { ...ANSHU_PACK, lineExamples: { ...ANSHU_PACK.lineExamples, opening: [ANSHU_PACK.lineExamples.opening[0]] } },
+    pack: { ...ANSHU_PACK, lineExamples: { ...ANSHU_PACK.lineExamples, opening: [ANSHU_PACK.lineExamples.opening[0]], retry: Object.fromEntries(Object.entries(ANSHU_PACK.lineExamples.retry).map(([id, examples]) => [id, [examples[0]]])), closing: [ANSHU_PACK.lineExamples.closing[0]] } },
     createEngines: async () => {
       if (process.env.CUEX_TEST_REAL_S2 === '1') {
         const { createEngines, readConfig } = await import('../src/config');
@@ -59,10 +59,11 @@ async function setup(overrides: Partial<import('../src/gateway/WebSocketGateway'
 }
 
 async function drift(h: Awaited<ReturnType<typeof setup>>) {
+  const from = h.events.length;
   await h.speech('主要终点是十二周时的诊室收缩压，多降了6.2毫米汞柱，');
-  assert.equal(h.events.filter(isPhase('retrieving')).length, 0, 'one sentence must not trigger preparation');
+  assert.equal(h.events.slice(from).filter(isPhase('retrieving')).length, 0, 'one sentence must not trigger preparation');
   await h.speech('而且不良反应发生率与安慰剂相当，我们还有华东地区上市后的结果，');
-  await h.waitFor(isPhase('ready'));
+  await h.waitFor(isPhase('ready'), from);
 }
 
 test('continued pitch prepares, rechecks and interrupts before final speech', async () => {
@@ -361,7 +362,7 @@ test('slow System 2 opening uses a pack example within the 1200 ms visitor budge
   let signal: AbortSignal | undefined;
   const system2 = new FakeSystemTwo(10);
   system2.prepareDoctorLine = async (req, phase) => {
-    signal = req.signal;
+    if (req.kind === 'opening') signal = req.signal;
     phase?.('drafting');
     await new Promise<void>((_resolve, reject) => req.signal.addEventListener('abort', () => reject(new Error('cancelled')), { once: true }));
     return '不应等到这句。';
@@ -398,5 +399,37 @@ test('closing is drafted when the last concern starts and is spoken from the rea
     await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.text === '人群和剂量都说明白了，资料请留下。' && e.payload.isFinal);
     assert(performance.now() - start < 800, 'ready closing should not spend the fallback budget');
     assert.equal(h.gateway.inspectSessions()[0].history.at(-1)?.text, '人群和剂量都说明白了，资料请留下。');
+  } finally { await h.close(); }
+});
+
+
+test('next concern is already drafted and a later visitor retry replaces the previous visit history', async () => {
+  const requests: import('../src/contracts').DoctorLineRequest[] = [];
+  const system2 = new FakeSystemTwo(10);
+  system2.prepareDoctorLine = async (req, phase) => {
+    requests.push(req); phase?.('drafting');
+    if (req.kind === 'opening') return '先说研究覆盖的人群。';
+    if (req.kind === 'closing') return '好，资料留给我。';
+    return req.concernId === 'concern-dose' ? '高龄起始剂量怎么安排？' : `我们继续${req.history.some(turn => turn.text.includes('第二位')) ? '第二位' : '第一位'}刚才的人群问题。`;
+  };
+  const h = await setup({ createEngines: () => ({ system1: new FakeSystemOne(), system2, asr: new TextOnlyAsr(), tts: new SilentTts() }) });
+  try {
+    assert(requests.some(req => req.kind === 'retry' && req.concernId === 'concern-dose'), 'dose line should start before scope is answered');
+    for (const visitor of ['第一位', '第二位']) {
+      const visitStart = h.events.length;
+      await drift(h);
+      await h.speech(`${visitor}，我先回答您的人群问题。`, true);
+      await h.waitFor(isPhase('withdrawn'), visitStart);
+      const from = h.events.length;
+      h.send('session.stop', { sessionId: 'current' });
+      await h.waitFor(e => e.type === 'system2.candidate' && e.payload.task === 'retry' && e.payload.candidate.targetConcernId === 'concern-scope' && e.payload.candidate.phase === 'ready', from);
+      h.send('session.start', { scenarioId: ANSHU_PACK.scenario.id, mode: 'performance' });
+      await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.text === '先说研究覆盖的人群。' && e.payload.isFinal, from);
+    }
+    const retryRequests = requests.filter(req => req.kind === 'retry' && req.concernId === 'concern-scope');
+    assert.equal(retryRequests.length, 2);
+    assert(retryRequests[0].history.some(turn => turn.text.includes('第一位')));
+    assert(retryRequests[1].history.some(turn => turn.text.includes('第二位')));
+    assert(!retryRequests[1].history.some(turn => turn.text.includes('第一位')));
   } finally { await h.close(); }
 });

@@ -67,6 +67,7 @@ export class TurnController {
   }
 
   start(): void {
+    if (this.concern.nextConcernId) this.lines.prefetch('retry', this.concern.nextConcernId, this.actualHistory());
     if (!this.concern.nextConcernId) this.lines.prefetch('closing', this.concern.id, this.actualHistory());
     void this.speakLine(this.retryConcernId ? 'retry' : 'opening', this.concern.id);
   }
@@ -84,7 +85,7 @@ export class TurnController {
     const retryConcerns = new Set(this.candidates.filter(candidate => candidate.fate).map(candidate => candidate.targetConcernId));
     for (const concernId of retryConcerns) {
       const missed = this.pack.scenario.concerns.find(concern => concern.id === concernId)!.points.filter(point => !this.resolved.has(point.id)).map(point => point.id);
-      this.lines.prefetch('retry', concernId, history, missed);
+      this.lines.refresh('retry', concernId, history, missed);
     }
   }
   get concern(): ConcernDef { return this.pack.scenario.concerns[this.concernIndex]; }
@@ -430,7 +431,7 @@ export class TurnController {
   }
 
   private actualHistory(): DialogueTurn[] { return [...this.history.filter(t => t.text.trim()).map(t => ({ ...t })), ...(this.sentence.trim() ? [{ who: 'rep' as const, text: this.sentence }] : [])]; }
-  snapshot() { return { sessionId: this.sessionId, concernId: this.concern.id, resolvedPointIds: [...this.resolved], history: this.actualHistory(), candidates: this.candidates.map(c => ({ ...c })) }; }
+  snapshot() { return { sessionId: this.sessionId, completed: this.completed, concernId: this.concern.id, resolvedPointIds: [...this.resolved], history: this.actualHistory(), candidates: this.candidates.map(c => ({ ...c })) }; }
   private emitCandidate(candidate: FollowupCandidate): void { this.emit({ type: 'system2.candidate', payload: { sessionId: this.sessionId, task: 'followup', candidate: { ...candidate } } }); }
   private error(code: string, message: string): void { this.emit({ type: 'session.error', payload: { code, message } }); }
   stop(): void {

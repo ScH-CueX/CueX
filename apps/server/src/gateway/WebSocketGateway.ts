@@ -161,9 +161,9 @@ export class WebSocketGateway {
       if (!connection.closed) {
         connection.lines.prefetch('opening', this.options.pack.scenario.concerns[0].id);
         const retryConcerns = new Set(snapshot.candidates.filter(candidate => candidate.fate).map(candidate => candidate.targetConcernId));
-        for (const concernId of retryConcerns) {
+        for (const concernId of snapshot.completed ? [] : retryConcerns) {
           const missed = this.options.pack.scenario.concerns.find(concern => concern.id === concernId)!.points.filter(point => !snapshot.resolvedPointIds.includes(point.id)).map(point => point.id);
-          connection.lines.prefetch('retry', concernId, snapshot.history, missed);
+          connection.lines.refresh('retry', concernId, snapshot.history, missed);
         }
       }
       connection.controller = undefined;
