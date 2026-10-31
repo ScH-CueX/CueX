@@ -1,0 +1,27 @@
+/**
+ * 前后端全双工 WebSocket 事件协议封装
+ */
+
+import type { AudioChunkPayload, AsrTranscriptDelta, TtsAudioStreamChunk, TtsAbortSignal } from './audio';
+import type { JevDecisionResponse } from './jev';
+import type { FollowupCandidate, PiAgentCandidateUpdate } from './piagent';
+import type { ControllerDispatchEvent } from './controller';
+
+// 客户端上行消息
+export type ClientMessage =
+  | { type: 'session.start'; payload: { scenarioId: string; mode: 'performance' | 'learning' } }
+  | { type: 'session.stop'; payload: { sessionId: string } }
+  | { type: 'audio.chunk'; payload: AudioChunkPayload }
+  | { type: 'speech.delta'; payload: { text: string; isFinal: boolean } }
+  | { type: 'user.interrupted_doctor'; payload: { timestamp: number } };
+
+// 服务端下行消息
+export type ServerMessage =
+  | { type: 'session.ready'; payload: { sessionId: string; serverTime: number } }
+  | { type: 'asr.transcript'; payload: AsrTranscriptDelta }
+  | { type: 'system1.verdict'; payload: JevDecisionResponse }
+  | { type: 'system2.candidate'; payload: PiAgentCandidateUpdate }
+  | { type: 'controller.dispatch'; payload: ControllerDispatchEvent }
+  | { type: 'tts.stream_chunk'; payload: TtsAudioStreamChunk }
+  | { type: 'tts.abort'; payload: TtsAbortSignal }
+  | { type: 'session.error'; payload: { code: string; message: string } };

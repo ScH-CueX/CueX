@@ -1,0 +1,21 @@
+{
+  "name": "cuex-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @cuex/web dev",
+    "dev:server": "pnpm --filter @cuex/server dev",
+    "build": "pnpm --filter @cuex/web build",
+    "typecheck": "pnpm -r run typecheck",
+    "video:studio": "pnpm --filter cuex-promo studio",
+    "video:render": "pnpm --filter cuex-promo render"
+  },
+  "pnpm": {
+    "overrides": {
+      "@types/react": "^18.3.12",
+      "@types/react-dom": "^18.3.1",
+      "three": "^0.170.0",
+      "@types/three": "^0.170.0"
+    }
+  }
+}
