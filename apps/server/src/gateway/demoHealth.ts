@@ -32,7 +32,7 @@ try {
     (async () => {
       const asr = engines.asr as typeof engines.asr & { probe?: () => Promise<void> };
       try {
-        if (asr.backend === 'text-only') { report('ASR', asr.backend, false, 'CUEX_ASR_URL is required'); return; }
+        if (asr.backend === 'text-only') { report('ASR', asr.backend, false, 'configure a local model or CUEX_ASR_URL'); return; }
         if (asr.probe) await asr.probe();
         else { const stream = await asr.open({ sampleRate: 16000 }, { onPartial() {}, onFinal() {}, onError() {} }); stream.end(); }
         report('ASR', asr.backend, true);

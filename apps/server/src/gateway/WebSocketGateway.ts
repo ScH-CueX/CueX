@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { WebSocketServer, WebSocket } from 'ws';
-import type { AudioChunkPayload, ServerMessage } from '@cuex/protocol';
+import type { AudioChunkPayload, BriefingResponse, ServerMessage } from '@cuex/protocol';
 import type { AsrEngine, AsrStream, ScenarioPack } from '../contracts';
 import { DoctorLinePrefetch } from '../controller/DoctorLinePrefetch';
 import { TurnController, type ControllerEngines, type ControllerOptions } from '../controller/TurnController';
@@ -44,6 +44,11 @@ export class WebSocketGateway {
       if (req.url === '/health') {
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
         res.end(JSON.stringify({ ok: true, service: 'cuex', sessions: this.inspectSessions().length }));
+      } else if (req.method === 'GET' && req.url === '/briefing') {
+        const { productName, packTitle, studyName, doctor } = this.options.pack.scenario;
+        const briefing: BriefingResponse = { productName, packTitle, studyName, doctor: { name: doctor.name, department: doctor.department, title: doctor.title }, facts: this.options.pack.facts.map(({ id, text, source }) => ({ id, text, source })) };
+        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+        res.end(JSON.stringify(briefing));
       } else { res.writeHead(404); res.end('Not found'); }
     });
     this.http = http;

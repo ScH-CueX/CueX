@@ -10,7 +10,7 @@ const executable = existsSync(node22) ? node22 : process.execPath;
 const env = { ...process.env, PATH: `${path.dirname(executable)}:${process.env.PATH ?? ''}`,
   CUEX_SYSTEM1: 'real', CUEX_SYSTEM2: 'real', CUEX_ASR: 'real', CUEX_TTS: 'real',
   CUEX_S1_URL: process.env.CUEX_S1_URL ?? 'http://127.0.0.1:18080',
-  CUEX_ASR_URL: process.env.CUEX_ASR_URL ?? 'ws://127.0.0.1:6006',
+  // ASR defaults to the Mac model; an explicit CUEX_ASR_URL still selects a remote engine.
 };
 const port = Number(env.PORT ?? 8765);
 const webPort = Number(env.CUEX_WEB_PORT ?? 5173);
@@ -81,11 +81,11 @@ try {
   if (await tcp(`http://127.0.0.1:${port}`) || await tcp(`http://127.0.0.1:${webPort}`)) {
     throw new Error(`Demo ports ${port}/${webPort} are already in use. Stop the old demo, or set PORT and CUEX_WEB_PORT.`);
   }
-  if (!await http(`${env.CUEX_S1_URL.replace(/\/$/, '')}/health`) || !await tcp(env.CUEX_ASR_URL)) {
-    console.log('[demo] Starting the Windows model tunnel.');
+  if (!await http(`${env.CUEX_S1_URL.replace(/\/$/, '')}/health`)) {
+    console.log('[demo] Starting the JEV model tunnel.');
     start('tunnel', '/bin/bash', ['scripts/s1-tunnel.sh']);
-    await waitFor('Windows System 1 and ASR forwards', async () => await http(`${env.CUEX_S1_URL.replace(/\/$/, '')}/health`) && await tcp(env.CUEX_ASR_URL));
-  } else console.log('[demo] Reusing the existing Windows model forwards.');
+    await waitFor('JEV forward', () => http(`${env.CUEX_S1_URL.replace(/\/$/, '')}/health`));
+  } else console.log('[demo] Reusing the existing JEV forward.');
   await runProbe();
   if (stopping) process.exit(0);
   start('server', executable, [path.join(root, 'apps/server/node_modules/tsx/dist/cli.mjs'), 'apps/server/src/index.ts']);
