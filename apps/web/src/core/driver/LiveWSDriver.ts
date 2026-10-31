@@ -129,6 +129,7 @@ export class LiveWSDriver implements IConversationDriver {
         this.player.abort(msg.payload.utteranceId);
         this.doctorPending = false;
         break;
+      case 'visit.ended': break; // reaches the session through onServerEvent
       case 'session.error': this.callbacks.onError?.(new Error(msg.payload.message), msg.payload.code); break;
       default: {
         const unhandled: never = msg;
