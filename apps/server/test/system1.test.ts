@@ -30,8 +30,8 @@ async function fakeLlama(stall = false) {
     const answering=/我先回答|75岁|eGFR/.test(recent);
     let truth=false;
     if(question.includes('候选追问')||question.includes('candidate follow-up')) truth=!answering;
-    else if(question.includes('继续介绍无关')||question.includes('continuing unrelated')||question.includes('describing overall study')) truth=!answering;
-    else if(question.includes('是否正在回应')||question.includes('responding to the doctor')) truth=answering;
+    else if(question.includes('继续介绍无关')||question.includes('continuing unrelated')||question.includes('describing overall study')||question.includes('general product pitch')) truth=!answering;
+    else if(question.includes('是否正在回应')||question.includes('responding to the doctor')||question.includes('answer or start answering')) truth=answering;
     else if(question.includes('75 岁')||question.includes('over 75')) truth=/75岁以上约占11%/.test(speech);
     else if(question.includes('30–60')||question.includes('30-60')) truth=/eGFR30到60.{0,12}412/.test(speech);
     else if(question.includes('低于 30')||question.includes('below 30')) truth=/eGFR低于30.{0,20}不建议/.test(speech);
@@ -173,3 +173,20 @@ for(const dose of ['75岁以上从2.5毫克开始','高龄要减半起始','起�
     await server.close();
   });
 }
+
+
+test('remote JEV prepares a c3-only follow-up after natural price and adherence pitch, then withdraws on the c3 answer', {skip:!process.env.CUEX_S1_REMOTE_TEST_URL}, async()=>{
+  const h=await session(new LlamaSystemOne({baseUrl:process.env.CUEX_S1_REMOTE_TEST_URL,timeoutMs:1460}));
+  try{
+    await h.speech('75岁以上约占11%，降压幅度与总体一致。',true);
+    await h.speech('eGFR30到60亚组有412人，结果与总体一致。',true);
+    assert.deepEqual(h.gateway.inspectSessions()[0].resolvedPointIds,['c1','c2']);
+    await h.speech('费用方面也比较合适，一天花不了多少钱，很多患者愿意长期承担。',true);
+    await h.speech('这个药一天吃一次就行，患者不用记那么多次，依从性会更好一些。',true);
+    await h.wait(e=>e.type==='system2.candidate'&&(!e.payload.task||e.payload.task==='followup')&&e.payload.candidate.phase==='ready');
+    await h.speech('对于肾小球滤过率小于30的病人，说明书不建议使用，我不会建议您给这类人开。',true);
+    await h.wait(e=>e.type==='system2.candidate'&&(!e.payload.task||e.payload.task==='followup')&&e.payload.candidate.phase==='withdrawn');
+    assert(!h.events.some(e=>e.type==='system2.candidate'&&(!e.payload.task||e.payload.task==='followup')&&e.payload.candidate.phase==='spoken'));
+    assert(h.gateway.inspectSessions()[0].resolvedPointIds.includes('c3'));
+  }finally{await h.close();}
+});

@@ -103,6 +103,7 @@ export class LlamaSystemOne implements SystemOneClient {
       const result = Object.fromEntries(answers);
       let explicitResponseCue = false;
       let doseAnswerCue = false;
+      let driftTiebreak = false;
       // An explicit turn-back phrase in an ASR partial is a direct response cue, not an answered point.
       try {
         const current = JSON.parse(state);
@@ -117,7 +118,15 @@ export class LlamaSystemOne implements SystemOneClient {
           if (result.candidateValid?.kind === 'noul') result.candidateValid = answerFromWeights(questions.candidateValid, [.99, .01]);
         }
       } catch { /* Unstructured state has no explicit ASR cue field. */ }
-      return { answers: result, latencyMs: performance.now() - start, backend: `${this.backend}${explicitResponseCue ? '+response-cue' : ''}${doseAnswerCue ? '+dose-cue' : ''}` };
+      // Clear drift wins only over marginal responding; a response cue always takes priority.
+      if (!explicitResponseCue && result.drift?.value >= .85 && result.responding?.value < .70) {
+        const responding = Math.min(result.responding.value, .49);
+        if (responding < result.responding.value) {
+          result.responding = answerFromWeights(questions.responding, [1 - responding, responding]);
+          driftTiebreak = true;
+        }
+      }
+      return { answers: result, latencyMs: performance.now() - start, backend: `${this.backend}${explicitResponseCue ? '+response-cue' : ''}${doseAnswerCue ? '+dose-cue' : ''}${driftTiebreak ? '+drift-tiebreak' : ''}` };
     } catch (error) {
       cancel.abort(); signal?.throwIfAborted();
       if (timeout.aborted) throw new DOMException(`System 1 exceeded ${this.timeoutMs} ms`, 'TimeoutError');
@@ -136,11 +145,20 @@ export class LlamaSystemOne implements SystemOneClient {
       resolved_d1: 'Has the rep given an elderly starting-dose answer: 2.5 mg for age over 75, half-dose start, lower starting dose with blood-pressure adjustment after two weeks, an adjustment instruction, or an explicit lack of data? Natural paraphrases count. Merely promising to answer does not count.',
       candidateValid: 'Does the candidate follow-up trigger condition still hold? Use candidate.targetPointIds and the latest speech. If the rep is now answering the targeted concern, or all target points have been answered, the trigger no longer holds.',
     };
-    if (id === 'drift') {
+    if (id === 'responding' || id === 'drift') {
       try {
         const current = JSON.parse(state);
-        if (current.concern === '适用范围') questions.drift = 'Is the latest speech describing overall study endpoints, efficacy or safety rather than age or renal subgroup details?';
-      } catch { /* Other packs retain the generic drift question. */ }
+        if (current.concern === '适用范围') {
+          const targets: Record<string, string> = {
+            c1: 'the number/proportion or applicable results for patients over 75',
+            c2: 'the number or applicable results for the eGFR 30-60 subgroup',
+            c3: 'eGFR below 30 or severe kidney impairment: study exclusion and whether use is recommended',
+          };
+          const remaining = (current.unresolvedPointIds ?? []).map((point: string) => targets[point] ?? point).join('; ');
+          if ((current.unresolvedPointIds ?? []).length < 3) questions.responding = `Does the latest speech answer or start answering the remaining doctor question about ${remaining}? Overall blood pressure benefit, tolerability, real-world outcomes, adherence or price do not answer that question.`;
+          questions.drift = 'Is the latest speech a general product pitch about efficacy, safety, real-world data, convenience, adherence, availability or cost, rather than answering the specific patient subgroup question?';
+        }
+      } catch { /* Other packs retain the generic question wording. */ }
     }
     return questions[id] ? { ...question, question: questions[id] } : question;
   }

@@ -61,3 +61,7 @@ For the ANSHU applicability concern, drift asks about overall endpoints/efficacy
 The demo's d1 point accepts a concrete elderly starting dose (`2.5 mg` / `2.5毫克`), a half-dose or lower-dose start, a dose-adjustment instruction, or an explicit lack of data. Promising to answer later does not resolve it. Both engines use the same narrow dose-answer cue after reading the actual rep speech. JEV results that use it append `+dose-cue`; this cue weight is a rule, not a calibrated JEV probability. The fact source remains the pack's `f-dose-elderly`.
 
 The demo transport now uses one persistent `ssh -F ~/.ssh/rtx-home/ssh-config -T rtx-home` exec session with strict host-key checking. `s1-relay.mjs` carries loopback TCP to port 18080; the host rejects native `-L` forwarding. ASR is local to the Mac and has no Windows tunnel forward.
+
+## Remaining-point drift check
+
+For applicability, the responding question stays broad until at least one concern point is answered. It then names only the remaining points. The drift question covers general endpoints, safety, real-world results, convenience, adherence and cost. Clear drift (`p >= 0.85`) takes priority over marginal responding (`p < 0.70`), except when an explicit response cue is present. This cap changes no resolution answer. Results changed by this tie-break append `+drift-tiebreak` to the backend name.
