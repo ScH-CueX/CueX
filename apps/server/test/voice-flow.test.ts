@@ -17,17 +17,40 @@ import { pcm16ToWav, sniffAudio } from '../src/voice/wav';
 /** The two tests that call the real Microsoft Edge voice service need internet. Set CUEX_TEST_OFFLINE=1 to skip them. */
 const online = process.env.CUEX_TEST_OFFLINE === '1' ? { skip: 'CUEX_TEST_OFFLINE=1' } : {};
 
-test('http-only voice profile reports remote failure without switching providers', async () => {
+test('default HTTP voice profile reports remote failure without switching providers', async () => {
   const server = createServer((_req, res) => res.writeHead(503).end());
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   try {
-    const tts = createTtsEngine({ CUEX_TTS_BACKEND: 'http', CUEX_TTS_FALLBACK: 'none', CUEX_TTS_URL: `http://127.0.0.1:${(server.address() as AddressInfo).port}/tts` });
+    assert.equal(createTtsEngine({}).backend, 'http-tts');
+    const tts = createTtsEngine({ CUEX_TTS_URL: `http://127.0.0.1:${(server.address() as AddressInfo).port}/tts` });
     assert.equal(tts.backend, 'http-tts');
     await assert.rejects(async () => {
       for await (const _chunk of tts.synthesize('你好。', new AbortController().signal)) assert.fail('failed service must not produce audio');
     }, /TTS server answered 503/);
   } finally { server.close(); }
+});
+
+test('Windows Ming speaks through the real gateway and an interruption prevents stale audio', {skip:process.env.CUEX_TEST_MING_TTS!=='1'}, async () => {
+  const health=await fetch('http://127.0.0.1:18766/health').then(response=>response.json());
+  assert.equal(health.model,'Ming-3.0-tts-0.5b');
+  assert.equal(health.ok,true);
+  const h=await session({tts:createTtsEngine({})});
+  try {
+    const first=await h.waitFor(event=>event.type==='tts.stream_chunk',30000);
+    assert(first.type==='tts.stream_chunk');
+    const audio=Buffer.from(first.payload.audioBase64,'base64');
+    assert.equal(sniffAudio(audio),'audio/wav');
+    assert.equal(decodes(audio),true);
+    const latency=h.times[h.events.indexOf(first)]-h.startedAt;
+    h.send('speech.delta',{text:'您好，我先回答您提到的人群问题。',isFinal:false});
+    const abort=await h.waitFor(event=>event.type==='tts.abort');
+    assert(abort.type==='tts.abort');
+    const index=h.events.indexOf(abort);
+    await delay(6000);
+    assert(!h.events.slice(index+1).some(event=>event.type==='tts.stream_chunk'&&event.payload.utteranceId===abort.payload.utteranceId));
+    console.log(JSON.stringify({flow:'windows-ming-gateway',model:health.model,firstChunkMs:latency,bytes:audio.length,decoded:true,noAudioAfterAbort:true}));
+  } finally {await h.close();}
 });
 
 type Predicate = (event: ServerMessage) => boolean;
@@ -179,7 +202,7 @@ test('doctor opening is spoken as self-contained WAV chunks from a remote TTS se
 });
 
 test('real Edge voice speaks the opening as playable MP3 and is cut off cleanly when the rep starts talking', online, async () => {
-  const tts = createTtsEngine({});
+  const tts = createTtsEngine({ CUEX_TTS_BACKEND: 'edge' });
   const h = await session({ tts });
   try {
     const first = await h.waitFor(e => e.type === 'tts.stream_chunk', 8000);
@@ -209,7 +232,7 @@ test('the doctor keeps talking when the primary TTS server is down: Edge takes o
   const deadPort = (probe.address() as AddressInfo).port;
   probe.close();
   await once(probe, 'close');
-  const tts = createTtsEngine({ CUEX_TTS_BACKEND: 'http', CUEX_TTS_URL: `http://127.0.0.1:${deadPort}/tts` });
+  const tts = createTtsEngine({ CUEX_TTS_BACKEND: 'http', CUEX_TTS_FALLBACK: 'auto', CUEX_TTS_URL: `http://127.0.0.1:${deadPort}/tts` });
   assert.equal(tts.backend, 'http-tts>edge-tts');
   const h = await session({ tts });
   try {

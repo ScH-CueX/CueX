@@ -1,11 +1,14 @@
 import {bundle} from '@remotion/bundler';
 import {openBrowser, renderMedia, selectComposition} from '@remotion/renderer';
-import {mkdirSync} from 'node:fs';
+import {mkdirSync,readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root=join(dirname(fileURLToPath(import.meta.url)),'..');
 const out=join(root,'out');mkdirSync(out,{recursive:true});
+const voiceManifest=JSON.parse(readFileSync(join(root,'../assets/audio/narration/manifest.json'),'utf8'));
+if(voiceManifest.length!==6||voiceManifest.some(clip=>clip.model!=='Ming-3.0-tts-0.5b'||createHash('sha256').update(readFileSync(join(root,'../assets',clip.file))).digest('hex')!==clip.sha256))throw new Error('Generate and verify all six Windows Ming narration clips before rendering.');
 const serveUrl=await bundle({entryPoint:join(root,'src/index.ts'),publicDir:join(root,'..','assets')});
 const chromiumOptions={gl:'angle'};
 const browser=await openBrowser('chrome',{chromiumOptions,browserExecutable:process.env.REMOTION_BROWSER??null});

@@ -2,7 +2,7 @@
 
 ## 当前交付范围
 
-Web 首页、68 秒演示回放和复盘页面可本地运行。回放使用虚构的 ANSHU-3 资料。`codex/cuex-cinematic-brand` 已整合实时分支至 `0e3ddc6`，包括语音输入、会话结束和单项重练；main 保持不变。本轮验证了离线引擎的前后端交互，不能把演示回放或离线测试当作真实模型性能基准。
+Web 首页、68 秒演示回放和复盘页面可本地运行。回放使用虚构的 ANSHU-3 资料。`codex/cuex-cinematic-brand` 已整合实时分支至 `450d60a`，包括语音输入、会话结束和单项重练；main 保持不变。本轮验证了离线引擎的前后端交互，不能把演示回放或离线测试当作真实模型性能基准。
 
 ## Web
 
@@ -24,7 +24,7 @@ pnpm --filter @cuex/web preview
 
 字体、环境贴图、3D 模型均从根目录 assets 加载。演示回放不调用在线模型；在依赖安装和本地启动完成后，可作为离线演示方案。需先在实际演示电脑上验证 WebGL 与浏览器播放。
 
-实时交互联调可在另一个终端执行 `pnpm dev:server`，其默认配置使用离线替身引擎；前端开发服务器将 `/ws` 和 `/health` 代理至 8765。完整真实模型演示使用 `pnpm demo`，它会检查并按需建立模型服务隧道，再检查引擎与启动前后端；需要配置好的 System 1、ASR、System 2 和 TTS 服务。模型与语音配置见 apps/server 的对应 README。
+实时交互联调可在另一个终端执行 `pnpm dev:server`，其默认配置使用离线替身引擎；前端开发服务器将 `/ws` 和 `/health` 代理至 8765。完整真实模型演示使用 `pnpm demo`，它会先接通 Windows Ming 语音，再检查并按需建立其他模型服务隧道，检查引擎与启动前后端；需要配置好的 System 1、ASR、System 2 和 TTS 服务。模型与语音配置见 apps/server 的对应 README。
 
 ## 45 秒视频
 
@@ -36,7 +36,7 @@ pnpm video:demo
 
 更新前端后，先启动 Web，再执行 `node scripts/capture-product.mjs` 与 `node scripts/record-product.mjs`，更新实际页面素材。浏览器采集需要 Playwright 和 Chrome。可设置 `CUEX_PLAYWRIGHT_PATH`，渲染可设置 `REMOTION_BROWSER` 指向本机 Chrome 可执行文件。
 
-`video/scripts/build-demo-voice.py` 是可选的旁白重建工具，需要 Python edge-tts 与 ffmpeg，会调用在线语音合成。最终配音已保存在 assets/audio/narration，不要求演示现场重建。
+`video/scripts/build-demo-voice.py` 使用 Windows RTX 5080 上的 Ming-3.0-tts-0.5b 重建旁白，需要 Python 与 ffmpeg。先运行 `pnpm tts:connect`，再运行 `python3 video/scripts/build-demo-voice.py`。六段全部成功后才替换正式配音；渲染会核对模型来源与音频哈希。配音保存在 assets/audio/narration，现场播放无需联网。无配乐版本可用 `node video/scripts/render-demo.mjs --no-bgm` 导出。
 
 ## 路演 PDF
 
@@ -45,3 +45,7 @@ pnpm video:demo
 ## 素材来源
 
 共享目录说明见 `assets/README.md`。X 标识提取自原 CueX 视频。字体来源与已有声音来源见 `video/src/assets/manifest.json`，新旁白见 `assets/audio/narration/manifest.json`。产品录像为本项目浏览器演示回放；没有使用患者记录或真实临床试验数据。
+
+## Windows 语音
+
+Windows 上的部署与启动见 `infra/windows/tts/README.md`。正式配置统一使用 Ming：医生为灵楷，视频旁白为灵小柔。默认禁止自动切换语音供应商。私钥只保存在个人机器的 `~/.ssh/cuex-rtx-tts/`，不在源码、素材或提交包中。

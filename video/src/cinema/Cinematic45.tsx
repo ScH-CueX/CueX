@@ -79,7 +79,7 @@ export const Withdrawal:React.FC=()=>{
   // Frozen with the captures: apps/web/src/lib/scenario.ts, candidate k2.
   const quote='那 eGFR 低于 30 的呢？这部分患者能用吗？';
   return <AbsoluteFill>
-    <Plane src={f<132?'captures/live-ready.png':'captures/live-answered.png'} frame={100} shift={-505*lift} scale={mix(.66,.37,lift)} opacity={mix(1,.9,lift)}/>
+    <Plane src={f<112?'captures/live-ready.png':'captures/live-answered.png'} frame={100} shift={-505*lift} scale={mix(.66,.37,lift)} opacity={mix(1,.9,lift)}/>
     <div style={{position:'absolute',zIndex:10,left:128,top:825,fontFamily:FONT.serif,fontSize:56,color:C.ok,opacity:ramp(f,112,132)}}>“这部分目前没有证据。”</div>
     <svg width={1920} height={1080} style={{position:'absolute',zIndex:9,inset:0,opacity:ramp(f,132,142)*(1-ramp(f,185,205))}}>
       <path d="M 650 813 Q 825 780 902 530" fill="none" stroke={C.ok} strokeOpacity=".38" strokeWidth="2"/>
@@ -94,15 +94,15 @@ export const Withdrawal:React.FC=()=>{
 };
 
 export const Practice:React.FC=()=>{
-  const f=useCurrentFrame();const swap=ramp(f,118,162,EASE.inOut);const travel=ramp(f,105,170,EASE.inOut);
+  const f=useCurrentFrame();const swap=ramp(f,118,152,EASE.inOut);const travel=ramp(f,105,170,EASE.inOut);
   return <AbsoluteFill>
-    <div style={{position:'absolute',zIndex:0,inset:0,opacity:1-swap}}><Plane src="captures/review.png" frame={f} scale={.62} offsetY={0}/></div>
+    <div style={{position:'absolute',zIndex:0,inset:0,opacity:(1-swap)*(1-.55*ramp(f,16,32))}}><Plane src="captures/review.png" frame={f} scale={.62} offsetY={0}/></div>
     <div style={{position:'absolute',zIndex:0,inset:0,opacity:swap,transform:`translateX(${(1-swap)*160}px)`}}><Plane src="captures/live-cue-amber.png" frame={100} scale={.62} offsetY={0}/></div>
-    <div style={{position:'absolute',zIndex:10,left:160,top:725,width:1600,opacity:ramp(f,16,32)*(1-swap)}}>
+    <div style={{position:'absolute',zIndex:10,left:160,top:725,width:1600,opacity:ramp(f,16,32)*(1-ramp(f,105,128))}}>
       <Img src={staticFile('captures/review-timeline.png')} style={{width:1600,height:95,clipPath:'inset(0 0 0 12%)'}}/>
-      <div style={{position:'absolute',right:90,top:-68,fontFamily:FONT.serif,fontSize:44,color:C.ok}}>0:55 · 主动补正</div>
+      <div style={{position:'absolute',right:90,top:180,fontFamily:FONT.serif,fontSize:44,color:C.ok}}>0:55 · 主动补正</div>
     </div>
-    <div style={{position:'absolute',zIndex:11,left:mix(1452,405,travel)-8,top:mix(807,250,travel)-8,width:16,height:16,borderRadius:'50%',background:C.ok,boxShadow:`0 0 ${18+18*travel}px ${7*travel}px ${C.ok}`,opacity:ramp(f,30,45)*(1-ramp(f,174,198))}}/>
+    <div style={{position:'absolute',zIndex:11,left:mix(1452,405,travel)-8,top:mix(807,250,travel)-8,width:16,height:16,borderRadius:'50%',background:travel>.8?C.cue:C.ok,boxShadow:`0 0 ${18+18*travel}px ${7*travel}px ${travel>.8?C.cue:C.ok}`,opacity:ramp(f,30,45)*(1-ramp(f,174,198))}}/>
     <div style={{position:'absolute',zIndex:10,left:140,top:80,fontFamily:FONT.serif,fontSize:68,color:C.paper}}>{f<135?'回到这一刻。':'再练一次。'}</div>
     <div style={{position:'absolute',zIndex:10,left:140,bottom:120,fontFamily:FONT.serif,fontSize:62,color:C.paper,opacity:ramp(f,174,200)}}>少一点提示。</div>
   </AbsoluteFill>;

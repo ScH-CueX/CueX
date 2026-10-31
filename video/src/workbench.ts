@@ -4,7 +4,7 @@ import {loadFonts} from './fonts';
 loadFonts();
 export const WORKBENCH={
   name:'CueX · Cinematic 45',fps:30,width:1920,height:1080,total:CINEMA_TOTAL,
-  background:'#07080b',revision:'cinematic-2',
+  background:'#07080b',revision:'cinematic-3-ming',
   shots:CINEMA_SHOTS.map(s=>({id:s.id,label:s.label,from:s.from,duration:s.duration,component:CINEMA_UNITS[s.id]})),
   transitions:[],captions:[],overlays:[],
   sfx:[...CINEMA_VOICE,...CINEMA_SFX],

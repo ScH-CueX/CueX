@@ -5,8 +5,9 @@
  *   CUEX_ASR_URL        ws://host:port of a sherpa-onnx streaming WebSocket server (the Windows box or any remote host)
  *   CUEX_ASR_MODEL_DIR  directory of a streaming transducer model, run in this process with sherpa-onnx-node
  *   neither             text-only: the browser sends speech.delta text and audio.chunk gets a clear error
- * TTS, tried in this order, the next one takes over when the one before fails:
- *   CUEX_TTS_BACKEND=edge|http|sherpa picks the first engine (default: http if CUEX_TTS_URL is set, else edge)
+ * TTS defaults to the Windows Ming HTTP service, with no provider fallback.
+ *   CUEX_TTS_BACKEND=edge|http|sherpa explicitly picks another provider when needed
+ *   CUEX_TTS_FALLBACK=auto explicitly enables the legacy fallback chain
  *   edge    Edge read-aloud voices over the internet (CUEX_EDGE_VOICE, CUEX_EDGE_RATE, CUEX_EDGE_PITCH)
  *   http    CUEX_TTS_URL, POST {"text"} returns one audio file
  *   sherpa  CUEX_TTS_MODEL_DIR, VITS model in this process
@@ -102,7 +103,7 @@ export function createTtsEngine(source: Source = process.env): TtsEngine {
   const shared = source === process.env;
   if (shared && tts) return tts;
   const { env, num } = reader(source);
-  const url = env('CUEX_TTS_URL');
+  const url = env('CUEX_TTS_URL') ?? 'http://127.0.0.1:18766/tts';
   const modelDir = env('CUEX_TTS_MODEL_DIR');
   const makers: Record<string, (() => TtsEngine) | undefined> = {
     edge: () => {
@@ -115,13 +116,13 @@ export function createTtsEngine(source: Source = process.env): TtsEngine {
       if (shared) edge = engine;
       return engine;
     },
-    http: url ? () => new HttpTts({ url, timeoutMs: num('CUEX_TTS_TIMEOUT_MS', 8000) }) : undefined,
+    http: () => new HttpTts({ url, timeoutMs: num('CUEX_TTS_TIMEOUT_MS', 30000) }),
     sherpa: modelDir ? () => new LocalSherpaTts({ modelDir, threads: num('CUEX_TTS_THREADS', 2), speakerId: num('CUEX_TTS_SPEAKER', 0), speed: num('CUEX_TTS_SPEED', 1) }) : undefined,
   };
-  const first = env('CUEX_TTS_BACKEND') ?? (url ? 'http' : 'edge');
+  const first = env('CUEX_TTS_BACKEND') ?? 'http';
   if (!(first in makers)) throw new Error(`CUEX_TTS_BACKEND must be edge, http or sherpa, got "${first}"`);
   if (!makers[first]) throw new Error(`CUEX_TTS_BACKEND=${first} needs ${first === 'http' ? 'CUEX_TTS_URL' : 'CUEX_TTS_MODEL_DIR'}`);
-  const fallback = env('CUEX_TTS_FALLBACK') ?? 'auto';
+  const fallback = env('CUEX_TTS_FALLBACK') ?? 'none';
   if (fallback !== 'auto' && fallback !== 'none') throw new Error('CUEX_TTS_FALLBACK must be auto or none');
   const order = fallback === 'none' ? [first] : [first, ...['http', 'sherpa', 'edge'].filter(name => name !== first)];
   const engines = order.flatMap(name => (makers[name] ? [makers[name]!()] : []));

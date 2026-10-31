@@ -1,0 +1,34 @@
+[
+  {
+    "voice": "doctor",
+    "text": "先停一下，这个结论能用在他们身上吗？",
+    "seconds": 4.522,
+    "audioDuration": 3.3,
+    "sampleRate": 44100,
+    "headers": {
+      "x-tts-model": "Ming-3.0-tts-0.5b",
+      "x-synthesis-ms": "3208",
+      "x-queue-ms": "54",
+      "content-type": "audio/wav",
+      "Content-Length": "291104",
+      "Date": "Sat, 31 Oct 2026 21:43:44 GMT",
+      "Connection": "close"
+    }
+  },
+  {
+    "voice": "narrator",
+    "text": "医生的追问，不会按你的稿子来。",
+    "seconds": 2.723,
+    "audioDuration": 2.4,
+    "sampleRate": 44100,
+    "headers": {
+      "x-tts-model": "Ming-3.0-tts-0.5b",
+      "x-synthesis-ms": "2205",
+      "x-queue-ms": "0",
+      "content-type": "audio/wav",
+      "Content-Length": "211724",
+      "Date": "Sat, 31 Oct 2026 21:43:47 GMT",
+      "Connection": "close"
+    }
+  }
+]
