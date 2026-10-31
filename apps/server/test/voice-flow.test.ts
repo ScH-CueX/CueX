@@ -17,6 +17,19 @@ import { pcm16ToWav, sniffAudio } from '../src/voice/wav';
 /** The two tests that call the real Microsoft Edge voice service need internet. Set CUEX_TEST_OFFLINE=1 to skip them. */
 const online = process.env.CUEX_TEST_OFFLINE === '1' ? { skip: 'CUEX_TEST_OFFLINE=1' } : {};
 
+test('http-only voice profile reports remote failure without switching providers', async () => {
+  const server = createServer((_req, res) => res.writeHead(503).end());
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  try {
+    const tts = createTtsEngine({ CUEX_TTS_BACKEND: 'http', CUEX_TTS_FALLBACK: 'none', CUEX_TTS_URL: `http://127.0.0.1:${(server.address() as AddressInfo).port}/tts` });
+    assert.equal(tts.backend, 'http-tts');
+    await assert.rejects(async () => {
+      for await (const _chunk of tts.synthesize('你好。', new AbortController().signal)) assert.fail('failed service must not produce audio');
+    }, /TTS server answered 503/);
+  } finally { server.close(); }
+});
+
 type Predicate = (event: ServerMessage) => boolean;
 
 async function session(engines: { asr?: AsrEngine; tts?: TtsEngine }) {

@@ -121,7 +121,9 @@ export function createTtsEngine(source: Source = process.env): TtsEngine {
   const first = env('CUEX_TTS_BACKEND') ?? (url ? 'http' : 'edge');
   if (!(first in makers)) throw new Error(`CUEX_TTS_BACKEND must be edge, http or sherpa, got "${first}"`);
   if (!makers[first]) throw new Error(`CUEX_TTS_BACKEND=${first} needs ${first === 'http' ? 'CUEX_TTS_URL' : 'CUEX_TTS_MODEL_DIR'}`);
-  const order = [first, ...['http', 'sherpa', 'edge'].filter(name => name !== first)];
+  const fallback = env('CUEX_TTS_FALLBACK') ?? 'auto';
+  if (fallback !== 'auto' && fallback !== 'none') throw new Error('CUEX_TTS_FALLBACK must be auto or none');
+  const order = fallback === 'none' ? [first] : [first, ...['http', 'sherpa', 'edge'].filter(name => name !== first)];
   const engines = order.flatMap(name => (makers[name] ? [makers[name]!()] : []));
   const engine = engines.length === 1 ? engines[0] : new FallbackTts(engines);
   if (shared) tts = engine;
