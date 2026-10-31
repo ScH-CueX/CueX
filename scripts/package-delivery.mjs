@@ -11,6 +11,7 @@ const require=createRequire(import.meta.url);
 const {PDFDocument}=require(require.resolve('pdf-lib',{paths:[path.join(root,'ppt')]}));
 const run=(command,args,options={})=>execFileSync(command,args,{cwd:root,encoding:'utf8',...options});
 run('git',['diff','--quiet']);run('git',['diff','--cached','--quiet']);
+run(process.execPath,['scripts/check-public-data.mjs']);
 const sourceRef=process.argv[2]??'HEAD';
 run('git',['diff','--quiet',sourceRef,'HEAD']);
 const revision=run('git',['rev-parse',sourceRef]).trim();
@@ -43,6 +44,7 @@ cpSync(path.join(root,'assets/captions',videoName.replace('.mp4','.srt')),path.j
 cpSync(path.join(root,'ppt/out',pdfName.replace('.pdf','.html')),path.join(extras,pdfName.replace('.pdf','.html')));
 buildRoadshow(path.join(extras,'联动路演.html'),`../${videoName}`);
 cpSync(path.join(root,'docs/RUNNING.md'),path.join(code,'运行说明.md'));
+cpSync(path.join(root,'docs/DEPLOYMENT.md'),path.join(code,'通用部署指南.md'));
 run('git',['archive','--format=zip','--output',path.join(code,`CueX-source-${revision.slice(0,7)}.zip`),sourceRef]);
 const dist=path.join(root,'apps/web/dist');
 cpSync(dist,path.join(code,'web-offline'),{recursive:true,filter:source=>!['qa','captures','audio','captions','references'].includes(path.relative(dist,source).split(path.sep)[0])});

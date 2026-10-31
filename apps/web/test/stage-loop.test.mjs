@@ -99,7 +99,7 @@ test('one rehearsal closes the loop: pitch, interruption, answer, closing, revie
   cdp.on('Network.webSocketFrameSent', frame => capture(sent, frame));
   try {
     // The stage page is the default view and has no navbar.
-    await page.goto(origin, { waitUntil: 'networkidle0' });
+    await page.goto(`${origin}/?view=stage`, { waitUntil: 'networkidle0' });
     await page.waitForSelector('[data-testid="stage"][data-phase="start"]');
     assert.equal(await page.$('header'), null, 'no navbar on the stage page');
     assert(await page.$('[data-testid="fullscreen"]'), 'fullscreen button');

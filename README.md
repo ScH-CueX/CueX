@@ -297,15 +297,6 @@ pnpm check:public-data --staged
 
 Windows 环境变量写法见[部署指南](docs/DEPLOYMENT.md)。模型联机测试是显式选择的检查；不要把替身测试或演示回放的结果写成真实模型性能。
 
-### 公开信息与运行数据
-
-- 凭据通过环境变量或仓库外的配置提供；`.env.example` 只保留示例。
-- 医生运行记忆使用独立的 `CUEX_AGENTS_DIR`，模型缓存也放在代码之外。
-- 不提交联系方式、个人绝对路径、真实主机地址、私钥或令牌；公开团队署名保持在本页。Git 作者邮箱使用 GitHub 隐私邮箱。
-- `check:public-data` 只报告位置和规则，不回显匹配值。它检查不超过 2 MB 的已跟踪文本，不能代替二进制素材、完整 Git 历史及外部服务的审查。
-
-问题和建议请通过 [Issues](https://github.com/ScH-CueX/CueX/issues) 提交，不要附真实凭据或用户数据。
-
 <p align="right">(<a href="#readme-top">返回顶部</a>)</p>
 
 <!-- LICENSE -->
