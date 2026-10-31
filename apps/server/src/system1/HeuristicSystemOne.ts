@@ -1,6 +1,7 @@
 import type { JevQuestion, ScenarioPack, SystemOneClient, SystemOneResult, SystemOneState } from '../contracts';
 import { S1_QUESTION_IDS } from '../contracts';
 import { answerFromWeights, labelsFor } from './probabilities';
+import { answersElderlyDose } from './dose';
 
 const normalize = (text: string): string => text.toLowerCase().replace(/七十五/g, '75').replace(/三十/g, '30').replace(/六十/g, '60').replace(/十一/g, '11').replace(/百分之11/g, '11%').replace(/[\s：:]/g, '');
 const AGE = /75岁|75周岁|高龄|老年/;
@@ -82,7 +83,7 @@ export class HeuristicSystemOne implements SystemOneClient {
     if (id === 'c1') return substantive(AGE, /(?:约占|占比|比例|占|共|有)(?:约)?11%|11%|百分之十一|(?:降压幅度|疗效|结果)(?:与|和|跟)总体一致/);
     if (id === 'c2') return substantive(MID, /412|四百一十二|(?:降压幅度|疗效|结果)(?:与|和|跟)总体一致/);
     if (id === 'c3') return clauses.some(clause => LOW.test(clause) && /(?:被)?排除|未(?:被)?(?:入组|纳入)|没有证据|缺乏证据|不建议(?:使用|用药)?|不推荐(?:使用|用药)?|不能(?:使用|用药)|禁用/.test(clause) && !DEFERRAL.test(clause) && !/(?:并未|没有|并没有|不是)(?:被)?排除|没有说.{0,4}不建议|并非.{0,4}禁用/.test(clause));
-    if (id === 'd1') return substantive(/剂量|起始|高龄|老年/, /\d+(?:\.\d+)?(?:mg|毫克)|减半|无需调整|需要调整|低剂量起始|没有.{0,4}(?:数据|证据)|资料.{0,4}未提供/);
+    if (id === 'd1') return answersElderlyDose(text);
     const words = normalize(label).split(/[^\p{L}\p{N}]+/u).filter(word => word.length > 1);
     return clauses.some(clause => words.some(word => clause.includes(word)) && /\d|一致|不建议|排除|证据/.test(clause) && !DEFERRAL.test(clause));
   }

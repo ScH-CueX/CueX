@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type { JevAnswer, JevQuestion, SystemOneClient, SystemOneResult } from '../contracts';
 import { answerFromWeights, labelsFor } from './probabilities';
+import { answersElderlyDose } from './dose';
 
 const jevMetadata = JSON.parse(readFileSync(new URL('./autotrust-jev9b.json', import.meta.url), 'utf8')) as {
   decisionHead: { bias: number[]; verbalizer_ids: number[]; slots: { ranges: Record<'noul' | 'choice' | 'score', [number, number]>; verbalizers: string[] } };
@@ -101,9 +102,14 @@ export class LlamaSystemOne implements SystemOneClient {
       }));
       const result = Object.fromEntries(answers);
       let explicitResponseCue = false;
+      let doseAnswerCue = false;
       // An explicit turn-back phrase in an ASR partial is a direct response cue, not an answered point.
       try {
         const current = JSON.parse(state);
+        if (result.resolved_d1?.kind === 'noul' && answersElderlyDose(current.repSpeechSinceConcern ?? '')) {
+          result.resolved_d1 = answerFromWeights(questions.resolved_d1, [.01, .99]);
+          doseAnswerCue = true;
+        }
         if (/^(?:我先回答|我直接回答|抱歉[，,]?我|不过我(?:得|要)?先说明|回到您(?:的)?问题)/.test(current.recentSpeech ?? '')) {
           explicitResponseCue = true;
           if (result.responding?.kind === 'noul') result.responding = answerFromWeights(questions.responding, [.01, .99]);
@@ -111,7 +117,7 @@ export class LlamaSystemOne implements SystemOneClient {
           if (result.candidateValid?.kind === 'noul') result.candidateValid = answerFromWeights(questions.candidateValid, [.99, .01]);
         }
       } catch { /* Unstructured state has no explicit ASR cue field. */ }
-      return { answers: result, latencyMs: performance.now() - start, backend: explicitResponseCue ? `${this.backend}+response-cue` : this.backend };
+      return { answers: result, latencyMs: performance.now() - start, backend: `${this.backend}${explicitResponseCue ? '+response-cue' : ''}${doseAnswerCue ? '+dose-cue' : ''}` };
     } catch (error) {
       cancel.abort(); signal?.throwIfAborted();
       if (timeout.aborted) throw new DOMException(`System 1 exceeded ${this.timeoutMs} ms`, 'TimeoutError');
@@ -127,7 +133,7 @@ export class LlamaSystemOne implements SystemOneClient {
       resolved_c1: 'Has the rep substantively answered the concern about patients over 75? A concrete subgroup proportion or result consistent with the overall population counts. Merely mentioning age, asking a question, promising later data, or claiming all elderly can use it does not count. Judge all repSpeechSinceConcern.',
       resolved_c2: 'Has the rep substantively answered the eGFR 30-60 subgroup concern? A concrete subgroup count or result consistent with overall population counts. Merely mentioning the group or promising an answer does not count. Judge all repSpeechSinceConcern.',
       resolved_c3: 'Has the rep substantively answered the eGFR below 30 concern by stating study exclusion, no evidence, or use not recommended? Merely mentioning the group or falsely claiming safe use does not count. Judge all repSpeechSinceConcern.',
-      resolved_d1: 'Has repSpeechSinceConcern substantively answered whether the elderly starting dose needs adjustment? A dose, adjustment instruction or explicit absence of evidence counts; promising to answer does not count.',
+      resolved_d1: 'Has the rep given an elderly starting-dose answer: 2.5 mg for age over 75, half-dose start, lower starting dose with blood-pressure adjustment after two weeks, an adjustment instruction, or an explicit lack of data? Natural paraphrases count. Merely promising to answer does not count.',
       candidateValid: 'Does the candidate follow-up trigger condition still hold? Use candidate.targetPointIds and the latest speech. If the rep is now answering the targeted concern, or all target points have been answered, the trigger no longer holds.',
     };
     if (id === 'drift') {

@@ -10,13 +10,11 @@ stop() {
 }
 trap stop INT TERM EXIT
 while true; do
-  ssh -N -L "${CUEX_S1_LOCAL_PORT:-18080}:127.0.0.1:${CUEX_S1_REMOTE_PORT:-18080}" \
-    -L 6006:127.0.0.1:6006 \
+  ssh -F "$HOME/.ssh/rtx-home/ssh-config" -N \
+    -L "${CUEX_S1_LOCAL_PORT:-18080}:127.0.0.1:${CUEX_S1_REMOTE_PORT:-18080}" \
     -o ExitOnForwardFailure=yes -o BatchMode=yes -o ConnectTimeout=20 \
     -o ServerAliveInterval=15 -o ServerAliveCountMax=2 \
-    -p 20415 -i "$HOME/.ssh/nkanf_c" -o IdentitiesOnly=yes \
-    -o UserKnownHostsFile=/tmp/cuex_known_hosts -o StrictHostKeyChecking=accept-new \
-    nkanf@192.0.2.1 &
+    -o StrictHostKeyChecking=yes rtx-home &
   child=$!
   wait "$child" || true
   child=""
