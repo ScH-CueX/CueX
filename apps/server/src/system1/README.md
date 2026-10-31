@@ -12,8 +12,8 @@
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `CUEX_S1_URL` | unset | llama-server base URL, such as `http://127.0.0.1:18080`; an ending `/v1` is accepted |
-| `CUEX_S1_TIMEOUT_MS` | `600` | Total model decide deadline, including prompt formatting and all parallel questions |
-| `CUEX_S1_BACKEND` | `llama.cpp` | Model/backend name in results, such as `jev-9b-q4@win-vulkan` |
+| `CUEX_S1_TIMEOUT_MS` | `1460` | Total model decide deadline, including prompt formatting and all parallel questions |
+| `CUEX_S1_BACKEND` | `jev-9b-q4@win-vulkan` | Model/backend name in results, such as `jev-9b-q4@win-vulkan` |
 | `CUEX_S1_MODEL` | unset | Optional model alias for prompt formatting |
 | `CUEX_S1_FORMAT` | `jev-v1` | `jev-v1` for autotrust/JEV-9B; `chat` for base Qwen; `jevstyle-v1` for older chaoliangUNSW 2B |
 | `CUEX_S1_LORA_ID` | `0` | Server adapter index; `none` omits adapter selection for servers without adapters |
@@ -48,6 +48,6 @@ PATH=/opt/homebrew/opt/node@22/bin:$PATH npx tsx scripts/s1-matrix.ts --quant Q4
 PATH=/opt/homebrew/opt/node@22/bin:$PATH CUEX_S1_REMOTE_TEST_URL=http://127.0.0.1:18080 npx tsx --test test/system1.test.ts
 ```
 
-Switch the Windows process to Q8_0, then repeat with `--quant Q8_0`. The matrix runs JEV Chinese questions, JEV English questions over Chinese state, and base-Qwen Chinese chat questions sequentially. It measures health HTTP RTT separately and saves raw decisions and summaries outside the repository. No model downloads or model execution run on the Mac.
+Q4_K_M is the selected demo quant. Q8_0 is stored on Windows for a later comparison; it is not the demo default. The matrix runs JEV Chinese questions, JEV English questions over Chinese state, and base-Qwen Chinese chat questions sequentially. It measures health HTTP RTT separately and saves raw decisions and summaries outside the repository. No model downloads or model execution run on the Mac.
 
 The reconnecting tunnel is `bash scripts/s1-tunnel.sh`. It owns only its SSH child and reconnects when the link drops. The Windows model process is detached and has a separate lifecycle.

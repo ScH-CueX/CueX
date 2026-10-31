@@ -5,13 +5,13 @@ param(
     [ValidateSet('Q8_0','Q4_K_M')][string]$Quant = 'Q4_K_M',
     [ValidateRange(1,65535)][int]$Port = 18080,
     [ValidateRange(512,32768)][int]$ContextPerSlot = 4096,
-    [ValidateRange(1,16)][int]$Parallel = 4,
-    [ValidateRange(0,524288)][int]$ContextTotal = 0,
-    [ValidateRange(-1,1048576)][int]$CacheRamMiB = 8192,
+    [ValidateRange(1,16)][int]$Parallel = 6,
+    [ValidateRange(0,524288)][int]$ContextTotal = 16384,
+    [ValidateRange(-1,1048576)][int]$CacheRamMiB = 0,
     [ValidateRange(1,9)][int]$LogVerbosity = 3,
-    [ValidateRange(0,1024)][int]$ContextCheckpoints = 32,
+    [ValidateRange(0,1024)][int]$ContextCheckpoints = 0,
     [ValidateRange(32,32768)][int]$BatchSize = 2048,
-    [ValidateRange(32,32768)][int]$UBatchSize = 512
+    [ValidateRange(32,32768)][int]$UBatchSize = 1024
 )
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Path (Join-Path $Root 'logs') -Force | Out-Null

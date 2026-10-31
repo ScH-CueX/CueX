@@ -24,7 +24,7 @@ C:\cuex\scripts\Start-JevServer.ps1 -Quant Q8_0
 
 Startup validates the base hash, Vulkan0, runtime flags, and a free loopback port. It starts a dedicated process through `Win32_Process.Create`, outside the SSH child job. The process survives SSH disconnect. It does not install a service, create a scheduled task, open a firewall rule, or stop a listener.
 
-The default server uses `127.0.0.1:18080`, four slots, continuous batching, 16,384 total context tokens, `--jinja`, and `--lora-init-without-apply`. Startup evidence is in `C:\cuex\logs\server-current.json`. Logs have unique timestamped names.
+The selected Q4 server uses `127.0.0.1:18080`, six slots, continuous batching, 16,384 total context tokens, RAM prompt cache disabled, context checkpoints disabled, batch size 2048, microbatch size 1024, `--jinja`, and `--lora-init-without-apply`. Startup evidence is in `C:\cuex\logs\server-current.json`. Logs have unique timestamped names.
 
 For controlled runtime comparisons, the starter accepts `-Parallel`, `-ContextTotal`, `-CacheRamMiB`, `-ContextCheckpoints`, `-BatchSize`, `-UBatchSize`, and `-LogVerbosity`. For example:
 
