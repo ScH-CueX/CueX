@@ -17,5 +17,6 @@
       "three": "^0.170.0",
       "@types/three": "^0.170.0"
     }
-  }
+  },
+  "packageManager": "pnpm@9.15.9"
 }
