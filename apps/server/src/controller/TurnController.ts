@@ -32,7 +32,8 @@ export class TurnController {
   private readonly history: DialogueTurn[] = [];
   private readonly candidates: FollowupCandidate[] = [];
   private readonly resolved = new Set<string>();
-  private readonly provisionalResolved = new Set<string>();
+  private readonly provisionalResolved = new Map<string, { transcriptId: string; text: string }>();
+  private readonly committedResolved = new Set<string>();
   private asrConsumedPrefix = '';
   private lastInputWasAsr = false;
   private concernIndex = 0;
@@ -67,7 +68,7 @@ export class TurnController {
     const retryIndex = pack.scenario.concerns.findIndex(concern => concern.id === retryConcernId);
     if (retryIndex >= 0) {
       this.concernIndex = retryIndex;
-      for (const concern of pack.scenario.concerns.slice(0, retryIndex)) for (const point of concern.points) this.resolved.add(point.id);
+      for (const concern of pack.scenario.concerns.slice(0, retryIndex)) for (const point of concern.points) { this.resolved.add(point.id); this.committedResolved.add(point.id); }
     }
   }
 
@@ -134,10 +135,13 @@ export class TurnController {
   private acceptTranscript(text: string, isFinal: boolean, recent: string): void {
     if (this.stopped || this.completed || (!text.trim() && !isFinal)) return;
     if (this.speech && (this.speech.text || !this.held)) this.interruptDoctor();
-    // ASR partials are revisable. Re-evaluate their tentative progress against the latest hypothesis.
-    for (const id of this.provisionalResolved) this.resolved.delete(id);
-    this.provisionalResolved.clear();
     const previous = this.sentence;
+    const extendsEvidence = (evidence: string) => this.normalizeSpeech(text).startsWith(this.normalizeSpeech(evidence));
+    for (const [id, evidence] of this.provisionalResolved) {
+      if (evidence.transcriptId !== this.transcriptId) continue;
+      if (!extendsEvidence(evidence.text)) { this.provisionalResolved.delete(id); if (!this.committedResolved.has(id)) this.resolved.delete(id); }
+      else if (isFinal) { this.committedResolved.add(id); this.provisionalResolved.delete(id); }
+    }
     this.sentence = text;
     this.recentSpeech = recent.slice(-80);
     this.revision++;
@@ -156,6 +160,8 @@ export class TurnController {
       void this.evaluate(false);
     }, isFinal || this.held ? 0 : this.timing.debounceMs);
   }
+
+  private normalizeSpeech(text: string): string { return text.replace(/[\p{P}\p{Z}\p{S}\s]/gu, ''); }
 
   private commitRepSentence(): void {
     if (this.sentence.trim()) {
@@ -184,6 +190,9 @@ export class TurnController {
     if (!recheck && this.evaluationInFlight) return false;
     const revision = this.revision;
     const speechSnapshot = this.repSpeech;
+    const segmentId = this.transcriptId;
+    const segmentText = this.sentence;
+    const onFinalSegment = !this.sentence;
     const concernId = this.concern.id;
     this.evaluationAbort?.abort();
     const abort = new AbortController();
@@ -198,7 +207,7 @@ export class TurnController {
       if (abort.signal.aborted || this.stopped || concernId !== this.concern.id) return false;
       // Ordinary snapshots remain evidence when more speech is appended. Output checks must be exact.
       if (recheck ? revision !== this.revision : !this.repSpeech.startsWith(speechSnapshot)) return false;
-      this.applyDecision(result, recheck);
+      this.applyDecision(result, recheck, { transcriptId: segmentId, text: segmentText, final: onFinalSegment });
       if (!recheck) return true;
       const p = (id: string) => result.answers[id]?.probabilities.true ?? result.answers[id]?.value ?? 0;
       return p(S1_QUESTION_IDS.responding) < 0.60 && p(S1_QUESTION_IDS.drift) >= 0.65 && p(S1_QUESTION_IDS.candidateValid) >= 0.5;
@@ -216,10 +225,15 @@ export class TurnController {
     }
   }
 
-  private applyDecision(result: SystemOneResult, recheck: boolean): void {
+  private applyDecision(result: SystemOneResult, recheck: boolean, segment: { transcriptId: string; text: string; final: boolean }): void {
     const probability = (id: string) => result.answers[id]?.probabilities.true ?? result.answers[id]?.value ?? 0;
     const newlyResolved = this.unresolved.filter(id => probability(S1_QUESTION_IDS.resolved(id)) >= 0.72);
-    newlyResolved.forEach(id => { this.resolved.add(id); if (this.sentence) this.provisionalResolved.add(id); });
+    newlyResolved.forEach(id => {
+      this.resolved.add(id);
+      if (segment.final) this.committedResolved.add(id);
+      else if (segment.transcriptId === this.transcriptId && this.normalizeSpeech(this.sentence).startsWith(this.normalizeSpeech(segment.text))) this.provisionalResolved.set(id, { transcriptId: segment.transcriptId, text: segment.text });
+      else this.committedResolved.add(id); // An append-only sentence finalized while this readout was in flight.
+    });
     const responding = probability(S1_QUESTION_IDS.responding) >= 0.60;
     const drifting = !responding && probability(S1_QUESTION_IDS.drift) >= 0.65;
     const targetAnswered = !!this.held && this.held.targetPointIds.some(id => this.resolved.has(id));
@@ -380,8 +394,8 @@ export class TurnController {
               timeRange: { startMs: this.transcriptStart, endMs: Date.now() },
             } });
             if (this.lastInputWasAsr) this.asrConsumedPrefix += this.sentence;
+            for (const [id, evidence] of this.provisionalResolved) if (evidence.transcriptId === this.transcriptId) { this.committedResolved.add(id); this.provisionalResolved.delete(id); }
             this.commitRepSentence();
-            this.provisionalResolved.clear();
             this.dispatch('asking', { type: 'interrupt_speak', textToSpeak: text, candidateId }, 1);
           }
           if (lineKind === 'closing') {
