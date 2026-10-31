@@ -11,6 +11,7 @@ interface ClinicalScaffoldingHUDProps {
   level: ScaffoldingLevel;
   onLevelChange: (level: ScaffoldingLevel) => void;
   className?: string;
+  liveContext?: { concern: string; points: string[]; sourceEvidence?: string; tactic?: string };
 }
 
 export const ClinicalScaffoldingHUD: React.FC<ClinicalScaffoldingHUDProps> = ({
@@ -18,6 +19,7 @@ export const ClinicalScaffoldingHUD: React.FC<ClinicalScaffoldingHUDProps> = ({
   level,
   onLevelChange,
   className,
+  liveContext,
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(true);
 
@@ -100,6 +102,14 @@ export const ClinicalScaffoldingHUD: React.FC<ClinicalScaffoldingHUDProps> = ({
       {/* HUD 内容主体 */}
       {isOpen && (
         <div className="p-4 space-y-4">
+          {liveContext ? (
+            <div className="space-y-3 text-sm">
+              <p className="font-medium">{liveContext.concern}</p>
+              <p className="text-ink-2 leading-relaxed">{liveContext.points.join('、') || '等待医生提出问题。'}</p>
+              {level === 'full' && liveContext.tactic && <p className="border-l-2 border-held pl-3 text-ink-2">{liveContext.tactic}</p>}
+              {liveContext.sourceEvidence && <p className="border-t border-line pt-3 text-ink-3">资料出处：{liveContext.sourceEvidence}</p>}
+            </div>
+          ) : <>
           {/* 实时情境应对战术（伴随式提示） */}
           {currentSec >= 23.5 && currentSec < 36.4 && (
             <div className="p-3 bg-held-tint/60 border-l-2 border-held rounded-[2px] space-y-1 animate-in fade-in">
@@ -144,6 +154,7 @@ export const ClinicalScaffoldingHUD: React.FC<ClinicalScaffoldingHUDProps> = ({
               </p>
             </div>
           </div>
+          </>}
         </div>
       )}
     </aside>

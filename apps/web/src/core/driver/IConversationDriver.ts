@@ -1,5 +1,5 @@
 import type {
-  DoctorPoseName,
+  ServerMessage,
   JevDecisionResponse,
   FollowupCandidate,
   AsrTranscriptDelta,
@@ -9,12 +9,14 @@ import type {
 export type DriverStatus = 'idle' | 'connecting' | 'running' | 'paused' | 'error';
 
 export interface DriverCallbacks {
+  onServerEvent?: (event: ServerMessage) => void;
+  onAudioPlayingChange?: (playing: boolean) => void;
   onStatusChange?: (status: DriverStatus) => void;
   onDoctorDispatch?: (dispatch: ControllerDispatchEvent) => void;
   onTranscript?: (delta: AsrTranscriptDelta) => void;
   onSystem1Verdict?: (verdict: JevDecisionResponse) => void;
   onSystem2Candidate?: (candidate: FollowupCandidate) => void;
-  onError?: (err: Error) => void;
+  onError?: (err: Error, code?: string) => void;
 }
 
 export interface IConversationDriver {
