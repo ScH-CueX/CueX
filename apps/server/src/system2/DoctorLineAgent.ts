@@ -22,7 +22,7 @@ import {
 } from './linePrompt';
 import { numbersIn } from './numbers';
 import { abortError, runAgentGuarded } from './run';
-import { bigramDice, ensureEnding } from './spoken';
+import { bigramDice, ensureEnding, stripFiller } from './spoken';
 
 export interface LineMetrics {
   kind: DoctorLineKind;
@@ -295,7 +295,7 @@ export class DoctorLineAgent {
 
     const usedTextFallback = said === null;
     // A line that is too long is written again, never cut: a cut sentence sounds broken when it is spoken.
-    const cleaned = cleanLine(said ?? textFallback, pack.scenario.doctor.name);
+    const cleaned = stripFiller(cleanLine(said ?? textFallback, pack.scenario.doctor.name));
     const tooLong = cleaned.length > MAX_LINE_CHARS + 3;
     const line = ensureEnding(cleaned);
     const ungrounded = line ? ungroundedNumbersIn(line, pack) : [];

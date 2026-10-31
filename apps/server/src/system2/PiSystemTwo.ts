@@ -10,7 +10,7 @@ import { loadS2Runtime, type S2Runtime } from './config';
 import { defaultDoctorStore, type DoctorStore } from './doctors';
 import { DoctorLineAgent, type LineMetrics } from './DoctorLineAgent';
 import { numbersIn } from './numbers';
-import { clampSpoken } from './spoken';
+import { clampSpoken, stripFiller } from './spoken';
 import { buildSystemPrompt, buildUserPrompt, formatFact, searchFacts, type RetrievalMode } from './prompt';
 import { abortError, runAgentGuarded } from './run';
 
@@ -222,7 +222,7 @@ export class PiSystemTwo implements SystemTwo {
 
     const fromText = !submitted;
     const raw: Record<string, unknown> = submitted ?? { text: textFallback };
-    const spoken = clampSpoken(String(raw.text ?? ''));
+    const spoken = clampSpoken(stripFiller(String(raw.text ?? '')));
     if (!spoken) throw new Error(`System 2 returned an empty follow-up (${rt.backend})`);
 
     const factIds = Array.isArray(raw.factIds) ? raw.factIds.map(String) : [];
