@@ -255,3 +255,41 @@ test('playback report trims unheard doctor clauses before the next reply enters 
     assert.equal(h.gateway.inspectSessions()[0].history[0].text, '你说这个研究结果不错。');
   } finally { await h.close(); }
 });
+
+
+test('answering one over-listed candidate target withdraws the question while other points stay open', async () => {
+  const h = await setup({
+    createEngines: () => ({
+      system1: new FakeSystemOne(), asr: new TextOnlyAsr(), tts: new SilentTts(),
+      system2: {
+        backend: 'over-listed-targets',
+        async prepareFollowup(req, onPhase) {
+          req.signal.throwIfAborted();
+          onPhase?.('drafting');
+          return {
+            text: '七十五岁以上的患者有多少？', basis: '高龄人群仍未说明',
+            triggerCondition: '代表仍未说明75岁以上患者', targetPointIds: ['c1', 'c2', 'c3'],
+          };
+        },
+      },
+    }),
+    controller: { debounceMs: 5, minDriftMs: 0, minDriftChars: 30, candidateHoldMs: 1000, minInterruptGapMs: 0 },
+  });
+  try {
+    await drift(h);
+    const ready = h.events.find(isPhase('ready'));
+    assert(ready?.type === 'system2.candidate');
+    // The latest 80 characters are another pitch, so withdrawal must follow point resolution,
+    // not just the separate "currently responding" judgment.
+    const pitch = '主要终点是诊室收缩压，不良反应与安慰剂相当，还有上市后研究的结果，'.repeat(4);
+    await h.speech(`75岁以上患者约占11%。${pitch}`, true);
+    await h.waitFor(e => isPhase('withdrawn')(e) && e.type === 'system2.candidate' && e.payload.candidate.id === ready.payload.candidate.id);
+    await h.waitFor(e => e.type === 'controller.dispatch' && e.payload.action.type === 'withdraw_question');
+    assert.deepEqual(h.gateway.inspectSessions()[0].resolvedPointIds, ['c1']);
+    assert(!h.events.some(isPhase('spoken')));
+    assert(!h.events.some(e => e.type === 'controller.dispatch' && e.payload.action.type === 'interrupt_speak'));
+    await h.speech('好的，请您继续。', true);
+    await h.waitFor(e => e.type === 'controller.dispatch' && e.payload.pose === 'listening' && e.payload.concernProgress.resolvedCount === 1);
+    assert.equal(h.gateway.inspectSessions()[0].candidates[0].fate, 'withdrawn');
+  } finally { await h.close(); }
+});

@@ -182,7 +182,7 @@ export class TurnController {
     newlyResolved.forEach(id => { this.resolved.add(id); if (this.sentence) this.provisionalResolved.add(id); });
     const responding = probability(S1_QUESTION_IDS.responding) >= 0.60;
     const drifting = !responding && probability(S1_QUESTION_IDS.drift) >= 0.65;
-    const targetAnswered = !!this.held && this.held.targetPointIds.every(id => this.resolved.has(id));
+    const targetAnswered = !!this.held && this.held.targetPointIds.some(id => this.resolved.has(id));
     const invalid = recheck && probability(S1_QUESTION_IDS.candidateValid) < 0.5;
     const withdraw = !!this.held && (responding || targetAnswered || invalid || this.unresolved.length === 0);
     if (drifting) {
@@ -249,8 +249,10 @@ export class TurnController {
         this.emitCandidate(event);
       });
       if (this.held !== held || held.abort.signal.aborted || this.stopped) return;
-      const targets = draft.targetPointIds.filter(id => this.concern.points.some(p => p.id === id));
-      if (!draft.text.trim() || !targets.length) throw new Error('Invalid follow-up draft');
+      const openPoints = new Set(this.unresolved);
+      const targets = draft.targetPointIds.filter(id => openPoints.has(id));
+      if (!targets.length) { this.withdrawCandidate(); return; }
+      if (!draft.text.trim()) throw new Error('Invalid follow-up draft');
       held.targetPointIds = targets;
       Object.assign(event, { draftText: draft.text, basis: draft.basis, triggerCondition: draft.triggerCondition, sourceEvidence: draft.sourceEvidence, phase: 'ready', readyAtMs: Date.now() });
       this.emitCandidate(event);
@@ -312,7 +314,7 @@ export class TurnController {
           if (candidateId && this.held?.event.id === candidateId) {
             // TTS may take hundreds of milliseconds. Re-check again with the audio ready to send.
             const checked = await this.evaluate(true);
-            if (!checked || speech.abort.signal.aborted || this.held?.event.id !== candidateId || this.held.targetPointIds.every(id => this.resolved.has(id))) return;
+            if (!checked || speech.abort.signal.aborted || this.held?.event.id !== candidateId || this.held.targetPointIds.some(id => this.resolved.has(id))) return;
             const held = this.held;
             this.held = undefined;
             held.event.phase = 'spoken'; held.event.fate = 'asked'; held.event.decidedAtMs = Date.now();
