@@ -58,3 +58,13 @@ Rejected experiments: Chinese prose compact state increased token count and ran 
 - Windows PowerShell script parsing, catalogue checks, conversion-script compilation, server health and runtime token/adapter checks passed.
 
 Raw run evidence lives outside the repository at `/tmp/cuex-s1-matrix/`. Infrastructure scripts remain in `infra/windows/`; model selection sources remain in `MODELS.md`.
+
+## Final live-flow correction
+
+The first real JEV gateway rehearsal exposed two gaps hidden by aggregate accuracy: generic “unrelated” wording missed endpoint/safety pitches at the controller's 0.65 threshold, and cumulative ASR partials let an earlier pitch outweigh a later explicit answer promise. No controller threshold changed.
+
+The applicability concern now asks JEV the focused positive question: “Is the latest speech describing overall study endpoints, efficacy or safety rather than age or renal subgroup details?” Responding/drift judge only the recent segment; substantive resolution retains its 120-character evidence window. An explicit turn-back phrase such as `我先回答` starts that segment. A small local cue guard sets responding true and drift/candidate-valid false for that explicit phrase, without resolving any point. Results using it append `+response-cue` to the backend name. This is a hybrid cue guard, not a claim that the resulting cue probabilities are calibrated JEV outputs.
+
+Final measured ordinary fixture: **197/200 correct (98.50%)**, decide p50/p95 **648.3 / 908.4 ms**; health RTT **63.7 / 390.5 ms**. Drift recall **100%** (6/6), precision **85.71%** (one false positive). Resolution precision remained 100% for c1/c2/c3; c2 recall was 90%. Raw evidence: `/tmp/cuex-s1-matrix/Q4_K_M-focused-drift-cue-ordinary120.json`.
+
+Three real-JEV gateway flows passed: listening/resolve-and-advance; continued partial pitch→prepare→interrupt; and prepared candidate→explicit answering promise→withdraw without speech. These runs used the controller's current in-tree any-target-resolved withdrawal patch. The 1460 ms timeout remains based on the earlier measured worst-case recheck, with the heuristic available on transport/timeout failures.

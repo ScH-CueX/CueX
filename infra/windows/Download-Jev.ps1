@@ -9,6 +9,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 if (-not $IsWindows) { throw 'Run this downloader on Windows. Do not download model files to the Mac.' }
 $rootFull = [IO.Path]::GetFullPath($Root).TrimEnd('\')
+New-Item -ItemType Directory -Path (Join-Path $rootFull 'logs') -Force | Out-Null
 $manifest = Get-Content (Join-Path $PSScriptRoot 'jev-downloads.json') -Raw | ConvertFrom-Json
 $items = @($manifest | Where-Object {
     if ($Selection -eq 'q8') { $_.file -eq 'Qwen3.5-9B-Q8_0.gguf' }

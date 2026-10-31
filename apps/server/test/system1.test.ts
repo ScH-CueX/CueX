@@ -30,7 +30,7 @@ async function fakeLlama(stall = false) {
     const answering=/我先回答|75岁|eGFR/.test(recent);
     let truth=false;
     if(question.includes('候选追问')||question.includes('candidate follow-up')) truth=!answering;
-    else if(question.includes('继续介绍无关')||question.includes('continuing unrelated')) truth=!answering;
+    else if(question.includes('继续介绍无关')||question.includes('continuing unrelated')||question.includes('describing overall study')) truth=!answering;
     else if(question.includes('是否正在回应')||question.includes('responding to the doctor')) truth=answering;
     else if(question.includes('75 岁')||question.includes('over 75')) truth=/75岁以上约占11%/.test(speech);
     else if(question.includes('30–60')||question.includes('30-60')) truth=/eGFR30到60.{0,12}412/.test(speech);
@@ -83,7 +83,7 @@ test('typed decision round trip uses JEV token slots and published calibration o
   await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
   try{
     const client=new LlamaSystemOne({baseUrl:`http://127.0.0.1:${(server.address() as {port:number}).port}`,promptFormat:'jev-v1',timeoutMs:1000});
-    const result=await client.decide(encodeSystemOneState({concernId:'concern-scope',concern:'适用范围',unresolvedPointIds:['c1'],repSpeechSinceConcern:'我先回答您的人群问题。'}),{responding:{kind:'noul',question:'代表是否正在回应？'},action:{kind:'choice',question:'下一步',options:['追问','继续听']},relevance:{kind:'score',question:'回应程度'}});
+    const result=await client.decide(encodeSystemOneState({concernId:'concern-scope',concern:'适用范围',unresolvedPointIds:['c1'],repSpeechSinceConcern:'75岁以上患者约占11%。'}),{responding:{kind:'noul',question:'代表是否正在回应？'},action:{kind:'choice',question:'下一步',options:['追问','继续听']},relevance:{kind:'score',question:'回应程度'}});
     assert.equal(result.answers.responding.top,'true');assert.equal(result.answers.action.top,'继续听');assert.equal(result.answers.relevance.top,'4');
     const expected=Math.exp((Math.log(.75)-.0004479771596379578)/1.0022178236691426)/(Math.exp((Math.log(.25)+.00044773018453270197)/1.0022178236691426)+Math.exp((Math.log(.75)-.0004479771596379578)/1.0022178236691426));
     assert.ok(Math.abs(result.answers.responding.value-expected)<1e-10);
@@ -111,4 +111,42 @@ test('fallback keeps an earlier answer when later speech exceeds the neural 120-
     await h.speech('eGFR低于30被排除，没有证据，说明书不建议使用。',true);
     await h.wait(e=>e.type==='controller.dispatch'&&e.payload.concernProgress.concernId==='concern-dose');
   }finally{await h.close();await server.close();}
+});
+
+
+test('remote JEV gateway visit prepares on a continued pitch and withdraws on an answering promise', {skip:!process.env.CUEX_S1_REMOTE_TEST_URL}, async()=>{
+  const engine=new LlamaSystemOne({baseUrl:process.env.CUEX_S1_REMOTE_TEST_URL,promptFormat:'jev-v1',timeoutMs:1460,loraScale:1});
+  const h=await session(engine);
+  try{
+    await h.speech('主要终点是12周收缩压，多降6.2毫米汞柱，');
+    await h.speech('而且不良反应率与安慰剂相当，另有上市后真实世界研究的疗效结果，');
+    await h.wait(e=>e.type==='system2.candidate'&&e.payload.candidate.phase==='ready');
+    await h.speech('我先回答您的人群问题，');
+    await h.wait(e=>e.type==='system2.candidate'&&e.payload.candidate.phase==='withdrawn');
+    assert(!h.events.some(e=>e.type==='system2.candidate'&&e.payload.candidate.phase==='spoken'));
+    assert.deepEqual(h.gateway.inspectSessions()[0].resolvedPointIds,[]);
+  }finally{await h.close();}
+});
+
+
+test('remote JEV gateway interrupts a continued pitch without waiting for final speech', {skip:!process.env.CUEX_S1_REMOTE_TEST_URL}, async()=>{
+  const h=await session(new LlamaSystemOne({baseUrl:process.env.CUEX_S1_REMOTE_TEST_URL,timeoutMs:1460}));
+  try{
+    await h.speech('主要终点是12周收缩压，多降6.2毫米汞柱，');
+    await h.speech('而且不良反应率与安慰剂相当，另有上市后真实世界研究的疗效结果，');
+    await h.wait(e=>e.type==='system2.candidate'&&e.payload.candidate.phase==='spoken');
+    assert.equal(h.gateway.inspectSessions()[0].candidates[0].fate,'asked');
+    assert(h.events.some(e=>e.type==='controller.dispatch'&&e.payload.action.type==='interrupt_speak'));
+  }finally{await h.close();}
+});
+
+test('remote JEV gateway listens to subgroup answers and advances without a follow-up', {skip:!process.env.CUEX_S1_REMOTE_TEST_URL}, async()=>{
+  const h=await session(new LlamaSystemOne({baseUrl:process.env.CUEX_S1_REMOTE_TEST_URL,timeoutMs:1460}));
+  try{
+    await h.speech('75岁以上约占11%，降压幅度与总体一致。',true);
+    await h.speech('eGFR30到60亚组有412人，结果与总体一致。',true);
+    await h.speech('eGFR低于30被排除，没有证据，说明书不建议使用。',true);
+    await h.wait(e=>e.type==='controller.dispatch'&&e.payload.concernProgress.concernId==='concern-dose');
+    assert.equal(h.gateway.inspectSessions()[0].candidates.length,0);
+  }finally{await h.close();}
 });

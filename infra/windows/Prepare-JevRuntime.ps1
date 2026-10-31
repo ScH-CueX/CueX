@@ -22,6 +22,8 @@ if (-not (Test-Path "$Root\convert-env\Scripts\python.exe")) {
     & uv venv "$Root\convert-env" --python 3.12 --managed-python
     if ($LASTEXITCODE -ne 0) { throw 'uv venv failed.' }
 }
+& uv pip install --python "$Root\convert-env\Scripts\python.exe" "torch==2.11.0+cpu" --index-url https://download.pytorch.org/whl/cpu
+if ($LASTEXITCODE -ne 0) { throw 'CPU torch install failed.' }
 & uv pip install --python "$Root\convert-env\Scripts\python.exe" -r "$Root\source\llama.cpp-b12023\requirements\requirements-convert_lora_to_gguf.txt"
 if ($LASTEXITCODE -ne 0) { throw 'Converter dependency install failed.' }
 & "$Root\convert-env\Scripts\python.exe" -c 'import torch; print(torch.__version__, "cuda", torch.version.cuda); assert torch.version.cuda is None'

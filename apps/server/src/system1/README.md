@@ -51,3 +51,7 @@ PATH=/opt/homebrew/opt/node@22/bin:$PATH CUEX_S1_REMOTE_TEST_URL=http://127.0.0.
 Q4_K_M is the selected demo quant. Q8_0 is stored on Windows for a later comparison; it is not the demo default. The matrix runs JEV Chinese questions, JEV English questions over Chinese state, and base-Qwen Chinese chat questions sequentially. It measures health HTTP RTT separately and saves raw decisions and summaries outside the repository. No model downloads or model execution run on the Mac.
 
 The reconnecting tunnel is `bash scripts/s1-tunnel.sh`. It owns only its SSH child and reconnects when the link drops. The Windows model process is detached and has a separate lifecycle.
+
+## Explicit response cue
+
+For the ANSHU applicability concern, drift asks about overall endpoints/efficacy/safety versus age or renal subgroup details. Responding and drift use the latest speech segment. An explicit turn-back phrase (`我先回答`, `我直接回答`, or `不过我得先说明`) starts a new segment. The local response-cue guard keeps listening and invalidates a pending interruption, but never marks a clinical point answered. Such results name the backend with `+response-cue`; substantive answer probabilities still come from JEV.

@@ -70,20 +70,48 @@ export class LlamaSystemOne implements SystemOneClient {
     // Keep the controller/fallback's full evidence; bound only the neural prompt.
     try {
       const full = JSON.parse(state);
-      if (typeof full.repSpeechSinceConcern === 'string') state = JSON.stringify({
-        concern: full.concern,
-        unresolvedPointIds: full.unresolvedPointIds,
-        repSpeechSinceConcern: full.repSpeechSinceConcern.slice(-120),
-        recentSpeech: String(full.recentSpeech ?? full.repSpeechSinceConcern).slice(-120),
-        ...(full.candidate ? { candidate: full.candidate } : {}),
-      });
+      if (typeof full.repSpeechSinceConcern === 'string') {
+        let recent = String(full.recentSpeech ?? full.repSpeechSinceConcern).slice(-120);
+        // ASR partials include the prior pitch. An explicit turn-back cue starts the latest response.
+        const correction = /(?:我先回答|我直接回答|抱歉[，,]?我|不过我(?:得|要)?先说明|回到您(?:的)?问题)/g;
+        const lastCorrection = [...recent.matchAll(correction)].at(-1);
+        if (lastCorrection?.index !== undefined) recent = recent.slice(lastCorrection.index);
+        state = JSON.stringify({
+          concern: full.concern,
+          unresolvedPointIds: full.unresolvedPointIds,
+          repSpeechSinceConcern: full.repSpeechSinceConcern.slice(-120),
+          recentSpeech: recent,
+          ...(full.candidate ? { candidate: full.candidate } : {}),
+        });
+      }
     } catch { /* Plain-text engine callers keep their supplied state. */ }
     const timeout = AbortSignal.timeout(this.timeoutMs);
     const cancel = new AbortController();
     const combined = AbortSignal.any([timeout, cancel.signal, ...(signal ? [signal] : [])]);
     try {
-      const answers = await Promise.all(Object.entries(questions).map(async ([id, question]) => [id, await this.answer(state, this.renderQuestion(id, question), combined)] as const));
-      return { answers: Object.fromEntries(answers), latencyMs: performance.now() - start, backend: this.backend };
+      const answers = await Promise.all(Object.entries(questions).map(async ([id, question]) => {
+        let questionState = state;
+        if (id === 'responding' || id === 'drift') {
+          try {
+            const current = JSON.parse(state);
+            if (typeof current.recentSpeech === 'string') questionState = JSON.stringify({ ...current, repSpeechSinceConcern: current.recentSpeech });
+          } catch { /* Plain-text callers keep their full state. */ }
+        }
+        return [id, await this.answer(questionState, this.renderQuestion(id, question, questionState), combined)] as const;
+      }));
+      const result = Object.fromEntries(answers);
+      let explicitResponseCue = false;
+      // An explicit turn-back phrase in an ASR partial is a direct response cue, not an answered point.
+      try {
+        const current = JSON.parse(state);
+        if (/^(?:我先回答|我直接回答|抱歉[，,]?我|不过我(?:得|要)?先说明|回到您(?:的)?问题)/.test(current.recentSpeech ?? '')) {
+          explicitResponseCue = true;
+          if (result.responding?.kind === 'noul') result.responding = answerFromWeights(questions.responding, [.01, .99]);
+          if (result.drift?.kind === 'noul') result.drift = answerFromWeights(questions.drift, [.99, .01]);
+          if (result.candidateValid?.kind === 'noul') result.candidateValid = answerFromWeights(questions.candidateValid, [.99, .01]);
+        }
+      } catch { /* Unstructured state has no explicit ASR cue field. */ }
+      return { answers: result, latencyMs: performance.now() - start, backend: explicitResponseCue ? `${this.backend}+response-cue` : this.backend };
     } catch (error) {
       cancel.abort(); signal?.throwIfAborted();
       if (timeout.aborted) throw new DOMException(`System 1 exceeded ${this.timeoutMs} ms`, 'TimeoutError');
@@ -91,7 +119,7 @@ export class LlamaSystemOne implements SystemOneClient {
     }
   }
 
-  private renderQuestion(id: string, question: JevQuestion): JevQuestion {
+  private renderQuestion(id: string, question: JevQuestion, state: string): JevQuestion {
     if (this.questionLanguage !== 'en') return question;
     const questions: Record<string, string> = {
       responding: 'Is the latest rep speech responding to the doctor concern, including explicitly starting to answer? An intention to answer is responding but does not resolve a point. Judge recentSpeech only.',
@@ -102,6 +130,12 @@ export class LlamaSystemOne implements SystemOneClient {
       resolved_d1: 'Has repSpeechSinceConcern substantively answered whether the elderly starting dose needs adjustment? A dose, adjustment instruction or explicit absence of evidence counts; promising to answer does not count.',
       candidateValid: 'Does the candidate follow-up trigger condition still hold? Use candidate.targetPointIds and the latest speech. If the rep is now answering the targeted concern, or all target points have been answered, the trigger no longer holds.',
     };
+    if (id === 'drift') {
+      try {
+        const current = JSON.parse(state);
+        if (current.concern === '适用范围') questions.drift = 'Is the latest speech describing overall study endpoints, efficacy or safety rather than age or renal subgroup details?';
+      } catch { /* Other packs retain the generic drift question. */ }
+    }
     return questions[id] ? { ...question, question: questions[id] } : question;
   }
 
