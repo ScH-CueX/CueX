@@ -92,7 +92,7 @@ npm --prefix ppt run dev
 node ppt/scripts/export-pdf.mjs cuex-pitch 5
 ```
 
-视频输出到 `video/out/`，PDF 与可离线打开的 HTML 输出到 `ppt/out/`。浏览器采集和 PDF 导出需要 Chrome；可用 `CUEX_PLAYWRIGHT_PATH` 指定已有 Playwright，Remotion 可用 `REMOTION_BROWSER` 指定 Chrome 路径。
+视频输出到 `video/out/`，PDF 与可离线打开的 HTML 输出到 `ppt/out/`。运行 `node scripts/build-roadshow.mjs` 可生成联动路演 HTML：第 2 页后播放视频，片尾返回第 3 页。浏览器采集和 PDF 导出需要 Chrome；可用 `CUEX_PLAYWRIGHT_PATH` 指定已有 Playwright，Remotion 可用 `REMOTION_BROWSER` 指定 Chrome 路径。
 
 ## 目录
 
