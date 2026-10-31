@@ -29,12 +29,12 @@ async function fakeLlama(stall = false) {
     const recent=state.recentSpeech as string;
     const answering=/我先回答|75岁|eGFR/.test(recent);
     let truth=false;
-    if(question.includes('候选追问')) truth=!answering;
-    else if(question.includes('继续介绍无关')) truth=!answering;
-    else if(question.includes('是否正在回应')) truth=answering;
-    else if(question.includes('75 岁')) truth=/75岁以上约占11%/.test(speech);
-    else if(question.includes('30–60')) truth=/eGFR30到60.{0,12}412/.test(speech);
-    else if(question.includes('低于 30')) truth=/eGFR低于30.{0,20}不建议/.test(speech);
+    if(question.includes('候选追问')||question.includes('candidate follow-up')) truth=!answering;
+    else if(question.includes('继续介绍无关')||question.includes('continuing unrelated')) truth=!answering;
+    else if(question.includes('是否正在回应')||question.includes('responding to the doctor')) truth=answering;
+    else if(question.includes('75 岁')||question.includes('over 75')) truth=/75岁以上约占11%/.test(speech);
+    else if(question.includes('30–60')||question.includes('30-60')) truth=/eGFR30到60.{0,12}412/.test(speech);
+    else if(question.includes('低于 30')||question.includes('below 30')) truth=/eGFR低于30.{0,20}不建议/.test(speech);
     res.end(JSON.stringify({probs:[{top_probs:[{id:3721,token:'false',prob:truth?.02:.98},{id:1802,token:'true',prob:truth?.98:.02}]}]}));
   });
   await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -97,4 +97,18 @@ test('remote JEV engine answers a Chinese live state with the adapter active', {
   assert.equal((await client.health()).ok,true);
   const result=await client.decide(encodeSystemOneState({concernId:'concern-scope',concern:'适用范围',unresolvedPointIds:['c1','c2','c3'],repSpeechSinceConcern:'我先回答您的人群问题，75岁以上的具体亚组数据我接下来说明。',recentSpeech:'我先回答您的人群问题，75岁以上的具体亚组数据我接下来说明。'}),{responding:{kind:'noul',question:'代表最近的话是否正在回应医生的人群关切？明确表示马上回答也算回应。'},resolved_c1:{kind:'noul',question:'代表是否已经实质给出75岁以上亚组的比例或研究结果？仅表示接下来说明不算实质回答。'}});
   assert.equal(result.answers.responding.top,'true');assert.equal(result.answers.resolved_c1.top,'false');
+});
+
+
+test('fallback keeps an earlier answer when later speech exceeds the neural 120-character window',async()=>{
+  const server=await fakeLlama(true);
+  const engine=new FallbackSystemOne(new LlamaSystemOne({baseUrl:server.url,timeoutMs:30}),new HeuristicSystemOne(ANSHU_PACK));
+  const h=await session(engine);
+  try{
+    await h.speech('75岁以上约占11%，降压幅度与总体一致。'+ '主要终点是12周收缩压，研究结果与总体一致。'.repeat(8),true);
+    assert(h.gateway.inspectSessions()[0].resolvedPointIds.includes('c1'));
+    await h.speech('eGFR30到60亚组有412人，结果与总体一致。',true);
+    await h.speech('eGFR低于30被排除，没有证据，说明书不建议使用。',true);
+    await h.wait(e=>e.type==='controller.dispatch'&&e.payload.concernProgress.concernId==='concern-dose');
+  }finally{await h.close();await server.close();}
 });

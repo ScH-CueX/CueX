@@ -13,12 +13,12 @@
 | --- | --- | --- |
 | `CUEX_S1_URL` | unset | llama-server base URL, such as `http://127.0.0.1:18080`; an ending `/v1` is accepted |
 | `CUEX_S1_TIMEOUT_MS` | `600` | Total model decide deadline, including prompt formatting and all parallel questions |
-| `CUEX_S1_BACKEND` | `llama.cpp` | Model/backend name in results, such as `qwen3.5-9b@win-vulkan` |
+| `CUEX_S1_BACKEND` | `llama.cpp` | Model/backend name in results, such as `jev-9b-q4@win-vulkan` |
 | `CUEX_S1_MODEL` | unset | Optional model alias for prompt formatting |
 | `CUEX_S1_FORMAT` | `jev-v1` | `jev-v1` for autotrust/JEV-9B; `chat` for base Qwen; `jevstyle-v1` for older chaoliangUNSW 2B |
 | `CUEX_S1_LORA_ID` | `0` | Server adapter index; `none` omits adapter selection for servers without adapters |
 | `CUEX_S1_LORA_SCALE` | `1` for JEV, otherwise `0` | Per-request adapter scale; the same server can compare JEV with the base model |
-| `CUEX_S1_QUESTION_LANGUAGE` | `zh` | `en` renders the fixed demo questions in English while preserving the Chinese state |
+| `CUEX_S1_QUESTION_LANGUAGE` | `en` | `en` renders the fixed demo questions in English while preserving the Chinese state |
 
 The client sends one `/completion` request per question with `n_predict: 1`, a restricted grammar, and token probabilities. It does not generate JSON or chain-of-thought. Chat models first use `/apply-template` (no inference); autotrust JEV uses the exact bare-v1 `[kind]`, `[state]`, `[question]`, `[options]`, `[decision]:` training prompt. Independent questions run in parallel. The shared state comes before the question and prompt caching is enabled. Start llama-server with multiple slots and continuous batching.
 

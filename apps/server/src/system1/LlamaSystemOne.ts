@@ -51,7 +51,7 @@ export class LlamaSystemOne implements SystemOneClient {
     this.loraScale = options.loraScale ?? Number(process.env.CUEX_S1_LORA_SCALE ?? (this.promptFormat === 'jev-v1' ? 1 : 0));
     if (this.loraId !== null && (!Number.isInteger(this.loraId) || this.loraId < 0)) throw new Error('System 1 LoRA id must be a nonnegative integer or none');
     if (!Number.isFinite(this.loraScale)) throw new Error('System 1 LoRA scale must be finite');
-    const language = options.questionLanguage ?? process.env.CUEX_S1_QUESTION_LANGUAGE ?? 'zh';
+    const language = options.questionLanguage ?? process.env.CUEX_S1_QUESTION_LANGUAGE ?? 'en';
     if (language !== 'zh' && language !== 'en') throw new Error('CUEX_S1_QUESTION_LANGUAGE must be zh or en');
     this.questionLanguage = language;
     this.request = options.fetch ?? fetch;
@@ -67,6 +67,17 @@ export class LlamaSystemOne implements SystemOneClient {
   async decide(state: string, questions: Record<string, JevQuestion>, signal?: AbortSignal): Promise<SystemOneResult> {
     signal?.throwIfAborted();
     const start = performance.now();
+    // Keep the controller/fallback's full evidence; bound only the neural prompt.
+    try {
+      const full = JSON.parse(state);
+      if (typeof full.repSpeechSinceConcern === 'string') state = JSON.stringify({
+        concern: full.concern,
+        unresolvedPointIds: full.unresolvedPointIds,
+        repSpeechSinceConcern: full.repSpeechSinceConcern.slice(-120),
+        recentSpeech: String(full.recentSpeech ?? full.repSpeechSinceConcern).slice(-120),
+        ...(full.candidate ? { candidate: full.candidate } : {}),
+      });
+    } catch { /* Plain-text engine callers keep their supplied state. */ }
     const timeout = AbortSignal.timeout(this.timeoutMs);
     const cancel = new AbortController();
     const combined = AbortSignal.any([timeout, cancel.signal, ...(signal ? [signal] : [])]);
@@ -83,11 +94,11 @@ export class LlamaSystemOne implements SystemOneClient {
   private renderQuestion(id: string, question: JevQuestion): JevQuestion {
     if (this.questionLanguage !== 'en') return question;
     const questions: Record<string, string> = {
-      responding: 'Is recentSpeech responding to the current doctor concern, including explicitly starting to answer? An intention to answer counts as responding, but does not resolve a point.',
-      drift: 'Is recentSpeech continuing unrelated benefits, endpoints, safety or marketing instead of addressing the unresolved doctor concern?',
-      resolved_c1: 'Has repSpeechSinceConcern substantively answered the over-75 subgroup concern? A concrete subgroup proportion or applicable result counts. Merely mentioning the group, repeating the question, promising an answer, or making an unsupported universal claim does not count.',
-      resolved_c2: 'Has repSpeechSinceConcern substantively answered the eGFR 30-60 subgroup concern? A concrete subgroup count or applicable result counts. Merely mentioning the group or promising an answer does not count.',
-      resolved_c3: 'Has repSpeechSinceConcern substantively answered the eGFR below 30 concern by stating study exclusion, no evidence, or use not recommended? Merely mentioning the group, promising later explanation or falsely claiming safe use does not count.',
+      responding: 'Is the latest rep speech responding to the doctor concern, including explicitly starting to answer? An intention to answer is responding but does not resolve a point. Judge recentSpeech only.',
+      drift: 'Is the latest rep speech continuing unrelated benefits, endpoints, safety or marketing instead of the unresolved doctor concern? Judge recentSpeech only.',
+      resolved_c1: 'Has the rep substantively answered the concern about patients over 75? A concrete subgroup proportion or result consistent with the overall population counts. Merely mentioning age, asking a question, promising later data, or claiming all elderly can use it does not count. Judge all repSpeechSinceConcern.',
+      resolved_c2: 'Has the rep substantively answered the eGFR 30-60 subgroup concern? A concrete subgroup count or result consistent with overall population counts. Merely mentioning the group or promising an answer does not count. Judge all repSpeechSinceConcern.',
+      resolved_c3: 'Has the rep substantively answered the eGFR below 30 concern by stating study exclusion, no evidence, or use not recommended? Merely mentioning the group or falsely claiming safe use does not count. Judge all repSpeechSinceConcern.',
       resolved_d1: 'Has repSpeechSinceConcern substantively answered whether the elderly starting dose needs adjustment? A dose, adjustment instruction or explicit absence of evidence counts; promising to answer does not count.',
       candidateValid: 'Does the candidate follow-up trigger condition still hold? Use candidate.targetPointIds and the latest speech. If the rep is now answering the targeted concern, or all target points have been answered, the trigger no longer holds.',
     };

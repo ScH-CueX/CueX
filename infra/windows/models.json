@@ -1,6 +1,6 @@
 {
   "checkedAt": "2026-10-31",
-  "defaultModel": "qwen35-9b-q8",
+  "defaultModel": "qwen35-9b-q4",
   "models": {
     "qwen35-4b-q4": {
       "repo": "unsloth/Qwen3.5-4B-GGUF",
@@ -47,7 +47,7 @@
       "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q8_0.gguf"
     }
   },
-  "defaultDeployment": "autotrust-jev-9b-q8",
+  "defaultDeployment": "autotrust-jev-9b-q4",
   "adapters": {
     "autotrust-jev-9b": {
       "repo": "autotrust/JEV-9B",

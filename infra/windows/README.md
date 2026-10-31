@@ -1,6 +1,6 @@
 # Windows System 1 (llama.cpp Vulkan)
 
-The default deployment is **Autotrust JEV-9B**, with Qwen3.5-9B Q8_0 and its decision LoRA. Follow [JEV.md](JEV.md) to prepare the isolated `C:\cuex` deployment and start `Start-JevServer.ps1`. Use adapter scale `1` for decisions and `0` for base chat. The generic scripts below also support standalone base-model comparisons.
+The default deployment is **Autotrust JEV-9B**, with Qwen3.5-9B Q4_K_M and its decision LoRA. Follow [JEV.md](JEV.md) to prepare the isolated `C:\cuex` deployment and start `Start-JevServer.ps1`. Use adapter scale `1` for decisions and `0` for base chat. The generic scripts below also support standalone base-model comparisons.
 
 Use an existing Windows Vulkan build of `llama-server.exe`. These scripts do not install software, change services or firewall rules, open LAN listeners, or stop other processes. Downloads run only when you call `Download-Model.ps1`.
 

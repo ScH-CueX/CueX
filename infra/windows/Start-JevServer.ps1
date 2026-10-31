@@ -2,15 +2,24 @@
 [CmdletBinding()]
 param(
     [string]$Root = 'C:\cuex',
-    [ValidateSet('Q8_0','Q4_K_M')][string]$Quant = 'Q8_0',
+    [ValidateSet('Q8_0','Q4_K_M')][string]$Quant = 'Q4_K_M',
     [ValidateRange(1,65535)][int]$Port = 18080,
-    [ValidateRange(512,32768)][int]$ContextPerSlot = 4096
+    [ValidateRange(512,32768)][int]$ContextPerSlot = 4096,
+    [ValidateRange(1,16)][int]$Parallel = 4,
+    [ValidateRange(0,524288)][int]$ContextTotal = 0,
+    [ValidateRange(-1,1048576)][int]$CacheRamMiB = 8192,
+    [ValidateRange(1,9)][int]$LogVerbosity = 3,
+    [ValidateRange(0,1024)][int]$ContextCheckpoints = 32,
+    [ValidateRange(32,32768)][int]$BatchSize = 2048,
+    [ValidateRange(32,32768)][int]$UBatchSize = 512
 )
 $ErrorActionPreference = 'Stop'
+New-Item -ItemType Directory -Path (Join-Path $Root 'logs') -Force | Out-Null
 $server = Join-Path $Root 'runtime\llama-server.exe'
 $model = Join-Path $Root "models\Qwen3.5-9B-$Quant.gguf"
 $lora = Join-Path $Root 'adapter_vllm\JEV-9B-lora-f16.gguf'
 foreach ($path in @($server,$model,$lora)) { if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw "Missing $path"} }
+if ((Get-FileHash $lora -Algorithm SHA256).Hash -ine 'c36b94a24e7a74199828cfcb50e1f683a4773a10c552bc83d93299255f2e95ca') { throw 'Converted LoRA SHA256 mismatch.' }
 $metadata = Get-Content (Join-Path $PSScriptRoot 'jev-downloads.json') -Raw | ConvertFrom-Json
 $entry = $metadata | Where-Object file -eq "Qwen3.5-9B-$Quant.gguf"
 if ((Get-Item $model).Length -ne [long]$entry.bytes) { throw 'Model size mismatch.' }
@@ -22,7 +31,8 @@ if($devices -notmatch '(?m)^\s*Vulkan0:'){throw 'Vulkan0 unavailable.'}
 $probe = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,$Port)
 $probe.Server.ExclusiveAddressUse=$true
 try { $probe.Start() } finally { $probe.Stop() }
-$arguments = @('--model',$model,'--host','127.0.0.1','--port',"$Port",'--parallel','4','--cont-batching','--ctx-size',"$($ContextPerSlot*4)",'--device','Vulkan0','--n-gpu-layers','99','--lora',$lora,'--lora-init-without-apply','--jinja','--reasoning-budget','0','--alias',"qwen35-9b-$Quant-jev",'--no-webui')
+$context = if($ContextTotal -gt 0){$ContextTotal}else{$ContextPerSlot*$Parallel}
+$arguments = @('--model',$model,'--host','127.0.0.1','--port',"$Port",'--parallel',"$Parallel",'--cont-batching','--ctx-size',"$context",'--device','Vulkan0','--n-gpu-layers','99','--lora',$lora,'--lora-init-without-apply','--jinja','--reasoning-budget','0','--alias',"qwen35-9b-$Quant-jev",'--no-webui','--cache-ram',"$CacheRamMiB",'-lv',"$LogVerbosity",'--ctx-checkpoints',"$ContextCheckpoints",'--batch-size',"$BatchSize",'--ubatch-size',"$UBatchSize")
 # CIM Create launches outside the SSH child job. Redirect inside a dedicated shell.
 $quoted = $arguments | ForEach-Object { "'" + $_.Replace("'","''") + "'" }
 $stamp=Get-Date -Format 'yyyyMMdd-HHmmss'
