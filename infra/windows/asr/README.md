@@ -65,3 +65,14 @@ The spoken-number reference spells numbers as spoken Chinese, for example `七�
 **Choice:** Both models preserved the `75 岁` population and `30 到 60` range in spoken Chinese. Neither preserved `eGFR` from Tingting. `zh` is the default because its first partial was about 380 ms earlier and its endpoint about 468 ms earlier. Its two extra character errors were in the endpoint/product lines. X-ASR stays installed and can be selected with one restart. Read mixed medical abbreviations clearly during the demo; this test did not establish reliable `eGFR` recognition.
 
 The real gateway test passed with final text `七十五岁以上的患者约占百分之十一` and 11 partial events. It took 6.53 seconds including real-time audio and trailing silence.
+
+## One-shot hotword experiment
+
+One additional comparison used `modified_beam_search`, four active paths and `--hotwords-score=1.5` with `hotwords.txt`. No score sweep was run. X-ASR used `--modeling-unit=bpe` and `bpe.vocab` exported from its bundled `bpe.model` using the official 2.0.1 exporter and `sentencepiece==0.2.1` on Windows. The zh model used `--modeling-unit=cjkchar`; its vocabulary could not encode `EGFR`, `ANSHU`, `肾`, or `滤`, and upstream skipped those tokens.
+
+| Model with hotwords | Literal CER | Spoken-number CER | First partial, median / p95 | Endpoint, median / p95 |
+| --- | --- | --- | --- | --- |
+| X-ASR | 23.97% (35/146) | 8.00% (12/150) | 1227 / 1418 ms | 1933 / 2384 ms |
+| zh | 23.97% (35/146) | 8.00% (12/150) | 678 / 1084 ms | 1288 / 1407 ms |
+
+The zh product name improved from `班舒平` to `安舒平`. Neither model preserved `eGFR`. The selected deployment remains **zh with greedy search**. `xasr-hotwords.json` and `zh-hotwords.json` preserve the full comparison. Hotwords are not enabled by `start.ps1`.
