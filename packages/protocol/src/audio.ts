@@ -47,3 +47,15 @@ export interface TtsAbortSignal {
   reason: 'user_interrupted' | 'candidate_withdrawn' | 'turn_switched';
   timestamp: number;
 }
+
+/** 浏览器 → 服务端：一段医生语音实际播放了多少。每段语音只发一次。服务端据此只把听到的部分记入对话历史。 */
+export interface TtsPlaybackReport {
+  sessionId: string;
+  utteranceId: string;
+  /** 已完整播放的分片数，按 chunkIndex 计。 */
+  completedChunks: number;
+  /** 这段语音实际播放的毫秒数。 */
+  playedMs: number;
+  /** finished：全部分片已播完。stopped：被代表说话、tts.abort 或断线打断。 */
+  status: 'finished' | 'stopped';
+}
