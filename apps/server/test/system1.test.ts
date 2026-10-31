@@ -62,12 +62,12 @@ for(const transport of ['model','timeout-fallback'] as const) test(`Chinese demo
   const h=await session(engine);
   try{
     await h.speech('主要终点是12周收缩压，多降6.2毫米汞柱，');
-    assert(!h.events.some(e=>e.type==='system2.candidate'));
+    assert(!h.events.some(e=>e.type==='system2.candidate'&&(!e.payload.task||e.payload.task==='followup')));
     await h.speech('而且不良反应率与安慰剂相当，另有上市后真实世界研究的疗效结果，');
-    await h.wait(e=>e.type==='system2.candidate'&&e.payload.candidate.phase==='ready');
+    await h.wait(e=>e.type==='system2.candidate'&&(!e.payload.task||e.payload.task==='followup')&&e.payload.candidate.phase==='ready');
     await h.speech('我先回答您的人群问题，');
-    await h.wait(e=>e.type==='system2.candidate'&&e.payload.candidate.phase==='withdrawn');
-    assert(!h.events.some(e=>e.type==='system2.candidate'&&e.payload.candidate.phase==='spoken'));
+    await h.wait(e=>e.type==='system2.candidate'&&(!e.payload.task||e.payload.task==='followup')&&e.payload.candidate.phase==='withdrawn');
+    assert(!h.events.some(e=>e.type==='system2.candidate'&&(!e.payload.task||e.payload.task==='followup')&&e.payload.candidate.phase==='spoken'));
     assert.deepEqual(h.gateway.inspectSessions()[0].resolvedPointIds,[],'answering promise must not resolve any point');
     await h.speech('75岁以上约占11%，eGFR30到60亚组412人，降压幅度与总体一致。',true);
     await h.speech('eGFR低于30被排除，没有证据，说明书不建议使用。',true);
@@ -120,10 +120,10 @@ test('remote JEV gateway visit prepares on a continued pitch and withdraws on an
   try{
     await h.speech('主要终点是12周收缩压，多降6.2毫米汞柱，');
     await h.speech('而且不良反应率与安慰剂相当，另有上市后真实世界研究的疗效结果，');
-    await h.wait(e=>e.type==='system2.candidate'&&e.payload.candidate.phase==='ready');
+    await h.wait(e=>e.type==='system2.candidate'&&(!e.payload.task||e.payload.task==='followup')&&e.payload.candidate.phase==='ready');
     await h.speech('我先回答您的人群问题，');
-    await h.wait(e=>e.type==='system2.candidate'&&e.payload.candidate.phase==='withdrawn');
-    assert(!h.events.some(e=>e.type==='system2.candidate'&&e.payload.candidate.phase==='spoken'));
+    await h.wait(e=>e.type==='system2.candidate'&&(!e.payload.task||e.payload.task==='followup')&&e.payload.candidate.phase==='withdrawn');
+    assert(!h.events.some(e=>e.type==='system2.candidate'&&(!e.payload.task||e.payload.task==='followup')&&e.payload.candidate.phase==='spoken'));
     assert.deepEqual(h.gateway.inspectSessions()[0].resolvedPointIds,[]);
   }finally{await h.close();}
 });
@@ -134,7 +134,7 @@ test('remote JEV gateway interrupts a continued pitch without waiting for final 
   try{
     await h.speech('主要终点是12周收缩压，多降6.2毫米汞柱，');
     await h.speech('而且不良反应率与安慰剂相当，另有上市后真实世界研究的疗效结果，');
-    await h.wait(e=>e.type==='system2.candidate'&&e.payload.candidate.phase==='spoken');
+    await h.wait(e=>e.type==='system2.candidate'&&(!e.payload.task||e.payload.task==='followup')&&e.payload.candidate.phase==='spoken');
     assert.equal(h.gateway.inspectSessions()[0].candidates[0].fate,'asked');
     assert(h.events.some(e=>e.type==='controller.dispatch'&&e.payload.action.type==='interrupt_speak'));
   }finally{await h.close();}

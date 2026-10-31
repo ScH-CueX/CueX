@@ -1,4 +1,4 @@
-import type { AsrTranscriptDelta, ControllerDispatchEvent, FollowupCandidate, JevDecisionResponse, ServerMessage, TrainingScenarioDef } from '@cuex/protocol';
+import type { AsrTranscriptDelta, CandidateLifecyclePhase, ControllerDispatchEvent, FollowupCandidate, JevDecisionResponse, ServerMessage, System2Task, TrainingScenarioDef } from '@cuex/protocol';
 import type { DriverStatus } from '../driver/IConversationDriver';
 
 export interface LiveSession {
@@ -9,6 +9,8 @@ export interface LiveSession {
   scenario?: TrainingScenarioDef;
   transcripts: AsrTranscriptDelta[];
   candidates: FollowupCandidate[];
+  /** The doctor line System 2 is writing now (opening, retry or closing). It is never a follow-up candidate. */
+  lineJob?: { task: Exclude<System2Task, 'followup'>; phase: CandidateLifecyclePhase };
   judgments: JevDecisionResponse[];
   dispatch?: ControllerDispatchEvent;
   resolved: Record<string, string>;
@@ -56,7 +58,8 @@ export function liveSessionReducer(state: LiveSession, action: LiveAction): Live
       return { ...state, resolved, judgments: [...state.judgments, event.payload].slice(-100) };
     }
     case 'system2.candidate': {
-      const candidate = event.payload.candidate;
+      const { candidate, task = 'followup' } = event.payload;
+      if (task !== 'followup') return { ...state, lineJob: { task, phase: candidate.phase } };
       const candidates = [...state.candidates];
       const index = candidates.findIndex(item => item.id === candidate.id);
       if (index < 0) candidates.push(candidate);

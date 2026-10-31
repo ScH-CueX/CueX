@@ -22,7 +22,7 @@ try {
         try {
           const draft: FollowupDraft = await engines.system2.prepareFollowup({
             sessionId: 'demo-health', pack: ANSHU_PACK, concernId: 'concern-scope', unresolvedPointIds: ['c1', 'c2', 'c3'],
-            history: [{ who: 'doctor', text: ANSHU_PACK.doctorOpening }, { who: 'rep', text: '主要终点是十二周收缩压，不良反应与安慰剂相当。' }],
+            history: [{ who: 'doctor', text: ANSHU_PACK.lineExamples.opening[0] }, { who: 'rep', text: '主要终点是十二周收缩压，不良反应与安慰剂相当。' }],
             repSpeechSinceConcern: '主要终点是十二周收缩压，不良反应与安慰剂相当。', reason: '代表继续介绍总体结果，尚未回答人群问题', signal: controller.signal,
           });
           report('System 2', engines.system2.backend, !!draft.text.trim());

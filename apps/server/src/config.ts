@@ -11,7 +11,7 @@ export interface ServerConfig {
   system2: EngineMode;
   asr: EngineMode;
   tts: EngineMode;
-  controller: ControllerOptions;
+  controller: Omit<ControllerOptions, 'doctorLines'>;
 }
 function mode(env: NodeJS.ProcessEnv, key: string): EngineMode {
   const value = env[key] ?? 'fake';

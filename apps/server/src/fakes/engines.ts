@@ -1,6 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import type {
-  AsrCallbacks, AsrEngine, AsrStream, FollowupDraft, FollowupPhase, FollowupRequest,
+  AsrCallbacks, AsrEngine, AsrStream, DoctorLineRequest, FollowupDraft, FollowupPhase, FollowupRequest,
   JevAnswer, JevQuestion, SystemOneClient, SystemOneResult, SystemOneState, SystemTwo, TtsEngine,
 } from '../contracts';
 
@@ -42,7 +42,17 @@ export class FakeSystemOne implements SystemOneClient {
 
 export class FakeSystemTwo implements SystemTwo {
   readonly backend = 'fake-delayed';
-  constructor(private delayMs = 250) {}
+  private lineNumber = 0;
+  constructor(private delayMs = 250, private lineDelayMs = 0) {}
+
+  async prepareDoctorLine(req: DoctorLineRequest, onPhase?: (phase: FollowupPhase, partialText?: string) => void): Promise<string> {
+    req.signal.throwIfAborted();
+    onPhase?.('drafting');
+    if (this.lineDelayMs) await delay(this.lineDelayMs, undefined, { signal: req.signal });
+    const examples = req.kind === 'retry' ? req.pack.lineExamples.retry[req.concernId ?? ''] ?? req.pack.lineExamples.opening : req.pack.lineExamples[req.kind];
+    const variation = this.lineNumber++ % 2 === 0 ? '我们就说具体患者。' : '这次先把范围说清楚。';
+    return `${examples[0]}${variation}`;
+  }
 
   async prepareFollowup(req: FollowupRequest, onPhase?: (phase: FollowupPhase, partialText?: string) => void): Promise<FollowupDraft> {
     req.signal.throwIfAborted();

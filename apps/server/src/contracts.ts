@@ -16,12 +16,29 @@ export interface ScenarioPack {
   scenario: TrainingScenarioDef;
   /** Facts from the (fictional) clinical material. System 2 retrieves from these; nothing else is evidence. */
   facts: PackFact[];
-  /** Line the doctor says to open the session. It raises the first concern. */
-  doctorOpening: string;
-  /** Rephrased opening per concern id, used when the rep retries from the review. */
-  retryOpenings: Record<string, string>;
-  /** Line the doctor says once every concern is resolved. The visit ends after it. */
-  doctorClosing: string;
+  /** Few-shot examples for the doctor lines System 2 writes live. */
+  lineExamples: DoctorLineExamples;
+  /** Observed misrecognitions of this pack's terms by the deployed ASR. Applied to rep transcripts before System 1 and display. */
+  asrCorrections?: AsrCorrection[];
+}
+
+export interface AsrCorrection {
+  /** Regular expression source, applied with the g flag to recognized rep text. */
+  pattern: string;
+  replacement: string;
+}
+
+/**
+ * Examples set the style of the doctor's lines; System 2 writes a new line every visit, so repeat visitors never hear a script.
+ * The doctor speaks an example verbatim only when the live line misses its time budget.
+ */
+export interface DoctorLineExamples {
+  /** The doctor opening the visit and raising the first concern. */
+  opening: string[];
+  /** Per concern id: the doctor raising that concern again in other words, for 从这里再试一次. */
+  retry: Record<string, string[]>;
+  /** The doctor ending the visit once every concern is resolved. */
+  closing: string[];
 }
 
 // ---------- System 1: Jev-style typed decisions ----------
@@ -118,9 +135,29 @@ export interface FollowupDraft {
 
 export type FollowupPhase = 'retrieving' | 'drafting';
 
+export type DoctorLineKind = 'opening' | 'retry' | 'closing';
+
+export interface DoctorLineRequest {
+  sessionId: string;
+  pack: ScenarioPack;
+  kind: DoctorLineKind;
+  /** The concern the line raises: the first concern for opening, the retried concern for retry. */
+  concernId?: string;
+  /** Dialogue as heard. For retry, the previous attempt, so the doctor presses on what was missed. */
+  history: DialogueTurn[];
+  /** Retry only: points of this concern the rep left unanswered last time. */
+  missedPointIds?: string[];
+  signal: AbortSignal;
+}
+
 export interface SystemTwo {
   readonly backend: string;
   prepareFollowup(req: FollowupRequest, onPhase?: (phase: FollowupPhase, partialText?: string) => void): Promise<FollowupDraft>;
+  /**
+   * Writes one spoken doctor line live, guided by pack.lineExamples. It runs on its own agent, in parallel with follow-up
+   * drafting; the Controller prefetches lines so they are ready the moment they are needed.
+   */
+  prepareDoctorLine?(req: DoctorLineRequest, onPhase?: (phase: FollowupPhase, partialText?: string) => void): Promise<string>;
 }
 
 // ---------- Voice ----------
