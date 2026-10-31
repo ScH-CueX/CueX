@@ -38,7 +38,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
   onNavigate,
 }) => {
   const [t, setT] = useState<number>(initialTime);
-  const [playing, setPlaying] = useState<boolean>(true);
+  const [playing, setPlaying] = useState<boolean>(() => new URLSearchParams(window.location.search).get('paused') !== '1');
   const [scaffoldingLevel, setScaffoldingLevel] = useState<ScaffoldingLevel>('full');
   const [jury, setJury] = useState<boolean>(initialJury);
   const [nodTrigger, setNodTrigger] = useState<number>(0);
@@ -159,7 +159,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
   }, []);
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-3.5rem)] bg-ground text-ink select-none">
+    <div data-ui="training" className="flex flex-col min-h-[calc(100vh-3.5rem)] bg-ground text-ink select-none">
       {/* 极简顶栏 */}
       <div className="w-full border-b border-line bg-surface/80 px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2 text-ink-2">
@@ -273,7 +273,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
         </div>
 
         {/* 中列：3D 石膏舞台 (前倾/点头/朱砂 Fresnel 侧光) */}
-        <div className="lg:col-span-5 flex flex-col items-center justify-center min-h-[460px] bg-ground-2/20 border border-line rounded-[2px] relative overflow-hidden">
+        <div data-capture="doctor" className="lg:col-span-5 flex flex-col items-center justify-center min-h-[460px] bg-ground-2/20 border border-line rounded-[2px] relative overflow-hidden">
           <DoctorCanvas
             state={currentStateName}
             readiness={readiness}
@@ -300,7 +300,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
         </div>
 
         {/* 右列：双声部排版对谈现场 (宋体为医生，黑体为代表) */}
-        <div className="lg:col-span-4 flex flex-col justify-between border border-line bg-surface rounded-[2px] p-5 shadow-sm">
+        <div data-capture="transcript" className="lg:col-span-4 flex flex-col justify-between border border-line bg-surface rounded-[2px] p-5 shadow-sm">
           <div className="space-y-5">
             <div className="flex items-center justify-between border-b border-line pb-2">
               <span className="text-xs font-bold text-ink-3 uppercase tracking-widest">对谈现场</span>
@@ -365,7 +365,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
 
       {/* 评审视界：脑电波脉冲与悬珠 */}
       {jury && (
-        <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 mb-4">
+        <div data-capture="decisions" className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 mb-4">
           <div className="border border-line bg-surface/90 rounded-[2px] p-4 space-y-3 shadow-sm">
             <div className="flex items-center justify-between border-b border-line pb-1.5 text-xs">
               <span className="font-bold text-ink">系统双层决策时序</span>

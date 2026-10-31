@@ -23,3 +23,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# local pnpm store created when the global store is not writable
+.pnpm-store/
+
+# Derived presentation/video artifacts and local review output
+video/out/
+ppt/out/
+assets/qa/
+assets/captures/raw/
+.firecrawl/
+.taste-skill/

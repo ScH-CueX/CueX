@@ -1,0 +1,16 @@
+import {bundle} from '@remotion/bundler';
+import {openBrowser, renderMedia, selectComposition} from '@remotion/renderer';
+import {mkdirSync} from 'node:fs';
+import {dirname, join} from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+const root=join(dirname(fileURLToPath(import.meta.url)),'..');
+const out=join(root,'out');mkdirSync(out,{recursive:true});
+const serveUrl=await bundle({entryPoint:join(root,'src/index.ts'),publicDir:join(root,'..','assets')});
+const chromiumOptions={gl:'angle'};
+const browser=await openBrowser('chrome',{chromiumOptions,browserExecutable:process.env.REMOTION_BROWSER??null});
+const composition=await selectComposition({serveUrl,id:'CueXDemo45',puppeteerInstance:browser,chromiumOptions});
+let last=-1;
+const outputLocation=join(out,'AI+医疗健康-记性好了一点-视频.mp4');
+await renderMedia({composition,serveUrl,outputLocation,codec:'h264',crf:18,pixelFormat:'yuv420p',audioCodec:'aac',audioBitrate:'192k',concurrency:8,puppeteerInstance:browser,chromiumOptions,onProgress:p=>{const n=Math.floor(p.progress*10);if(n!==last){last=n;console.log(`render ${n*10}%`);}}});
+await browser.close({silent:true});console.log(outputLocation);

@@ -36,7 +36,10 @@ interface ReviewViewProps {
 }
 
 export const ReviewView: React.FC<ReviewViewProps> = ({ onNavigate }) => {
-  const [t, setT] = useState<number>(29.4);
+  const [t, setT] = useState<number>(() => {
+    const value = Number(new URLSearchParams(window.location.search).get('t') ?? 29.4);
+    return Number.isFinite(value) ? Math.max(0, Math.min(DUR, value)) : 29.4;
+  });
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [selectedMomentId, setSelectedMomentId] = useState<string>('m2');
   const [practiceMode, setPracticeMode] = useState<'learning' | 'performance'>('learning');

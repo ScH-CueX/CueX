@@ -48,10 +48,10 @@ export const ClinicalScaffoldingHUD: React.FC<ClinicalScaffoldingHUDProps> = ({
       aria-label="实时认知辅助系统"
     >
       {/* HUD 头部栏 */}
-      <div className="flex items-center justify-between p-3 border-b border-line bg-ground-2/40">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3 border-b border-line bg-ground-2/40">
         <div className="flex items-center gap-2">
           <BookOpen className="w-3.5 h-3.5 text-ink" />
-          <span className="font-bold text-ink">临床资料与策略伴随 (HUD)</span>
+          <span className="font-bold text-ink">临场辅助</span>
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -73,7 +73,7 @@ export const ClinicalScaffoldingHUD: React.FC<ClinicalScaffoldingHUDProps> = ({
               className="text-[11px] h-6 px-2"
               title="微信号：仅提供关键数据点与红线"
             >
-              微信号
+              轻提示
             </button>
             <button
               type="button"
@@ -101,7 +101,7 @@ export const ClinicalScaffoldingHUD: React.FC<ClinicalScaffoldingHUDProps> = ({
       {isOpen && (
         <div className="p-4 space-y-4">
           {/* 实时情境应对战术（伴随式提示） */}
-          {currentSec >= 23.5 && currentSec < 36.4 && (
+          {level === 'full' && currentSec >= 23.5 && currentSec < 36.4 && (
             <div className="p-3 bg-held-tint/60 border-l-2 border-held rounded-[2px] space-y-1 animate-in fade-in">
               <div className="flex items-center gap-1.5 text-held-ink font-semibold">
                 <Sparkles className="w-3.5 h-3.5" />
@@ -114,7 +114,7 @@ export const ClinicalScaffoldingHUD: React.FC<ClinicalScaffoldingHUDProps> = ({
           )}
 
           {/* 临床证据速查卡（ANSHU-3 获批证据） */}
-          <div className="space-y-2">
+          {level === 'full' ? <div className="space-y-2">
             <div className="flex items-center justify-between text-ink-3 text-[11px]">
               <span className="font-semibold uppercase tracking-wider">证据出处 · ANSHU-3 亚组</span>
               <span className="font-mono">P.14 表 3-2</span>
@@ -132,7 +132,7 @@ export const ClinicalScaffoldingHUD: React.FC<ClinicalScaffoldingHUDProps> = ({
                 <span className="text-[10px] text-ink-2 block">肾功能不全无需减量</span>
               </div>
             </div>
-          </div>
+          </div> : <p className="text-sm leading-relaxed text-ink">先回应适用范围，再说明证据边界。</p>}
 
           {/* 合规与安全红线提醒 */}
           <div className="p-2.5 bg-ground-2/40 border border-line/80 rounded-[2px] flex items-start gap-2 text-ink-2">

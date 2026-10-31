@@ -1,5 +1,7 @@
 <a id="readme-top"></a>
 
+当前演示范围、离线运行与新制作的 45 秒视频见 [运行说明](docs/RUNNING.md)。超宽屏路演工程见 [ppt/README.md](ppt/README.md)。
+
 <!-- PROJECT SHIELDS -->
 <div align="center">
 
@@ -14,10 +16,7 @@
 <br />
 <div align="center">
   <a href="https://github.com/ScH-CueX/CueX">
-    <svg viewBox="0 0 24 24" width="80" height="80" aria-hidden="true">
-      <rect x="1" y="1" width="22" height="22" rx="3" fill="#141716"/>
-      <path d="M6 9.5h12M6 14.5h6.5M15 14.5h3" stroke="#ecede8" stroke-width="2"/>
-    </svg>
+    <img src="assets/brand/cuex-symbol.svg" width="80" height="80" alt="CueX" />
   </a>
 
 <h2 align="center">CueX</h2>

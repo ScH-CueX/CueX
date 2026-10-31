@@ -1,0 +1,148 @@
+{
+  "capturedFrom": "CueX working tree",
+  "viewport": {
+    "width": 1920,
+    "height": 1080,
+    "scale": 2
+  },
+  "states": {
+    "home": {
+      "pageH": 2573,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=home",
+      "elements": {}
+    },
+    "live-holding": {
+      "pageH": 1420,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=live&t=28&jury=1&paused=1",
+      "elements": {
+        "doctor": {
+          "x": 618,
+          "y": 140,
+          "width": 566,
+          "height": 732.75
+        },
+        "transcript": {
+          "x": 1208,
+          "y": 140,
+          "width": 448,
+          "height": 732.75
+        },
+        "decisions": {
+          "x": 240,
+          "y": 896.75,
+          "width": 1440,
+          "height": 157
+        }
+      }
+    },
+    "live-asked": {
+      "pageH": 1420,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=live&t=33&jury=1&paused=1",
+      "elements": {
+        "doctor": {
+          "x": 618,
+          "y": 140,
+          "width": 566,
+          "height": 732.75
+        },
+        "transcript": {
+          "x": 1208,
+          "y": 140,
+          "width": 448,
+          "height": 732.75
+        },
+        "decisions": {
+          "x": 240,
+          "y": 896.75,
+          "width": 1440,
+          "height": 157
+        }
+      }
+    },
+    "live-withdrawn": {
+      "pageH": 1374,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=live&t=55.8&jury=1&paused=1",
+      "elements": {
+        "doctor": {
+          "x": 618,
+          "y": 140,
+          "width": 566,
+          "height": 687
+        },
+        "transcript": {
+          "x": 1208,
+          "y": 140,
+          "width": 448,
+          "height": 687
+        },
+        "decisions": {
+          "x": 240,
+          "y": 851,
+          "width": 1440,
+          "height": 157
+        }
+      }
+    },
+    "review": {
+      "pageH": 1981,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=review&t=55.8",
+      "elements": {}
+    },
+    "live-listening": {
+      "pageH": 1374,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=live&t=12.2&jury=1&paused=1",
+      "elements": {
+        "doctor": {
+          "x": 618,
+          "y": 140,
+          "width": 566,
+          "height": 709
+        },
+        "transcript": {
+          "x": 1208,
+          "y": 140,
+          "width": 448,
+          "height": 709
+        },
+        "decisions": {
+          "x": 240,
+          "y": 873,
+          "width": 1440,
+          "height": 135
+        }
+      }
+    },
+    "live-ready": {
+      "pageH": 1374,
+      "width": 1920,
+      "url": "http://127.0.0.1:5173/?view=live&t=53.5&jury=1&paused=1",
+      "elements": {
+        "doctor": {
+          "x": 618,
+          "y": 140,
+          "width": 566,
+          "height": 687
+        },
+        "transcript": {
+          "x": 1208,
+          "y": 140,
+          "width": 448,
+          "height": 687
+        },
+        "decisions": {
+          "x": 240,
+          "y": 851,
+          "width": 1440,
+          "height": 157
+        }
+      }
+    }
+  },
+  "errors": []
+}

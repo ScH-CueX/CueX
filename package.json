@@ -8,7 +8,10 @@
     "build": "pnpm --filter @cuex/web build",
     "typecheck": "pnpm -r run typecheck",
     "video:studio": "pnpm --filter cuex-promo studio",
-    "video:render": "pnpm --filter cuex-promo render"
+    "video:render": "pnpm --filter cuex-promo render",
+    "video:demo": "pnpm --filter cuex-promo render:demo",
+    "ppt:dev": "npm --prefix ppt run dev",
+    "ppt:build": "npm --prefix ppt run build"
   },
   "pnpm": {
     "overrides": {

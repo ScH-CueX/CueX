@@ -10,7 +10,7 @@ import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const audioDir = join(root, 'public/assets/audio');
+const audioDir = join(root, '..', 'assets/audio');
 const voiceDir = join(audioDir, 'voiceover');
 const musicDir = join(audioDir, 'music');
 const sfxDir = join(audioDir, 'sfx');

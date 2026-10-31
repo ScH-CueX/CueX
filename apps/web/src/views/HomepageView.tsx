@@ -60,8 +60,8 @@ export const HomepageView: React.FC<HomepageViewProps> = ({ onNavigate }) => {
 
             <div className="pt-4 border-t border-line/60 grid grid-cols-3 gap-4 text-xs">
               <div>
-                <span className="font-bold text-ink text-sm block font-mono">0.0 秒</span>
-                <span className="text-ink-3">插话无额外等待</span>
+                <span className="font-bold text-ink text-sm block">说话途中</span>
+                <span className="text-ink-3">感知关切变化</span>
               </div>
               <div>
                 <span className="font-bold text-ink text-sm block font-mono">System 1/2</span>

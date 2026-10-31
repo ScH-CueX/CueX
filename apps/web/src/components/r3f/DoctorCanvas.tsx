@@ -109,15 +109,15 @@ export const DoctorCanvas: React.FC<DoctorCanvasProps> = ({
           powerPreference: 'high-performance',
           outputColorSpace: THREE.SRGBColorSpace,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.05,
+          toneMappingExposure: 0.85,
         }}
         dpr={[1, 1.75]}
         onError={() => setHasError(true)}
       >
         <Suspense fallback={null}>
-          <Environment preset="apartment" />
-          <directionalLight position={[-2.6, 2.0, 2.2]} intensity={2.4} color="#fff4e6" />
-          <hemisphereLight args={['#f1f3ee', '#878580', 0.55]} />
+          <Environment files="/env/lebombo_1k.hdr" environmentIntensity={0.32} />
+          <directionalLight position={[-3.5, 2.7, 1.6]} intensity={1.5} color="#fff4e6" />
+          <hemisphereLight args={['#f1f3ee', '#535c58', 0.3]} />
 
           <DoctorBust
             state={state}

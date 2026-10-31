@@ -1,0 +1,74 @@
+[
+  {
+    "id": "problem",
+    "voice": "zh-CN-XiaoxiaoNeural",
+    "text": "资料都背过了，可医生的追问，从不按准备稿来。",
+    "fromFrame": 8,
+    "shotFrames": 165,
+    "sourceDuration": 4.56,
+    "speed": 1.0,
+    "file": "audio/narration/problem.wav",
+    "sha256": "88ee840dcece68ec3b64c56f628b54d8538b9dd5100417f71aff8ce495c01ab5",
+    "source": "Microsoft Edge online speech synthesis via edge-tts; synthetic narration, not live participant audio"
+  },
+  {
+    "id": "enter",
+    "voice": "zh-CN-XiaoxiaoNeural",
+    "text": "Cue X，让医药代表在对话压力里，练习临场应对。",
+    "fromFrame": 173,
+    "shotFrames": 195,
+    "sourceDuration": 4.944,
+    "speed": 1.0,
+    "file": "audio/narration/enter.wav",
+    "sha256": "0fca6c709c0ce6310bbf15892be289b89b54bc5555b9555daab9b70cdff0bf1d",
+    "source": "Microsoft Edge online speech synthesis via edge-tts; synthetic narration, not live participant audio"
+  },
+  {
+    "id": "interrupt",
+    "voice": "zh-CN-XiaoxiaoNeural",
+    "text": "持续偏离关切，医生会追问。快层判断时机，慢层提前准备。",
+    "fromFrame": 368,
+    "shotFrames": 240,
+    "sourceDuration": 6.336,
+    "speed": 1.0,
+    "file": "audio/narration/interrupt.wav",
+    "sha256": "0e0f36a63811793227eb470c30d4dfffcd9a65196022924b3374fcfb20157cf7",
+    "source": "Microsoft Edge online speech synthesis via edge-tts; synthetic narration, not live participant audio"
+  },
+  {
+    "id": "withdraw",
+    "voice": "zh-CN-XiaoxiaoNeural",
+    "text": "但当你主动补上答案，已经准备好的追问，就不必再说。",
+    "fromFrame": 608,
+    "shotFrames": 270,
+    "sourceDuration": 4.848,
+    "speed": 1.0,
+    "file": "audio/narration/withdraw.wav",
+    "sha256": "0b114562f1087c53b7379513c1764160806bb6a4d80d30e6b6606f7133b6af02",
+    "source": "Microsoft Edge online speech synthesis via edge-tts; synthetic narration, not live participant audio"
+  },
+  {
+    "id": "review",
+    "voice": "zh-CN-XiaoxiaoNeural",
+    "text": "复盘回到刚才的关键时刻。减少提示，换一种问法，再练一次。",
+    "fromFrame": 878,
+    "shotFrames": 300,
+    "sourceDuration": 6.336,
+    "speed": 1.0,
+    "file": "audio/narration/review.wav",
+    "sha256": "58d099e81660d7a317e8cd7704ab48477633781ca7f59c3f99f8dc1ce788f6e0",
+    "source": "Microsoft Edge online speech synthesis via edge-tts; synthetic narration, not live participant audio"
+  },
+  {
+    "id": "brand",
+    "voice": "zh-CN-XiaoxiaoNeural",
+    "text": "Cue X，让每一次临场应对，都有准备。",
+    "fromFrame": 1178,
+    "shotFrames": 180,
+    "sourceDuration": 3.792,
+    "speed": 1.0,
+    "file": "audio/narration/brand.wav",
+    "sha256": "5d91b17d5414359f063baf3f66e5dd1bffa7b5db7dbdba54c89751f08d70d68a",
+    "source": "Microsoft Edge online speech synthesis via edge-tts; synthetic narration, not live participant audio"
+  }
+]

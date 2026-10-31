@@ -6,6 +6,8 @@
   "scripts": {
     "studio": "remotion studio src/index.ts",
     "render": "remotion render src/index.ts CueXPromo out/cuex-promo.mp4",
+    "render:demo": "node scripts/render-demo.mjs",
+    "capture": "node ../scripts/capture-product.mjs && node ../scripts/record-product.mjs",
     "still": "remotion still src/index.ts CueXPromo",
     "typecheck": "tsc --noEmit",
     "audio:placeholder": "node scripts/build-placeholder-audio.mjs",
