@@ -11,13 +11,16 @@ export interface ControllerOptions {
   minDriftChars?: number;
   candidateHoldMs?: number;
   minInterruptGapMs?: number;
+  retryConcernId?: string;
 }
 interface HeldCandidate { event: FollowupCandidate; targetPointIds: string[]; abort: AbortController }
 interface SpeechOutput { abort: AbortController; utteranceId: string; transcriptId: string; text: string; start: number; turn: DialogueTurn; chunks: string[]; reported: boolean }
 
 /** Per-session state machine. Engines never own dialogue or candidate lifecycle. */
 export class TurnController {
-  private readonly timing: Required<ControllerOptions>;
+  private readonly timing: Required<Omit<ControllerOptions, 'retryConcernId'>>;
+  private readonly opening: string;
+  private completed = false;
   private readonly history: DialogueTurn[] = [];
   private readonly candidates: FollowupCandidate[] = [];
   private readonly resolved = new Set<string>();
@@ -49,10 +52,17 @@ export class TurnController {
     private readonly emit: (event: ServerMessage) => void,
     options: ControllerOptions = {},
   ) {
-    this.timing = { debounceMs: 280, minDriftMs: 900, minDriftChars: 35, candidateHoldMs: 650, minInterruptGapMs: 2000, ...options };
+    const { retryConcernId, ...timing } = options;
+    this.timing = { debounceMs: 280, minDriftMs: 900, minDriftChars: 35, candidateHoldMs: 650, minInterruptGapMs: 2000, ...timing };
+    const retryIndex = pack.scenario.concerns.findIndex(concern => concern.id === retryConcernId);
+    if (retryIndex >= 0) {
+      this.concernIndex = retryIndex;
+      for (const concern of pack.scenario.concerns.slice(0, retryIndex)) for (const point of concern.points) this.resolved.add(point.id);
+    }
+    this.opening = retryConcernId && retryIndex >= 0 ? pack.retryOpenings[retryConcernId] ?? pack.doctorOpening : pack.doctorOpening;
   }
 
-  start(): void { void this.speak(this.pack.doctorOpening, 'speaking'); }
+  start(): void { void this.speak(this.opening, 'speaking'); }
   get concern(): ConcernDef { return this.pack.scenario.concerns[this.concernIndex]; }
   private get repSpeech(): string { return this.concernFinalSpeech + this.sentence; }
   private get unresolved(): string[] { return this.concern.points.filter(p => !this.resolved.has(p.id)).map(p => p.id); }
@@ -92,7 +102,7 @@ export class TurnController {
   }
 
   private acceptTranscript(text: string, isFinal: boolean, recent: string): void {
-    if (this.stopped || (!text.trim() && !isFinal)) return;
+    if (this.stopped || this.completed || (!text.trim() && !isFinal)) return;
     if (this.speech && (this.speech.text || !this.held)) this.interruptDoctor();
     // ASR partials are revisable. Re-evaluate their tentative progress against the latest hypothesis.
     for (const id of this.provisionalResolved) this.resolved.delete(id);
@@ -140,7 +150,7 @@ export class TurnController {
   }
 
   private async evaluate(recheck: boolean): Promise<boolean> {
-    if (this.stopped || !this.repSpeech.trim()) return false;
+    if (this.stopped || this.completed || !this.repSpeech.trim()) return false;
     if (!recheck && this.evaluationInFlight) return false;
     const revision = this.revision;
     const speechSnapshot = this.repSpeech;
@@ -230,7 +240,7 @@ export class TurnController {
   }
 
   private async prepareCandidate(reason: string): Promise<void> {
-    if (this.held || this.stopped) return;
+    if (this.held || this.stopped || this.completed) return;
     const event: FollowupCandidate = { id: randomUUID(), targetConcernId: this.concern.id, phase: 'retrieving', draftText: '', basis: reason,
       triggerCondition: '目标要点仍未回答，且代表继续偏离', preparedFromMs: Date.now() };
     const held: HeldCandidate = { event, targetPointIds: this.unresolved, abort: new AbortController() };
@@ -279,7 +289,16 @@ export class TurnController {
 
   private advanceConcern(): void {
     const nextIndex = this.pack.scenario.concerns.findIndex(c => c.id === this.concern.nextConcernId);
-    if (nextIndex < 0) return;
+    if (nextIndex < 0) {
+      if (this.pack.scenario.concerns.every(concern => concern.points.every(point => this.resolved.has(point.id)))) {
+        this.completed = true;
+        this.evaluationAbort?.abort();
+        clearTimeout(this.evaluationTimer);
+        clearTimeout(this.candidateTimer);
+        void this.speak(this.pack.doctorClosing, 'speaking');
+      }
+      return;
+    }
     this.concernIndex = nextIndex;
     this.concernFinalSpeech = '';
     this.recentSpeech = '';

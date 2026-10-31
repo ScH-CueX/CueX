@@ -74,13 +74,21 @@ export class WebSocketGateway {
     if (message.type === 'session.start') {
       if (payload.scenarioId !== this.options.pack.scenario.id) { this.error(ws, 'UNKNOWN_SCENARIO', '没有找到这个演练场景。'); return; }
       if (payload.mode !== 'performance' && payload.mode !== 'learning') { this.error(ws, 'INVALID_MESSAGE', '请选择有效的演练模式。'); return; }
+      let retryConcernId: string | undefined;
+      const retry = payload.retry;
+      if (retry !== undefined) {
+        if (!isRecord(retry) || typeof retry.concernId !== 'string' || !this.options.pack.scenario.concerns.some(concern => concern.id === retry.concernId)) {
+          this.error(ws, 'INVALID_MESSAGE', '重试关切不存在。'); return;
+        }
+        retryConcernId = retry.concernId;
+      }
       this.resetSession(connection);
       const generation = connection.generation;
       const engines = await this.options.createEngines();
       if (connection.closed || generation !== connection.generation) return;
       const sessionId = randomUUID();
       connection.engines = engines;
-      connection.controller = new TurnController(sessionId, this.options.pack, engines, event => this.send(ws, event), this.options.controller);
+      connection.controller = new TurnController(sessionId, this.options.pack, engines, event => this.send(ws, event), { ...this.options.controller, retryConcernId });
       this.send(ws, { type: 'session.ready', payload: { sessionId, serverTime: Date.now(), scenario: this.options.pack.scenario } });
       connection.controller.start();
       return;

@@ -10,7 +10,7 @@ import { ANSHU_PACK } from '../src/scenario/anshu';
 type Predicate = (event: ServerMessage) => boolean;
 const isPhase = (phase: string): Predicate => (event) => event.type === 'system2.candidate' && event.payload.candidate.phase === phase;
 
-async function setup(overrides: Partial<import('../src/gateway/WebSocketGateway').GatewayOptions> = {}, waitOpening = true) {
+async function setup(overrides: Partial<import('../src/gateway/WebSocketGateway').GatewayOptions> = {}, waitOpening = true, retryConcernId?: string) {
   const gateway = new WebSocketGateway({
     port: 0,
     host: '127.0.0.1',
@@ -45,7 +45,7 @@ async function setup(overrides: Partial<import('../src/gateway/WebSocketGateway'
     });
   }
   const send = (type: string, payload: unknown) => ws.send(JSON.stringify({ type, payload }));
-  send('session.start', { scenarioId: ANSHU_PACK.scenario.id, mode: 'performance' });
+  send('session.start', { scenarioId: ANSHU_PACK.scenario.id, mode: 'performance', ...(retryConcernId ? { retry: { concernId: retryConcernId } } : {}) });
   await waitFor(e => e.type === 'session.ready');
   if (waitOpening) await waitFor(e => e.type === 'controller.dispatch' && e.payload.pose === 'listening');
   async function speech(text: string, isFinal = false) {
@@ -291,5 +291,38 @@ test('answering one over-listed candidate target withdraws the question while ot
     await h.speech('好的，请您继续。', true);
     await h.waitFor(e => e.type === 'controller.dispatch' && e.payload.pose === 'listening' && e.payload.concernProgress.resolvedCount === 1);
     assert.equal(h.gateway.inspectSessions()[0].candidates[0].fate, 'withdrawn');
+  } finally { await h.close(); }
+});
+
+
+test('retry visit rephrases the concern, resolves the visit and speaks the closing line last', async () => {
+  const h = await setup({}, true, 'concern-scope');
+  try {
+    const opening = h.gateway.inspectSessions()[0];
+    assert.deepEqual(opening.resolvedPointIds, []);
+    assert.equal(opening.history[0].text, ANSHU_PACK.retryOpenings['concern-scope']);
+    assert.equal(opening.candidates.length, 0);
+    await h.speech('75岁以上患者约占11%，降压幅度与总体一致。', true);
+    await h.speech('eGFR30到60的亚组有412人，结果与总体一致。', true);
+    await h.speech('eGFR低于30被排除，没有证据，说明书不建议使用。', true);
+    await h.waitFor(e => e.type === 'controller.dispatch' && e.payload.concernProgress.concernId === 'concern-dose');
+    await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.text.includes('起始剂量') && e.payload.isFinal);
+    await h.speech('高龄患者的起始剂量需要调整，应核对说明书。', true);
+    await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.text === ANSHU_PACK.doctorClosing && e.payload.isFinal);
+    const completed = h.gateway.inspectSessions()[0];
+    assert.deepEqual(completed.resolvedPointIds, ['c1', 'c2', 'c3', 'd1']);
+    assert.equal(completed.history.at(-1)?.text, ANSHU_PACK.doctorClosing);
+    assert.equal(completed.candidates.length, 0);
+    const verdictCount = h.events.filter(e => e.type === 'system1.verdict').length;
+    const from = h.events.length;
+    h.send('speech.delta', { text: '主要终点还有更多结果。', isFinal: true });
+    h.ws.send(JSON.stringify({ type: 'ping', payload: { t: Date.now() } }));
+    // A restarted dose retry proves prior concerns stay resolved and no old candidates carry over.
+    h.send('session.start', { scenarioId: ANSHU_PACK.scenario.id, mode: 'performance', retry: { concernId: 'concern-dose' } });
+    await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.text === ANSHU_PACK.retryOpenings['concern-dose'] && e.payload.isFinal, from);
+    assert.equal(h.events.filter(e => e.type === 'system1.verdict').length, verdictCount);
+    const doseRetry = h.gateway.inspectSessions()[0];
+    assert.deepEqual(doseRetry.resolvedPointIds, ['c1', 'c2', 'c3']);
+    assert.equal(doseRetry.candidates.length, 0);
   } finally { await h.close(); }
 });

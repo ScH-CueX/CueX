@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
+    "demo": "node scripts/demo.mjs",
     "dev:web": "pnpm --filter @cuex/web dev",
     "dev:server": "pnpm --filter @cuex/server dev",
     "build": "pnpm --filter @cuex/web build",
