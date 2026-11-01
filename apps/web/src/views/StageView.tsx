@@ -190,10 +190,12 @@ export function StageView() {
               <div className="tagline">医药代表的临场应对训练</div>
               <div className="en">REAL-TIME CONVERSATION TRAINING</div>
               <div className="act">
-                <button type="button" className="st-cta" onClick={() => void begin('voice')} disabled={!connected && session.status !== 'paused' || micAsking}>开始演练</button>
                 {session.status === 'error'
-                  ? <button type="button" className="st-ghost" onClick={live.open}>重新连接</button>
-                  : <button type="button" className="st-ghost" onClick={() => void begin('text')} disabled={micAsking}>不用麦克风，改用文字</button>}
+                  ? <button type="button" className="st-cta" onClick={live.open}>重新连接</button>
+                  : <>
+                      <button type="button" className="st-cta" onClick={() => void begin('voice')} disabled={!connected && session.status !== 'paused' || micAsking}>开始演练</button>
+                      <button type="button" className="st-ghost" onClick={() => void begin('text')} disabled={micAsking}>不用麦克风，改用文字</button>
+                    </>}
                 <div className={`st-note${session.status === 'error' ? ' err' : ''}`} role="status" data-testid="start-note">{startNote}</div>
               </div>
             </div>
