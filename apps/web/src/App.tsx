@@ -49,6 +49,7 @@ export function App() {
     // URL 同步
     const url = new URL(window.location.href);
     url.searchParams.set('view', newView);
+    if (newView !== view) url.searchParams.delete('scenarioId');
     if (params?.t !== undefined) {
       url.searchParams.set('t', params.t.toString());
       url.searchParams.set('mode', 'replay');

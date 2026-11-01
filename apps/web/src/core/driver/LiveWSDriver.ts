@@ -42,7 +42,9 @@ export class LiveWSDriver implements IConversationDriver {
     window.addEventListener('offline', this.onOffline);
     try {
       const url = this.options.serverUrl ?? `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/session`;
-      const ws = new WebSocket(url);
+      const endpoint = new URL(url);
+      if (this.options.scenarioId) endpoint.searchParams.set('scenarioId', this.options.scenarioId);
+      const ws = new WebSocket(endpoint.toString());
       this.ws = ws;
       this.connectTimer = window.setTimeout(() => {
         if (this.ws === ws && this._status === 'connecting') this.fail('连接超时，请确认后端已启动后重连。');

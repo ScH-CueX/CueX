@@ -5,7 +5,7 @@ import { emptySession, liveSessionReducer } from './liveSession';
 
 export type RetryRequest = { concernId: string };
 
-export function useLiveSession(enabled: boolean) {
+export function useLiveSession(enabled: boolean, scenarioId?: string) {
   const [session, dispatch] = useReducer(liveSessionReducer, emptySession);
   const [mic, setMic] = useState<'off' | 'starting' | 'on'>('off');
   const [volume, setVolume] = useState(0);
@@ -41,7 +41,7 @@ export function useLiveSession(enabled: boolean) {
     driver.current?.destroy();
     dispatch({ type: 'reset' });
     setFinishing(false);
-    const live = new LiveWSDriver({ retry, idle });
+    const live = new LiveWSDriver({ retry, idle, scenarioId });
     driver.current = live;
     void live.init({
       onServerEvent: event => {
@@ -63,7 +63,7 @@ export function useLiveSession(enabled: boolean) {
     if (idle) void live.start();
     else void live.unlockAudio().then(() => { if (driver.current === live) void live.start(); })
       .catch(() => dispatch({ type: 'error', message: '请允许浏览器播放音频，再点击开始拜访。' }));
-  }, [cancelText, stopMic]);
+  }, [cancelText, stopMic, scenarioId]);
   const connect = useCallback(() => startVisit(), [startVisit]);
   /** Connects without starting a visit. The stage page calls this on load. */
   const open = useCallback(() => startVisit(undefined, true), [startVisit]);

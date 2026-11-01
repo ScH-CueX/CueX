@@ -44,7 +44,8 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
   const [nodTrigger, setNodTrigger] = useState<number>(0);
   const [driverType] = useState<'replay' | 'live'>(() => new URLSearchParams(window.location.search).get('mode') === 'replay' ? 'replay' : 'live');
 
-  const live = useLiveSession(driverType === 'live');
+  const scenarioId = new URLSearchParams(window.location.search).get('scenarioId') ?? undefined;
+  const live = useLiveSession(driverType === 'live', scenarioId);
   const [elapsed, setElapsed] = useState(0);
   const lastTimeRef = useRef<number>(Date.now());
   const nodCheckedRef = useRef<Set<number>>(new Set());
@@ -169,7 +170,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
         </div>
       </div>
 
-      {waitingToStart && <><LiveBriefing onStart={live.connect} starting={live.session.status === 'connecting'} />{live.session.error && <p role="alert" className="max-w-[1440px] w-full mx-auto px-6 pt-3 text-sm text-held-ink">{live.session.error}</p>}</>}
+      {waitingToStart && <><LiveBriefing scenarioId={scenarioId} onStart={live.connect} starting={live.session.status === 'connecting'} />{live.session.error && <p role="alert" className="max-w-[1440px] w-full mx-auto px-6 pt-3 text-sm text-held-ink">{live.session.error}</p>}</>}
       {live.finishing && <p role="status" data-testid="visit-closing" className="max-w-[1440px] w-full mx-auto px-6 pt-4 text-sm text-ink-2">医生正在收尾，随后查看本次反馈。</p>}
       {ended && <LiveOutcome ended={ended} onRetry={concernId => live.restartVisit({ concernId })} onNext={live.clear} />}
 

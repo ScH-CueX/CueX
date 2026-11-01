@@ -18,7 +18,8 @@ const REVIEW_DELAY_MS = 1600;
 const MIC_FALLBACK_MS = 9000;
 
 export function StageView() {
-  const live = useLiveSession(false);
+  const scenarioId = new URLSearchParams(window.location.search).get('scenarioId') ?? undefined;
+  const live = useLiveSession(false, scenarioId);
   const { session } = live;
   const [phase, setPhase] = useState<Phase>('start');
   const [scale, setScale] = useState(1);
@@ -73,14 +74,14 @@ export function StageView() {
     const timer = window.setTimeout(() => controller.abort(), 8000);
     setBriefingLoading(true);
     setBriefingError(undefined);
-    fetch('/briefing', { signal: controller.signal })
+    fetch(scenarioId ? `/briefing?scenarioId=${encodeURIComponent(scenarioId)}` : '/briefing', { signal: controller.signal })
       .then(response => { if (!response.ok) throw new Error(String(response.status)); return response.json() as Promise<BriefingResponse>; })
       .then(data => { if (!stale()) setBriefing(data); })
       .catch(() => { if (!stale()) setBriefingError('读不到资料，请确认服务已启动。'); })
       .finally(() => { window.clearTimeout(timer); if (!stale()) setBriefingLoading(false); });
     // A newer request, or leaving the page, makes this one stale. Its result is dropped.
     return () => { briefingRequest.current++; window.clearTimeout(timer); controller.abort(); };
-  }, []);
+  }, [scenarioId]);
   useEffect(() => loadBriefing(), [loadBriefing]);
 
   // Start screen: ask for the microphone once, here, so no permission dialog interrupts the visit.

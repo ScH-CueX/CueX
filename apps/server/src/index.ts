@@ -1,8 +1,12 @@
+import { fileURLToPath } from 'node:url';
+import { LibraryStore } from './library/LibraryStore';
+import { LibraryApi } from './library/LibraryApi';
 import { readConfig, createEngines } from './config';
 import { WebSocketGateway } from './gateway/WebSocketGateway';
 import { ANSHU_PACK } from './scenario/anshu';
 
 const config = readConfig();
+const library = new LibraryApi(new LibraryStore(process.env.CUEX_LIBRARY_DIR || fileURLToPath(new URL('../../../.cuex-runtime/library/', import.meta.url)), ANSHU_PACK));
 if (config.asr === 'real' || config.tts === 'real') {
   const { warmupVoice } = await import('./voice/index');
   await warmupVoice();
@@ -10,9 +14,10 @@ if (config.asr === 'real' || config.tts === 'real') {
 // Each connection owns its engine instances and its cancellation lifecycle.
 const gateway = new WebSocketGateway({
   port: config.port, host: config.host, pack: ANSHU_PACK, controller: config.controller,
-  createEngines: () => createEngines(config, ANSHU_PACK),
-  onSessionEnd: snapshot => {
-    void import('./system2/doctors').then(({ recordSessionMemory }) => recordSessionMemory(ANSHU_PACK, snapshot)).catch(() => {});
+  library,
+  createEngines: pack => createEngines(config, pack),
+  onSessionEnd: (snapshot, pack) => {
+    void import('./system2/doctors').then(({ recordSessionMemory }) => recordSessionMemory(pack, snapshot)).catch(() => {});
   },
 });
 await gateway.start();

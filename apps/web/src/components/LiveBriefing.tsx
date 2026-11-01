@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { BriefingResponse } from '@cuex/protocol';
 import { Button } from './ui/button';
 
-export function LiveBriefing({ onStart, starting }: { onStart(): void; starting: boolean }) {
+export function LiveBriefing({ onStart, starting, scenarioId }: { onStart(): void; starting: boolean; scenarioId?: string }) {
   const [briefing, setBriefing] = useState<BriefingResponse>();
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -11,13 +11,13 @@ export function LiveBriefing({ onStart, starting }: { onStart(): void; starting:
     const timer = window.setTimeout(() => controller.abort(), 8000);
     let active = true;
     setError(false);
-    fetch('/briefing', { signal: controller.signal }).then(response => {
+    fetch(scenarioId ? `/briefing?scenarioId=${encodeURIComponent(scenarioId)}` : '/briefing', { signal: controller.signal }).then(response => {
       if (!response.ok) throw new Error('briefing');
       return response.json() as Promise<BriefingResponse>;
     }).then(data => { if (active) setBriefing(data); }).catch(() => { if (active) setError(true); })
       .finally(() => window.clearTimeout(timer));
     return () => { active = false; controller.abort(); window.clearTimeout(timer); };
-  }, [attempt]);
+  }, [attempt, scenarioId]);
   const reload = useCallback(() => setAttempt(value => value + 1), []);
   return <section data-testid="live-briefing" className="max-w-[1440px] w-full mx-auto px-4 sm:px-6 pt-5">
     <div className="border border-line bg-surface rounded-[2px] p-5 space-y-3">
