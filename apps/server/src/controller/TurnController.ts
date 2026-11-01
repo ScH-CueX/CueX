@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { diffChars } from 'diff';
 import { parseBuffer } from 'music-metadata';
-import type { ConcernDef, ControllerDispatchEvent, DoctorPoseName, FollowupCandidate, JevDecisionResponse, ServerMessage, TtsPlaybackReport, ReviewMoment, WithdrawalReason } from '@cuex/protocol';
+import type { ConcernDef, ControllerDispatchEvent, DoctorPoseName, FollowupCandidate, JevDecisionResponse, ServerMessage, TtsPlaybackReport, ReviewMoment, WithdrawalReason, VisitOutcome, SystemTwoActivity } from '@cuex/protocol';
 import { encodeSystemOneState, S1_QUESTION_IDS } from '../contracts';
+import { isExplicitFarewell } from '../conversation/visitIntent';
 import type { DoctorLines } from './DoctorLinePrefetch';
-import type { DialogueTurn, JevQuestion, ScenarioPack, SystemOneClient, SystemOneResult, SystemTwo, TtsEngine } from '../contracts';
+import type { DialogueTurn, JevQuestion, ScenarioPack, SystemOneClient, SystemOneResult, SystemTwo, TtsEngine, DoctorTurnDraft } from '../contracts';
 
 export interface ControllerEngines { system1: SystemOneClient; system2: SystemTwo; tts: TtsEngine }
 export interface ControllerOptions {
@@ -13,11 +14,19 @@ export interface ControllerOptions {
   minDriftChars?: number;
   candidateHoldMs?: number;
   minInterruptGapMs?: number;
+  finalQuietMs?: number;
+  partialQuietMs?: number;
+  idleFirstMs?: number;
+  idleSecondMs?: number;
+  idleCloseMs?: number;
+  turnTimeoutMs?: number;
+  outcomeTimeoutMs?: number;
+  playbackAckGraceMs?: number;
   retryConcernId?: string;
   doctorLines: DoctorLines;
 }
 interface HeldCandidate { event: FollowupCandidate; targetPointIds: string[]; abort: AbortController; basisRevision: number }
-interface SpeechOutput { abort: AbortController; utteranceId: string; transcriptId: string; text: string; start: number; turn: DialogueTurn; chunks: string[]; reported: boolean; lineKind?: 'opening' | 'retry' | 'closing'; isOpening?: boolean; moment?: ReviewMoment; audioDurationMs: number; fallbackTimer?: ReturnType<typeof setTimeout> }
+interface SpeechOutput { abort: AbortController; utteranceId: string; transcriptId: string; text: string; start: number; turn: DialogueTurn; chunks: string[]; reported: boolean; lineKind?: 'opening' | 'retry' | 'closing'; isOpening?: boolean; moment?: ReviewMoment; audioDurationMs: number; normalTurn?: boolean; playbackDone?: boolean; playbackTimedOut?: boolean; fallbackTimer?: ReturnType<typeof setTimeout> }
 
 /** Per-session state machine. Engines never own dialogue or candidate lifecycle. */
 export class TurnController {
@@ -25,6 +34,21 @@ export class TurnController {
   private readonly lines: DoctorLines;
   private readonly retryConcernId?: string;
   private completed = false;
+  private readonly normalTurns: boolean;
+  private turnTimer?: ReturnType<typeof setTimeout>;
+  private idleTimer?: ReturnType<typeof setTimeout>;
+  private turnAbort?: AbortController;
+  private normalFailures = 0;
+  private turnActivity?: { taskId: string; kind: SystemTwoActivity['kind'] };
+  private outcome?: VisitOutcome;
+  private outcomeAbort?: AbortController;
+  private endReason: 'completed' | 'user_requested' | 'farewell' | 'silence' = 'completed';
+  private ending = false;
+  private idleStage = 0;
+  private normalRepSpeech = '';
+  private normalSpeechKey = '';
+  private lastRepChangeAt = 0;
+  private playbackPending?: SpeechOutput;
   private readonly startedAt = Date.now();
   private ended = false;
   private openingOutput?: SpeechOutput;
@@ -70,8 +94,9 @@ export class TurnController {
   ) {
     const { retryConcernId, doctorLines, ...timing } = options;
     this.lines = doctorLines;
+    this.normalTurns = !!engines.system2.prepareTurn;
     this.retryConcernId = retryConcernId;
-    this.timing = { debounceMs: 280, minDriftMs: 900, minDriftChars: 35, candidateHoldMs: 650, minInterruptGapMs: 2000, ...timing };
+    this.timing = { debounceMs: 280, minDriftMs: 900, minDriftChars: 35, candidateHoldMs: 650, minInterruptGapMs: 2000, finalQuietMs: 1100, partialQuietMs: 1800, idleFirstMs: 7000, idleSecondMs: 12000, idleCloseMs: 20000, turnTimeoutMs: 8000, outcomeTimeoutMs: 11000, playbackAckGraceMs: 15000, ...timing };
     const retryIndex = pack.scenario.concerns.findIndex(concern => concern.id === retryConcernId);
     if (retryIndex >= 0) {
       this.concernIndex = retryIndex;
@@ -80,6 +105,7 @@ export class TurnController {
   }
 
   start(): void {
+    if (this.normalTurns) this.emit({ type: 'conversation.progress', payload: { sessionId: this.sessionId, resolvedPointIds: [...this.committedResolved] } });
     if (this.concern.nextConcernId) this.lines.prefetch('retry', this.concern.nextConcernId, this.actualHistory());
     if (!this.concern.nextConcernId) this.lines.prefetch('closing', this.concern.id, this.actualHistory());
     void this.speakLine(this.retryConcernId ? 'retry' : 'opening', this.concern.id);
@@ -109,6 +135,139 @@ export class TurnController {
     }, Math.min(700, Math.max(0, pending.expiresAt - Date.now())));
   }
 
+  private cancelNormalWork(): void {
+    clearTimeout(this.turnTimer); clearTimeout(this.idleTimer);
+    this.turnTimer = undefined; this.idleTimer = undefined;
+    this.turnAbort?.abort(); this.turnAbort = undefined;
+    if (this.turnActivity) { this.activity(this.turnActivity, 'cancelled'); this.turnActivity = undefined; }
+  }
+
+  private activity(task: { taskId: string; kind: SystemTwoActivity['kind'] }, phase: SystemTwoActivity['phase'], reason?: string, sourceEvidence?: string): void {
+    if (!this.stopped) this.emit({ type: 'system2.activity', payload: { sessionId: this.sessionId, ...task, phase, reason, sourceEvidence } });
+  }
+
+  private scheduleNormalTurn(isFinal: boolean): void {
+    if (!this.normalTurns || this.stopped || this.completed) return;
+    clearTimeout(this.turnTimer);
+    this.turnTimer = setTimeout(() => { this.turnTimer = undefined; void this.prepareNormalTurn('turn_end', 0); }, isFinal ? this.timing.finalQuietMs : this.timing.partialQuietMs);
+  }
+
+  private armIdleAfterPlayback(): void {
+    if (!this.normalTurns || this.stopped || this.completed || this.playbackPending || this.speech || this.turnAbort || this.turnTimer) return;
+    clearTimeout(this.idleTimer);
+    const stage = this.idleStage + 1;
+    const wait = stage === 1 ? this.timing.idleFirstMs : stage === 2 ? this.timing.idleSecondMs : this.timing.idleCloseMs;
+    this.idleTimer = setTimeout(() => { this.idleTimer = undefined; void this.prepareNormalTurn('silence', Math.min(stage, 3)); }, wait);
+  }
+
+  private async prepareNormalTurn(trigger: 'turn_end' | 'silence', silenceStage: number): Promise<void> {
+    if (!this.engines.system2.prepareTurn || this.stopped || this.completed || this.speech || this.playbackPending || this.turnAbort || this.pendingLine) return;
+    if (trigger === 'turn_end' && isExplicitFarewell(this.lastRepSegment.text)) {
+      // A partial farewell can still be corrected. Only final heard text can end the visit.
+      if (!this.lastRepSegment.isFinal) return;
+      this.endReason = 'farewell';
+      await this.closeConversation();
+      return;
+    }
+    const revision = this.revision;
+    const concernId = this.concern.id;
+    const abort = new AbortController();
+    this.turnAbort = abort;
+    const task = { taskId: randomUUID(), kind: (trigger === 'silence' ? 'silence_prompt' : 'reply') as SystemTwoActivity['kind'] };
+    this.turnActivity = task; this.activity(task, 'preparing');
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const draft = await Promise.race([this.engines.system2.prepareTurn({ sessionId: this.sessionId, pack: this.pack, concernId, resolvedPointIds: [...this.committedResolved], history: this.actualHistory(), repSpeech: this.normalRepSpeech, trigger, silenceStage, signal: abort.signal }), new Promise<never>((_resolve, reject) => { timeout = setTimeout(() => { abort.abort(); reject(new Error('turn timeout')); }, this.timing.turnTimeoutMs); })]);
+      if (abort.signal.aborted || this.stopped || revision !== this.revision || concernId !== this.concern.id) return;
+      if (!draft.text.trim()) throw new Error('empty doctor turn');
+      this.normalFailures = 0;
+      this.activity(task, 'ready', draft.basis, draft.sourceEvidence);
+      this.reconcileTurnProgress(draft);
+      if (this.held?.targetPointIds.some(id => this.resolved.has(id))) this.withdrawCandidate('target_answered');
+      else if (this.held) {
+        this.held.abort.abort(); this.held.event.phase = 'idle'; this.emitCandidate(this.held.event); this.held = undefined; clearTimeout(this.candidateTimer);
+      }
+      if (silenceStage) this.idleStage = silenceStage;
+      this.turnAbort = undefined; this.turnActivity = undefined;
+      this.activity(task, 'speaking', draft.basis, draft.sourceEvidence);
+      if (draft.action === 'end_visit' || silenceStage >= 3) {
+        this.endReason = silenceStage >= 3 ? 'silence' : 'farewell';
+        await this.closeConversation(draft.text);
+      } else if (this.unresolved.length === 0 && this.concern.nextConcernId) {
+        this.dispatch('listening', { type: 'nod' }, 0, 0.1);
+        this.advanceConcern();
+      } else {
+        await this.speak(draft.text, 'speaking', undefined, undefined, false, true);
+      }
+      if (revision === this.revision) this.normalRepSpeech = '';
+      this.activity(task, revision === this.revision ? 'completed' : 'cancelled');
+    } catch {
+      if (!this.stopped && revision === this.revision) {
+        this.activity(task, 'error');
+        this.normalFailures++;
+        if (this.normalFailures <= 1) this.turnTimer = setTimeout(() => { this.turnTimer = undefined; void this.prepareNormalTurn(trigger, silenceStage); }, 350);
+        else {
+          this.error('SYSTEM2_TURN_ERROR', '回应暂未生成，请重试。');
+          this.turnAbort = undefined;
+          this.turnActivity = undefined;
+          this.dispatch('listening', { type: 'idle' });
+        }
+      }
+    } finally {
+      clearTimeout(timeout);
+      if (this.turnAbort === abort) this.turnAbort = undefined;
+    }
+  }
+
+  private reconcileTurnProgress(draft: DoctorTurnDraft): void {
+    const known = new Set(this.pack.scenario.concerns.flatMap(concern => concern.points.map(point => point.id)));
+    const reopened = new Set([...draft.contradictedPointIds, ...(draft.reopenedPointIds ?? [])].filter(id => known.has(id)));
+    for (const id of reopened) { this.resolved.delete(id); this.committedResolved.delete(id); this.provisionalResolved.delete(id); }
+    for (const id of draft.resolvedPointIds) if (known.has(id) && !reopened.has(id)) { this.resolved.add(id); this.committedResolved.add(id); this.provisionalResolved.delete(id); }
+    this.emit({ type: 'conversation.progress', payload: { sessionId: this.sessionId, resolvedPointIds: [...this.committedResolved] } });
+    this.dispatch('listening', { type: 'idle' });
+  }
+
+  async finishVisit(): Promise<void> {
+    if (this.stopped || this.ending || this.ended) return;
+    this.endReason = 'user_requested';
+    await this.closeConversation();
+  }
+
+  private async closeConversation(spokenClosing?: string): Promise<void> {
+    if (this.stopped || this.ending || this.ended) return;
+    this.ending = true; this.completed = true; this.cancelNormalWork();
+    this.evaluationAbort?.abort(); clearTimeout(this.candidateTimer);
+    this.pendingLine = undefined; clearTimeout(this.pendingLineTimer);
+    if (this.held) { this.held.abort.abort(); this.held = undefined; }
+    this.interruptDoctor('turn_switched');
+    if (this.playbackPending) {
+      this.emit({ type: 'tts.abort', payload: { sessionId: this.sessionId, utteranceId: this.playbackPending.utteranceId, reason: 'turn_switched', timestamp: Date.now() } });
+      clearTimeout(this.playbackPending.fallbackTimer); this.playbackPending = undefined;
+    }
+    this.outcome = await this.assessOutcome();
+    if (this.stopped) return;
+    const text = spokenClosing ?? (this.outcome.assessment === 'completed' ? this.outcome.doctorResponse : await this.lines.take('closing', this.concern.id, this.actualHistory()));
+    if (this.stopped) return;
+    await this.speak(text, 'speaking', undefined, 'closing', false, true);
+    if (!this.stopped) this.prefetchNextVisit();
+  }
+
+  private async assessOutcome(): Promise<VisitOutcome> {
+    const unavailable: VisitOutcome = { assessment: 'unavailable', stance: 'needs_evidence', doctorResponse: '', rationale: '复盘暂未生成，请重试。', strengths: [], gaps: [], nextStep: '重试复盘' };
+    if (!this.engines.system2.prepareOutcome) return unavailable;
+    const task = { taskId: randomUUID(), kind: 'assessment' as const };
+    this.activity(task, 'preparing');
+    const abort = new AbortController(); this.outcomeAbort = abort;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const outcome = await Promise.race([this.engines.system2.prepareOutcome({ sessionId: this.sessionId, pack: this.pack, history: this.actualHistory(), resolvedPointIds: [...this.committedResolved], endReason: this.endReason, signal: abort.signal }), new Promise<undefined>(resolve => { timer = setTimeout(() => { abort.abort(); resolve(undefined); }, this.timing.outcomeTimeoutMs); })]);
+      if (!outcome || abort.signal.aborted || this.stopped) { this.activity(task, 'error'); return unavailable; }
+      this.activity(task, 'completed'); return outcome;
+    } catch { this.activity(task, 'error'); return unavailable; }
+    finally { clearTimeout(timer); if (this.outcomeAbort === abort) this.outcomeAbort = undefined; }
+  }
+
   private prefetchNextVisit(): void {
     const history = this.actualHistory();
     this.lines.prefetch('opening', this.pack.scenario.concerns[0].id);
@@ -132,6 +291,7 @@ export class TurnController {
   /** ASR callbacks already contain the full current sentence. */
   onAsrTranscript(text: string, isFinal: boolean): void {
     this.lastInputWasAsr = true;
+    let consumedOnly = false;
     if (this.asrConsumedPrefix) {
       const consumed = this.asrConsumedPrefix;
       if (text.startsWith(consumed)) text = text.slice(consumed.length);
@@ -150,14 +310,28 @@ export class TurnController {
           text = text.slice(newChars);
         } else this.asrConsumedPrefix = '';
       }
+      consumedOnly = !text.trim();
       if (isFinal) this.asrConsumedPrefix = '';
     }
-    if (!text.trim() && !isFinal) return;
+    if (consumedOnly || (!text.trim() && !isFinal)) return;
     this.acceptTranscript(text, isFinal, text.slice(-80));
   }
 
   private acceptTranscript(text: string, isFinal: boolean, recent: string): void {
     if (this.stopped || (!text.trim() && !isFinal)) return;
+    const speechKey = this.normalizeSpeech(text);
+    const changed = speechKey !== this.normalSpeechKey;
+    if (this.normalTurns && !changed && (!isFinal || this.lastRepSegment.isFinal)) return;
+    if (this.normalTurns && changed) {
+      this.normalSpeechKey = speechKey; this.lastRepChangeAt = Date.now(); this.idleStage = 0;
+      this.cancelNormalWork();
+      if (this.playbackPending && this.speech !== this.playbackPending) {
+        const playing = this.playbackPending; playing.playbackDone = true; clearTimeout(playing.fallbackTimer);
+        this.emit({ type: 'tts.abort', payload: { sessionId: this.sessionId, utteranceId: playing.utteranceId, reason: 'user_interrupted', timestamp: Date.now() } });
+        this.playbackPending = undefined;
+      }
+      this.normalRepSpeech = [...this.history.slice(this.history.map(turn => turn.who).lastIndexOf('doctor') + 1).filter(turn => turn.who === 'rep').map(turn => turn.text), text].join('');
+    }
     if (this.pendingLine && !this.speech?.text) this.schedulePendingLine();
     if (this.completed) return;
     if (this.speech && (this.speech.text || !this.held)) this.interruptDoctor();
@@ -185,6 +359,7 @@ export class TurnController {
       isFinal, confidence: 1, timeRange: { startMs: this.transcriptStart, endMs: Date.now() },
     } });
     if (isFinal) this.commitRepSentence();
+    if (this.normalTurns) this.scheduleNormalTurn(isFinal);
     if (!this.repSpeech.trim()) { this.dispatch('listening', { type: 'idle' }); return; }
     if (isFinal || this.held) { clearTimeout(this.evaluationTimer); this.evaluationTimer = undefined; }
     if (!this.evaluationTimer) this.evaluationTimer = setTimeout(() => {
@@ -261,7 +436,7 @@ export class TurnController {
 
   private applyDecision(result: SystemOneResult, recheck: boolean, segment: { transcriptId: string; text: string; final: boolean }): void {
     const probability = (id: string) => result.answers[id]?.probabilities.true ?? result.answers[id]?.value ?? 0;
-    const newlyResolved = this.unresolved.filter(id => probability(S1_QUESTION_IDS.resolved(id)) >= 0.72);
+    const newlyResolved = this.normalTurns ? [] : this.unresolved.filter(id => probability(S1_QUESTION_IDS.resolved(id)) >= 0.72);
     newlyResolved.forEach(id => {
       this.resolved.add(id);
       if (segment.final) this.committedResolved.add(id);
@@ -302,6 +477,7 @@ export class TurnController {
       return;
     }
     if (canInterrupt && this.held) {
+      if (this.normalTurns) this.cancelNormalWork();
       const held = this.held;
       clearTimeout(this.candidateTimer);
       this.drift = undefined;
@@ -384,7 +560,7 @@ export class TurnController {
     if (this.held) this.withdrawCandidate('concern_changed');
     const nextIndex = this.pack.scenario.concerns.findIndex(c => c.id === this.concern.nextConcernId);
     if (nextIndex < 0) {
-      if (this.pack.scenario.concerns.every(concern => concern.points.every(point => this.resolved.has(point.id)))) {
+      if (!this.normalTurns && this.pack.scenario.concerns.every(concern => concern.points.every(point => this.resolved.has(point.id)))) {
         this.completed = true;
         this.evaluationAbort?.abort();
         clearTimeout(this.evaluationTimer);
@@ -411,9 +587,10 @@ export class TurnController {
   }
 
   /** Only successfully emitted audio segments enter doctor history. */
-  private async speak(text: string, pose: 'speaking' | 'asking', candidateId?: string, lineKind?: 'opening' | 'retry' | 'closing', isOpening = false): Promise<void> {
+  private async speak(text: string, pose: 'speaking' | 'asking', candidateId?: string, lineKind?: 'opening' | 'retry' | 'closing', isOpening = false, normalTurn = false): Promise<void> {
+    if (this.normalTurns) this.cancelNormalWork();
     this.interruptDoctor('turn_switched');
-    const speech: SpeechOutput = { abort: new AbortController(), utteranceId: randomUUID(), transcriptId: randomUUID(), text: '', start: Date.now(), turn: { who: 'doctor', text: '' }, chunks: [], reported: false, lineKind, isOpening, audioDurationMs: 0 };
+    const speech: SpeechOutput = { abort: new AbortController(), utteranceId: randomUUID(), transcriptId: randomUUID(), text: '', start: Date.now(), turn: { who: 'doctor', text: '' }, chunks: [], reported: false, lineKind, isOpening, normalTurn, audioDurationMs: 0 };
     this.speech = speech;
     this.outputs.set(speech.utteranceId, speech);
     if (isOpening) this.openingOutput = speech;
@@ -461,7 +638,7 @@ export class TurnController {
             this.commitRepSentence();
             this.dispatch('asking', { type: 'interrupt_speak', textToSpeak: text, candidateId }, 1);
           }
-          if (lineKind === 'closing') {
+          if (lineKind === 'closing' || this.normalTurns) {
             try {
               const metadata = await parseBuffer(chunk.audio, { mimeType: chunk.mimeType }, { duration: true, skipCovers: true });
               speech.audioDurationMs += (metadata.format.duration ?? segment.length / 4) * 1000;
@@ -469,6 +646,12 @@ export class TurnController {
             if (speech.abort.signal.aborted || this.stopped) return;
           }
           if (lineKind && this.pendingLine?.text === text) { this.pendingLine = undefined; clearTimeout(this.pendingLineTimer); }
+          if (normalTurn && !speech.text && this.sentence.trim()) {
+            if (this.lastInputWasAsr) this.asrConsumedPrefix += this.sentence;
+            this.emit({ type: 'asr.transcript', payload: { sessionId: this.sessionId, transcriptId: this.transcriptId, speaker: 'rep', text: this.sentence, delta: '', isFinal: true, confidence: 1, timeRange: { startMs: this.transcriptStart, endMs: Date.now() } } });
+            this.commitRepSentence();
+          }
+          if (this.normalTurns) this.playbackPending = speech;
           speech.chunks.push(sent ? '' : segment);
           this.emit({ type: 'tts.stream_chunk', payload: { sessionId: this.sessionId, utteranceId: speech.utteranceId, chunkIndex: chunkIndex++, isLastChunk: false, audioBase64: chunk.audio.toString('base64') } });
           if (!sent) {
@@ -484,14 +667,39 @@ export class TurnController {
       this.emit({ type: 'tts.stream_chunk', payload: { sessionId: this.sessionId, utteranceId: speech.utteranceId, chunkIndex, isLastChunk: true, audioBase64: '' } });
       this.doctorTranscript(speech, '', true);
       if (lineKind === 'closing') {
-        speech.fallbackTimer = setTimeout(() => this.endVisit(), Math.ceil(speech.audioDurationMs) + 1500);
+        speech.fallbackTimer = setTimeout(() => {
+          speech.playbackDone = true;
+          if (this.playbackPending === speech) this.playbackPending = undefined;
+          this.endVisit();
+        }, Math.ceil(speech.audioDurationMs) + 1500);
+      } else if (this.normalTurns) {
+        speech.fallbackTimer = setTimeout(() => {
+          if (speech.reported || this.stopped) return;
+          speech.playbackTimedOut = true;
+          speech.playbackDone = true;
+          speech.abort.abort();
+          if (this.playbackPending === speech) this.playbackPending = undefined;
+          this.emit({ type: 'tts.abort', payload: { sessionId: this.sessionId, utteranceId: speech.utteranceId, reason: 'turn_switched', timestamp: Date.now() } });
+          this.error('PLAYBACK_TIMEOUT', '语音播放未确认，请继续说或结束拜访。');
+          this.dispatch('listening', { type: 'idle' });
+        }, Math.ceil(speech.audioDurationMs) + this.timing.playbackAckGraceMs);
       }
     } catch (error) {
-      if (!speech.abort.signal.aborted && !this.stopped) this.error('TTS_ERROR', '语音输出暂时不可用。');
+      if (!speech.abort.signal.aborted && !this.stopped) {
+        speech.abort.abort();
+        speech.playbackDone = true;
+        clearTimeout(speech.fallbackTimer);
+        if (this.playbackPending === speech) this.playbackPending = undefined;
+        this.emit({ type: 'tts.abort', payload: { sessionId: this.sessionId, utteranceId: speech.utteranceId, reason: 'turn_switched', timestamp: Date.now() } });
+        this.doctorTranscript(speech, '', true);
+        this.error('TTS_ERROR', '语音暂不可用，请继续说或结束拜访。');
+        if (lineKind === 'closing') this.endVisit();
+      }
     } finally {
       if (this.speech === speech) {
         this.speech = undefined;
         this.dispatch(this.held?.event.phase === 'ready' ? 'holding' : 'listening', { type: 'idle' }, this.held?.event.phase === 'ready' ? 0.7 : 0);
+        if (speech.playbackDone && speech.reported && !speech.playbackTimedOut) this.armIdleAfterPlayback();
       }
     }
   }
@@ -506,6 +714,8 @@ export class TurnController {
     if (!speech) return;
     this.speech = undefined;
     speech.abort.abort();
+    clearTimeout(speech.fallbackTimer);
+    if (this.playbackPending === speech) this.playbackPending = undefined;
     if (reason === 'user_interrupted' && !speech.text && this.pendingLine && speech.lineKind === this.pendingLine.kind) this.schedulePendingLine();
     this.emit({ type: 'tts.abort', payload: { sessionId: this.sessionId, utteranceId: speech.utteranceId, reason, timestamp: Date.now() } });
     this.doctorTranscript(speech, '', true);
@@ -527,16 +737,23 @@ export class TurnController {
       if (speech.text) this.doctorTranscript(speech, '', true);
       else this.emit({ type: 'asr.transcript', payload: { sessionId: this.sessionId, transcriptId: speech.transcriptId, speaker: 'doctor', text: '', delta: '', isFinal: true, confidence: 1, timeRange: { startMs: speech.start, endMs: Date.now() } } });
     }
+    speech.playbackDone = true;
+    if (this.playbackPending === speech) this.playbackPending = undefined;
     this.outputs.delete(report.utteranceId);
+    if (this.normalTurns && speech.lineKind !== 'closing' && !speech.playbackTimedOut) {
+      if (this.normalRepSpeech && this.lastRepChangeAt > speech.start) this.scheduleNormalTurn(this.lastRepSegment.isFinal);
+      else this.armIdleAfterPlayback();
+    }
     if (speech.lineKind === 'closing' && !this.stopped) this.endVisit();
   }
 
   private endVisit(): void {
     if (this.ended || this.stopped || !this.completed) return;
     this.ended = true;
+    this.cancelNormalWork();
     const suggested = this.moments.find(moment => moment.kind === 'interrupted') ?? this.moments.find(moment => moment.kind === 'withdrawn');
     this.emit({ type: 'visit.ended', payload: {
-      sessionId: this.sessionId, durationMs: Date.now() - this.startedAt, retry: !!this.retryConcernId, doctorOpening: this.openingOutput?.turn.text ?? '',
+      sessionId: this.sessionId, ...(this.outcome ? { outcome: this.outcome } : {}), durationMs: Date.now() - this.startedAt, retry: !!this.retryConcernId, doctorOpening: this.openingOutput?.turn.text ?? '',
       concerns: this.pack.scenario.concerns.map(concern => ({ concernId: concern.id, title: concern.title, points: concern.points.map(point => ({ id: point.id, label: point.label, resolved: this.resolved.has(point.id) })) })),
       moments: this.moments.map(moment => ({ ...moment, openPointIds: [...moment.openPointIds] })),
       ...(suggested ? { suggestedRetryConcernId: suggested.concernId } : {}),
@@ -551,6 +768,7 @@ export class TurnController {
     if (this.stopped) return;
     this.interruptDoctor('turn_switched');
     this.stopped = true;
+    this.cancelNormalWork(); this.outcomeAbort?.abort();
     clearTimeout(this.evaluationTimer); clearTimeout(this.candidateTimer); clearTimeout(this.pendingLineTimer); this.pendingLine = undefined;
     this.evaluationAbort?.abort(); this.held?.abort.abort(); this.held = undefined;
     for (const output of this.outputs.values()) clearTimeout(output.fallbackTimer);

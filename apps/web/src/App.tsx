@@ -4,19 +4,24 @@ import { Footer } from '@/components/layout/Footer';
 import { HomepageView } from '@/views/HomepageView';
 import { LiveTrainingView } from '@/views/LiveTrainingView';
 import { ReviewView } from '@/views/ReviewView';
-import { StageView } from '@/views/StageView';
 
 type AppView = ViewKey | 'stage';
 const VIEWS: AppView[] = ['home', 'live', 'review', 'stage'];
 
 export function App() {
-  // Keep the clinic homepage as the default; the full-screen stage is an explicit entry.
-  const [view, setView] = useState<AppView>(() => {
+  // The homepage stays the default. Old stage links enter the one Live exercise.
+  const [view, setView] = useState<ViewKey>(() => {
     const requested = new URLSearchParams(window.location.search).get('view') as AppView | null;
+    if (requested === 'stage') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('view', 'live');
+      window.history.replaceState({}, '', url);
+      return 'live';
+    }
     return requested && VIEWS.includes(requested) ? requested : 'home';
   });
   const [initialTime, setInitialTime] = useState<number>(0);
-  const [initialJury, setInitialJury] = useState<boolean>(false);
+  const [initialJury, setInitialJury] = useState<boolean>(true);
 
   // Initialize from URL params
   useEffect(() => {
@@ -44,10 +49,13 @@ export function App() {
     // URL 同步
     const url = new URL(window.location.href);
     url.searchParams.set('view', newView);
+    if (newView !== view) url.searchParams.delete('scenarioId');
     if (params?.t !== undefined) {
       url.searchParams.set('t', params.t.toString());
+      url.searchParams.set('mode', 'replay');
     } else {
       url.searchParams.delete('t');
+      url.searchParams.delete('mode');
     }
     if (params?.jury !== undefined) {
       url.searchParams.set('jury', params.jury ? '1' : '0');
@@ -57,8 +65,6 @@ export function App() {
     window.history.pushState({}, '', url.toString());
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-
-  if (view === 'stage') return <StageView />;
 
   return (
     <div className="min-h-screen flex flex-col bg-ground text-ink selection:bg-held-tint selection:text-ink font-ui antialiased">

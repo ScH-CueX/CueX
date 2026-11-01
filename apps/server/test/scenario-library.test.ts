@@ -83,3 +83,25 @@ test('experience added during generation survives the later scene save; damaged 
     assert.throws(() => new LibraryStore(f.dir, ANSHU_PACK), /未覆盖/);
   } finally { rmSync(f.dir, { recursive: true }); }
 });
+
+test('two scene connections keep their own engine pack and reject a mismatched start id', async () => {
+  const f = fixture(generator); const sockets: WebSocket[] = [];
+  try {
+    for (const id of ['synth-one', 'synth-two']) { const pack = structuredClone(ANSHU_PACK); pack.scenario.id = id; pack.scenario.doctor.id = 'dr-' + id; f.store.addScenario(pack); }
+    await f.gateway.start();
+    const tracks = await Promise.all(['synth-one', 'synth-two'].map(async id => {
+      const ws = new WebSocket(`ws://127.0.0.1:${f.gateway.port}/ws/session?scenarioId=${id}`); sockets.push(ws);
+      const messages: any[] = []; ws.on('message', raw => messages.push(JSON.parse(raw.toString())));
+      await new Promise<void>(resolve => ws.once('open', resolve));
+      ws.send(JSON.stringify({ type: 'session.start', payload: { scenarioId: id, mode: 'performance' } }));
+      for (let n = 0; n < 100 && !messages.some(m => m.type === 'session.ready'); n++) await new Promise(r => setTimeout(r, 10));
+      assert.equal(messages.find(m => m.type === 'session.ready')?.payload.scenario.id, id);
+      return { ws, messages };
+    }));
+    assert.deepEqual(new Set(f.observed), new Set(['synth-one', 'synth-two']));
+    tracks[0].ws.send(JSON.stringify({ type: 'session.start', payload: { scenarioId: 'synth-two', mode: 'performance' } }));
+    for (let n = 0; n < 100 && !tracks[0].messages.some(m => m.type === 'session.error'); n++) await new Promise(r => setTimeout(r, 10));
+    assert.equal(tracks[0].messages.find(m => m.type === 'session.error')?.payload.code, 'UNKNOWN_SCENARIO');
+    assert.equal(f.gateway.inspectSessions().length, 2);
+  } finally { sockets.forEach(ws => ws.terminate()); await f.gateway.stop(); rmSync(f.dir, { recursive: true }); }
+});

@@ -9,6 +9,7 @@ let chunks = 0;
 let bytes = 0;
 let audioFormat = 0;
 let longAudio = process.env.CUEX_WEB_LONG_TTS === '1';
+let longAudioSeconds = 3;
 let abortWithAsr: (() => void) | undefined;
 const pcmAsr: AsrEngine = {
   backend: 'browser-feature-asr',
@@ -41,7 +42,7 @@ function wav(seconds: number) {
 const longTts: TtsEngine = {
   backend: 'browser-feature-tts',
   async *synthesize(_text, signal) {
-    yield { audio: wav(3), mimeType: 'audio/wav' };
+    yield { audio: wav(longAudioSeconds), mimeType: 'audio/wav' };
     await delay(800, undefined, { signal });
   },
 };
@@ -60,7 +61,7 @@ const gateway = new WebSocketGateway({
 await gateway.start();
 const control = createServer((req, res) => {
   res.setHeader('Content-Type', 'application/json');
-  if (req.url === '/long-audio') { longAudio = true; res.end('{}'); }
+  if (req.url?.startsWith('/long-audio')) { longAudio = true; longAudioSeconds = Number(new URL(req.url, 'http://fixture').searchParams.get('seconds') ?? 3); res.end('{}'); }
   else if (req.url === '/short-audio') { longAudio = false; res.end('{}'); }
   else if (req.url === '/abort') { abortWithAsr?.(); res.end('{}'); }
   else if (req.url === '/metrics') res.end(JSON.stringify({ chunks, bytes, audioFormat, sessions: gateway.inspectSessions() }));

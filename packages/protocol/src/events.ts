@@ -20,6 +20,7 @@ export type ClientMessage =
       };
     }
   | { type: 'session.stop'; payload: { sessionId: string } }
+  | { type: 'visit.end'; payload: { sessionId: string } }
   | { type: 'audio.chunk'; payload: AudioChunkPayload }
   | { type: 'speech.delta'; payload: { text: string; isFinal: boolean } }
   | { type: 'user.interrupted_doctor'; payload: { timestamp: number } }
@@ -33,6 +34,8 @@ export type ServerMessage =
   | { type: 'system1.verdict'; payload: JevDecisionResponse }
   | { type: 'system2.candidate'; payload: PiAgentCandidateUpdate }
   | { type: 'visit.ended'; payload: VisitEndedPayload }
+  | { type: 'system2.activity'; payload: SystemTwoActivity }
+  | { type: 'conversation.progress'; payload: { sessionId: string; resolvedPointIds: string[] } }
   | { type: 'controller.dispatch'; payload: ControllerDispatchEvent }
   | { type: 'tts.stream_chunk'; payload: TtsAudioStreamChunk }
   | { type: 'tts.abort'; payload: TtsAbortSignal }
@@ -62,6 +65,8 @@ export interface ReviewMoment {
 /** Sent once, right after the doctor's closing line. Everything in it comes from this visit. */
 export interface VisitEndedPayload {
   sessionId: string;
+  /** Persuasion assessment from the heard dialogue and evidence, not the number of checked points. */
+  outcome?: VisitOutcome;
   durationMs: number;
   /** True when this visit was a retry from the review. */
   retry: boolean;
@@ -71,4 +76,26 @@ export interface VisitEndedPayload {
   moments: ReviewMoment[];
   /** The concern to retry: the first interrupted one, else the first withdrawn one. Absent when neither happened. */
   suggestedRetryConcernId?: string;
+}
+
+
+export interface SystemTwoActivity {
+  sessionId: string;
+  taskId: string;
+  kind: 'reply' | 'silence_prompt' | 'assessment';
+  phase: 'preparing' | 'ready' | 'speaking' | 'completed' | 'cancelled' | 'error';
+  reason?: string;
+  sourceEvidence?: string;
+}
+
+export interface VisitOutcome {
+  /** Unavailable must never be presented as a negative or successful assessment. */
+  assessment: 'completed' | 'unavailable';
+  stance: 'willing_to_continue' | 'needs_evidence' | 'not_convinced';
+  /** The doctor's stance, in first-person spoken Chinese, supported by this visit. */
+  doctorResponse: string;
+  rationale: string;
+  strengths: Array<{ quote: string; explanation: string }>;
+  gaps: Array<{ pointId?: string; quote?: string; explanation: string }>;
+  nextStep: string;
 }

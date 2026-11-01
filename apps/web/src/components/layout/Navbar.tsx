@@ -14,7 +14,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onSelectView, class
   const navItems: { key: ViewKey; label: string }[] = [
     { key: 'home', label: '首页' },
     { key: 'live', label: '实时演练' },
-    { key: 'review', label: '对谈复盘' },
+    { key: 'review', label: '复盘示例' },
   ];
 
   return (

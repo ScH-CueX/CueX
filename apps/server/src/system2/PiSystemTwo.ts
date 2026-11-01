@@ -5,10 +5,11 @@
  */
 import { Agent, type AgentEvent, type AgentTool, type ThinkingLevel } from '@earendil-works/pi-agent-core';
 import { Type, type Api, type Model } from '@earendil-works/pi-ai';
-import type { DoctorLineRequest, FollowupDraft, FollowupPhase, FollowupRequest, SystemTwo } from '../contracts';
+import type { DoctorLineRequest, DoctorOutcomeRequest, DoctorTurnDraft, DoctorTurnRequest, FollowupDraft, FollowupPhase, FollowupRequest, SystemTwo } from '../contracts';
 import { loadS2Runtime, type S2Runtime } from './config';
 import { defaultDoctorStore, type DoctorStore } from './doctors';
 import { DoctorLineAgent, type LineMetrics } from './DoctorLineAgent';
+import { DoctorTurnAgent } from './DoctorTurnAgent';
 import { numbersIn } from './numbers';
 import { clampSpoken, stripFiller } from './spoken';
 import { buildSystemPrompt, buildUserPrompt, formatFact, searchFacts, type RetrievalMode } from './prompt';
@@ -71,6 +72,7 @@ export class PiSystemTwo implements SystemTwo {
   private readonly doctors: DoctorStore;
   /** The second worker: writes the doctor's opening, retry and closing lines. It never shares an Agent with prepareFollowup. */
   private readonly lineAgent: DoctorLineAgent;
+  private readonly turnAgent: DoctorTurnAgent;
   /** Metrics of the most recent finished call. */
   lastMetrics: S2Metrics | null = null;
 
@@ -85,6 +87,7 @@ export class PiSystemTwo implements SystemTwo {
     this.doctors = opts.doctors ?? defaultDoctorStore();
     this.doctors.reload();
     this.lineAgent = new DoctorLineAgent({ runtime: this.rt, doctors: this.doctors, timeoutMs: this.timeoutMs, thinkingLevel: this.thinking });
+    this.turnAgent = new DoctorTurnAgent({ runtime: this.rt, doctors: this.doctors, timeoutMs: this.timeoutMs, thinkingLevel: this.thinking });
   }
 
   /**
@@ -98,6 +101,14 @@ export class PiSystemTwo implements SystemTwo {
 
   prepareDoctorLineWithMetrics(req: DoctorLineRequest, onPhase?: (phase: FollowupPhase, partialText?: string) => void): Promise<{ line: string; metrics: LineMetrics }> {
     return this.lineAgent.write(req, onPhase);
+  }
+
+  prepareTurn(req: DoctorTurnRequest): Promise<DoctorTurnDraft> {
+    return this.turnAgent.reply(req);
+  }
+
+  prepareOutcome(req: DoctorOutcomeRequest): Promise<import('@cuex/protocol').VisitOutcome> {
+    return this.turnAgent.outcome(req);
   }
 
   async prepareFollowup(req: FollowupRequest, onPhase?: (phase: FollowupPhase, partialText?: string) => void): Promise<FollowupDraft> {

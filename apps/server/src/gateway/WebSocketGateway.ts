@@ -94,7 +94,7 @@ export class WebSocketGateway {
   private async handle(ws: WebSocket, connection: Connection, message: unknown): Promise<void> {
     if (!isRecord(message) || typeof message.type !== 'string') { this.error(ws, 'INVALID_MESSAGE', '消息格式错误。'); return; }
     if (message.type === 'ping') return; // LiveWSDriver application heartbeat.
-    const known = ['session.start', 'session.stop', 'speech.delta', 'audio.chunk', 'user.interrupted_doctor', 'tts.playback'];
+    const known = ['session.start', 'session.stop', 'speech.delta', 'audio.chunk', 'user.interrupted_doctor', 'tts.playback', 'visit.end'];
     if (!known.includes(message.type)) return;
     const payload = message.payload;
     if (!isRecord(payload)) { this.error(ws, 'INVALID_MESSAGE', '消息缺少 payload。'); return; }
@@ -124,10 +124,14 @@ export class WebSocketGateway {
     if (message.type === 'session.stop') {
       if (typeof payload.sessionId !== 'string') { this.error(ws, 'INVALID_MESSAGE', '消息缺少 sessionId。'); return; }
       if (payload.sessionId === 'current' || payload.sessionId === connection.controller?.sessionId) this.resetSession(connection);
+      else this.error(ws, 'INVALID_SESSION', '会话已更新，请重试。');
       return;
     }
     if (!connection.controller || !connection.engines) { this.error(ws, 'SESSION_NOT_STARTED', '请先开始演练。'); return; }
-    if (message.type === 'speech.delta') {
+    if (message.type === 'visit.end') {
+      if (payload.sessionId !== connection.controller.sessionId) { this.error(ws, 'INVALID_SESSION', '会话已更新，请重试。'); return; }
+      await connection.controller.finishVisit();
+    } else if (message.type === 'speech.delta') {
       if (typeof payload.text !== 'string' || payload.text.length > 20000 || typeof payload.isFinal !== 'boolean') { this.error(ws, 'INVALID_MESSAGE', '语音文本格式错误。'); return; }
       connection.controller.onSpeechDelta(payload.text, payload.isFinal);
     } else if (message.type === 'user.interrupted_doctor') {

@@ -37,7 +37,7 @@ export class ScenarioSynthesizer implements ScenarioGenerator {
     }, streamFn: rt.models.streamSimple.bind(rt.models), toolExecution: 'sequential', identity: { attribution: null } });
     await runAgentGuarded(agent, JSON.stringify({ facts: base.facts, concerns: base.scenario.concerns, settings: input, experiences }), signal, 45_000, 'scenario synthesis');
     signal.throwIfAborted();
-    const last = agent.state.messages.findLast(message => message.role === 'assistant');
+    const last = [...agent.state.messages].reverse().find(message => message.role === 'assistant');
     if (last?.role === 'assistant' && last.stopReason === 'error') throw new Error(rt.redact(last.errorMessage ?? '模型请求失败。'));
     const x = submitted as { sceneTitle?: unknown; doctorNote?: unknown; concernIds?: unknown; opening?: unknown; closing?: unknown; retries?: unknown } | undefined;
     if (!x || !Array.isArray(x.concernIds) || x.concernIds.length < 1 || x.concernIds.length > 2 || new Set(x.concernIds).size !== x.concernIds.length
@@ -55,7 +55,7 @@ export class ScenarioSynthesizer implements ScenarioGenerator {
     const allowedNumbers = new Set(numbersIn(base.facts.map(f => f.text).join('\n') + input.timeConstraintSec));
     if (numbersIn([sceneTitle, note, opening, closing, ...Object.values(retry).flat()].join('\n')).some(n => !allowedNumbers.has(n))) throw new Error('场景包含资料外的数值，请重新生成。');
     const id = `synth-${randomUUID()}`;
-    return { facts: structuredClone(base.facts), asrCorrections: base.asrCorrections,
+    return { ...structuredClone(base), facts: structuredClone(base.facts), asrCorrections: base.asrCorrections,
       scenario: { ...structuredClone(base.scenario), id, sceneTitle, concerns,
         doctor: { ...base.scenario.doctor, id: `dr-${id}`, style: input.doctorStyle, timeConstraintSec: input.timeConstraintSec, note },
         expertRules: experiences.map(({ createdAt: _, ...rule }) => rule),

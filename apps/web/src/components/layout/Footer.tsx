@@ -11,9 +11,9 @@ export const Footer: React.FC<FooterProps> = ({ onSelectView }) => {
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 text-ink-3 leading-relaxed">
           <div>
-            <strong className="block text-ink font-semibold mb-1">CueX 认知伴随架构</strong>
+            <strong className="block text-ink font-semibold mb-1">有依据的医生回应</strong>
             <p className="text-[11px]">
-              基于 TypeScript 全栈架构设计，集成 Jev 快速决策引擎、PiAgent 深度智能体基座与双向流式音视频管道。
+              医生结合资料和你的表达回应、追问，并在你补正后撤销已准备的追问。
             </p>
           </div>
           <div>
@@ -23,9 +23,9 @@ export const Footer: React.FC<FooterProps> = ({ onSelectView }) => {
             </p>
           </div>
           <div>
-            <strong className="block text-ink font-semibold mb-1">模拟与虚构声明</strong>
+            <strong className="block text-ink font-semibold mb-1">训练场景</strong>
             <p className="text-[11px]">
-              当前演练案例中的安舒平、ANSHU-3 研究及心内科陈主任均为模拟用例，专用于临场应对训练与算法验证。
+              以模拟临床资料和医生角色练习拜访。每次结束后，回看医生的态度、判断依据和下一步建议。
             </p>
           </div>
         </div>
@@ -41,7 +41,7 @@ export const Footer: React.FC<FooterProps> = ({ onSelectView }) => {
                 实时演练室
               </button>
               <button type="button" onClick={() => onSelectView('review')} className="hover:text-ink hover:underline">
-                对谈复盘室
+                复盘示例
               </button>
             </div>
           </div>

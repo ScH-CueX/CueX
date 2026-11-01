@@ -10,10 +10,12 @@ export function useLiveSession(enabled: boolean, scenarioId?: string) {
   const [mic, setMic] = useState<'off' | 'starting' | 'on'>('off');
   const [volume, setVolume] = useState(0);
   const [sending, setSending] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const driver = useRef<LiveWSDriver>();
   const capture = useRef(new AudioCapture());
   const textTimer = useRef<number>();
   const textPrefix = useRef('');
+  const inputBlocked = useRef(false);
 
   const cancelText = useCallback(() => {
     window.clearInterval(textTimer.current);
@@ -33,16 +35,19 @@ export function useLiveSession(enabled: boolean, scenarioId?: string) {
   }, [cancelText, stopMic]);
 
   const startVisit = useCallback((retry?: RetryRequest, idle = false) => {
+    inputBlocked.current = false;
     cancelText();
     stopMic();
     driver.current?.destroy();
     dispatch({ type: 'reset' });
+    setFinishing(false);
     const live = new LiveWSDriver({ retry, idle, scenarioId });
     driver.current = live;
     void live.init({
       onServerEvent: event => {
         dispatch({ type: 'event', event });
         if (event.type === 'controller.dispatch' && event.payload.action.type === 'interrupt_speak') cancelText();
+        if (event.type === 'visit.ended') { inputBlocked.current = true; cancelText(); stopMic(); setFinishing(false); }
       },
       onStatusChange: status => {
         dispatch({ type: 'status', status });
@@ -55,14 +60,24 @@ export function useLiveSession(enabled: boolean, scenarioId?: string) {
       },
     });
     // connect() is called by a user gesture. Resume before the server's first audio.
-    if (!idle) void live.unlockAudio().catch(() => dispatch({ type: 'error', message: '请允许浏览器播放音频，再重新连接。' }));
-    void live.start();
+    if (idle) void live.start();
+    else void live.unlockAudio().then(() => { if (driver.current === live) void live.start(); })
+      .catch(() => dispatch({ type: 'error', message: '请允许浏览器播放音频，再点击开始拜访。' }));
   }, [cancelText, stopMic, scenarioId]);
   const connect = useCallback(() => startVisit(), [startVisit]);
   /** Connects without starting a visit. The stage page calls this on load. */
   const open = useCallback(() => startVisit(undefined, true), [startVisit]);
 
-  /** Review ends the visit but keeps the socket, so the server can write the retry line meanwhile. */
+  const finishVisit = useCallback(() => {
+    if (session.status !== 'running' || finishing || session.visitEnded) return;
+    cancelText();
+    stopMic();
+    inputBlocked.current = true;
+    setFinishing(true);
+    driver.current?.finishVisit();
+  }, [session.status, session.visitEnded, finishing, cancelText, stopMic]);
+
+  /** Abrupt visit reset for internal legacy consumers. */
   const endVisit = useCallback(() => {
     cancelText();
     stopMic();
@@ -74,17 +89,18 @@ export function useLiveSession(enabled: boolean, scenarioId?: string) {
     cancelText();
     stopMic();
     dispatch({ type: 'visit' });
+    inputBlocked.current = false;
+    setFinishing(false);
     const live = driver.current;
-    if (live && live.restart(retry)) {
-      void live.unlockAudio().catch(() => dispatch({ type: 'error', message: '请允许浏览器播放音频，再重新连接。' }));
-      return;
-    }
-    startVisit(retry);
+    if (live && (live.status === 'paused' || live.status === 'running')) {
+      void live.unlockAudio().then(() => { if (!live.restart(retry)) startVisit(retry); })
+        .catch(() => dispatch({ type: 'error', message: '请允许浏览器播放音频，再重新连接。' }));
+    } else startVisit(retry);
   }, [cancelText, stopMic, startVisit]);
 
   useEffect(() => {
     if (!enabled) return;
-    if (!driver.current) connect();
+    // Starting a real visit requires an explicit click for browser audio.
     return () => {
       cancelText();
       stopMic();
@@ -95,6 +111,7 @@ export function useLiveSession(enabled: boolean, scenarioId?: string) {
 
   /** Always (re)starts capture. Call it from a click so the browser can ask for permission. */
   const startMic = useCallback(async (): Promise<boolean> => {
+    if (inputBlocked.current) return false;
     cancelText();
     dispatch({ type: 'error', message: undefined });
     setMic('starting');
@@ -112,9 +129,10 @@ export function useLiveSession(enabled: boolean, scenarioId?: string) {
       },
       onError: error => dispatch({ type: 'error', message: error.name === 'NotAllowedError' ? '麦克风权限已关闭。请允许访问，或用文字回应。' : error.message }),
     });
+    if (inputBlocked.current) { stopMic(); return false; }
     setMic(started ? 'on' : 'off');
     return started;
-  }, [cancelText]);
+  }, [cancelText, stopMic]);
   const toggleMic = useCallback(async () => {
     if (mic !== 'off') { stopMic(); return; }
     await startMic();
@@ -139,7 +157,7 @@ export function useLiveSession(enabled: boolean, scenarioId?: string) {
 
   const sendText = useCallback((text: string) => {
     const speech = text.trim();
-    if (!speech || session.status !== 'running' || speech.length > 10000) return;
+    if (!speech || session.status !== 'running' || finishing || session.visitEnded || speech.length > 10000) return;
     cancelText();
     stopMic();
     dispatch({ type: 'error', message: undefined });
@@ -157,12 +175,12 @@ export function useLiveSession(enabled: boolean, scenarioId?: string) {
     };
     advance();
     if (cursor < speech.length) textTimer.current = window.setInterval(advance, 200);
-  }, [session.status, cancelText, stopMic]);
+  }, [session.status, session.visitEnded, finishing, cancelText, stopMic]);
 
   const finishText = useCallback(() => {
     if (sending) driver.current?.sendSpeechDelta('', true);
     cancelText();
   }, [sending, cancelText]);
 
-  return { session, connect, open, startVisit, restartVisit, endVisit, clear, stop, stopMic, startMic, mic, volume, toggleMic, sending, sendText, finishText };
+  return { session, connect, open, startVisit, restartVisit, finishVisit, finishing, endVisit, clear, stop, stopMic, startMic, mic, volume, toggleMic, sending, sendText, finishText };
 }
