@@ -31,7 +31,8 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
       debounceMs: number(env, 'CUEX_DEBOUNCE_MS', 280), minDriftMs: number(env, 'CUEX_MIN_DRIFT_MS', 900),
       minDriftChars: number(env, 'CUEX_MIN_DRIFT_CHARS', 35), candidateHoldMs: number(env, 'CUEX_CANDIDATE_HOLD_MS', 650),
       minInterruptGapMs: number(env, 'CUEX_MIN_INTERRUPT_GAP_MS', 2000),
-      turnTimeoutMs: number(env, 'CUEX_TURN_TIMEOUT_MS', 12000, 1),
+      turnTimeoutMs: number(env, 'CUEX_TURN_TIMEOUT_MS', 22000, 1),
+      outcomeTimeoutMs: number(env, 'CUEX_OUTCOME_TIMEOUT_MS', 22000, 1),
     },
   };
 }

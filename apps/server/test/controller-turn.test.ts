@@ -88,7 +88,9 @@ test('a partial farewell corrected before final quiet does not end the visit', a
 
 
 test('normal-turn budget is bounded, configurable and gives the default ten-second engine budget room', () => {
-  assert.equal(readConfig({}).controller.turnTimeoutMs, 12000);
+  assert.equal(readConfig({}).controller.turnTimeoutMs, 22000);
+  assert.equal(readConfig({}).controller.outcomeTimeoutMs, 22000);
+  assert.equal(readConfig({ CUEX_OUTCOME_TIMEOUT_MS: '15000' }).controller.outcomeTimeoutMs, 15000);
   assert.equal(readConfig({ CUEX_TURN_TIMEOUT_MS: '13500' }).controller.turnTimeoutMs, 13500);
   assert.throws(() => readConfig({ CUEX_TURN_TIMEOUT_MS: '0' }));
 });
@@ -162,6 +164,135 @@ test('a valid response inside the configured budget succeeds and stale aborts st
     assert(!h.events.some(e => e.type === 'session.error'));
     assert.equal(logs.length, 0);
   } finally { await h.close(); console.warn = warn; }
+});
+
+
+
+test('a transient normal failure stays preparing during its one retry and succeeds without a user error', async () => {
+  let calls = 0;
+  const h = await session(() => { if (++calls === 1) throw new Error('temporary provider failure'); return reply('数据我听到了，我们继续核对。'); });
+  try {
+    const from = h.events.length;
+    h.send('speech.delta', { text: '我想核对亚组数据。', isFinal: true });
+    await h.wait(e => e.type === 'system2.activity' && e.payload.phase === 'preparing' && e.payload.reason === '正在重新准备回应。', from);
+    assert(!h.events.slice(from).some(e => e.type === 'system2.activity' && e.payload.phase === 'error'));
+    await h.wait(doctor('数据我听到了，我们继续核对。'), from);
+    assert.equal(calls, 2);
+    assert(!h.events.slice(from).some(e => e.type === 'session.error'));
+    const activities = h.events.slice(from).filter(e => e.type === 'system2.activity' && e.payload.kind === 'reply');
+    assert(activities.every(e => e.type === 'system2.activity' && e.payload.taskId === (activities[0].type === 'system2.activity' ? activities[0].payload.taskId : '')));
+    assert(activities.some(e => e.type === 'system2.activity' && e.payload.phase === 'completed'), 'one logical retry task reaches completed, with no abandoned preparing spinner');
+    assert(!activities.some(e => e.type === 'system2.activity' && e.payload.phase === 'error'));
+  } finally { await h.close(); }
+});
+
+test('outcome retries one transient provider error within one total budget and keeps feedback preparing', async () => {
+  const logs: string[] = []; const warn = console.warn; console.warn = (...args: unknown[]) => { logs.push(args.join(' ')); };
+  let calls = 0;
+  const result: VisitOutcome = { assessment: 'completed', stance: 'needs_evidence', doctorResponse: '资料留给我再核对。', rationale: '需要核对', strengths: [], gaps: [], nextStep: '核对资料' };
+  const h = await session(() => reply('继续说。'), new SilentTts(), { outcomeTimeoutMs: 150, outcome: async () => { if (++calls === 1) throw new Error('SECRET https://private.invalid temporary upstream'); return result; } });
+  try {
+    const ready = h.events.find(e => e.type === 'session.ready'); assert(ready?.type === 'session.ready'); const from = h.events.length;
+    h.send('visit.end', { sessionId: ready.payload.sessionId });
+    await h.wait(doctor(result.doctorResponse), from); await h.playback(from);
+    const ended = await h.wait(e => e.type === 'visit.ended', from); assert(ended.type === 'visit.ended');
+    assert.equal(calls, 2); assert.equal(ended.payload.outcome?.assessment, 'completed');
+    assert(h.events.slice(from).some(e => e.type === 'system2.activity' && e.payload.phase === 'preparing' && e.payload.reason === '正在重新准备复盘。'));
+    assert(!h.events.slice(from).some(e => e.type === 'system2.activity' && e.payload.phase === 'error'));
+    const row = JSON.parse(logs[0]); assert.equal(row.category, 'OUTCOME_PROVIDER_ERROR'); assert.equal(row.attempt, 1);
+    assert(!logs.join('\n').includes('SECRET')); assert(!logs.join('\n').includes('private.invalid'));
+  } finally { await h.close(); console.warn = warn; }
+});
+
+test('a typed unavailable outcome is final and is not retried', async () => {
+  let calls = 0;
+  const h = await session(() => reply('继续说。'), new SilentTts(), { outcome: async () => { calls++; return { assessment: 'unavailable', stance: 'needs_evidence', doctorResponse: '', rationale: '复盘暂未生成，请重试。', strengths: [], gaps: [], nextStep: '重试复盘' }; } });
+  try {
+    const ready = h.events.find(e => e.type === 'session.ready'); assert(ready?.type === 'session.ready'); const from = h.events.length;
+    h.send('visit.end', { sessionId: ready.payload.sessionId });
+    await h.wait(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.isFinal, from); await h.playback(from);
+    const ended = await h.wait(e => e.type === 'visit.ended', from); assert(ended.type === 'visit.ended');
+    assert.equal(calls, 1); assert.equal(ended.payload.outcome?.assessment, 'unavailable');
+    assert.equal(h.events.slice(from).filter(e => e.type === 'system2.activity' && e.payload.kind === 'assessment' && e.payload.phase === 'error').length, 1);
+  } finally { await h.close(); }
+});
+
+test('an outcome retry shares the original deadline and stop cancellation emits no false failure', async () => {
+  let calls = 0; const logs: string[] = []; const warn = console.warn; console.warn = (...args: unknown[]) => { logs.push(args.join(' ')); };
+  const h = await session(() => reply('继续说。'), new SilentTts(), { outcomeTimeoutMs: 100, outcome: async () => { calls++; if (calls === 1) { await new Promise(resolve => setTimeout(resolve, 65)); throw new Error('temporary network failure'); } return new Promise(() => {}); } });
+  try {
+    const ready = h.events.find(e => e.type === 'session.ready'); assert(ready?.type === 'session.ready'); const from = h.events.length;
+    h.send('visit.end', { sessionId: ready.payload.sessionId });
+    await h.wait(e => e.type === 'system2.activity' && e.payload.kind === 'assessment' && e.payload.phase === 'error', from);
+    assert.equal(calls, 2); const rows = logs.map(line => JSON.parse(line)); const last = rows.at(-1);
+    assert.equal(last.category, 'OUTCOME_TIMEOUT'); assert(last.elapsedMs < 155, `one shared100ms budget, not two: ${last.elapsedMs}`);
+  } finally { await h.close(); console.warn = warn; }
+  const cancelledLogs: string[] = []; console.warn = (...args: unknown[]) => { cancelledLogs.push(args.join(' ')); };
+  const stopped = await session(() => reply('继续说。'), new SilentTts(), { outcome: req => new Promise((_resolve, reject) => req.signal.addEventListener('abort', () => reject(Object.assign(new Error('stopped'), { name: 'AbortError' })), { once: true })) });
+  try {
+    const ready = stopped.events.find(e => e.type === 'session.ready'); assert(ready?.type === 'session.ready');
+    stopped.send('visit.end', { sessionId: ready.payload.sessionId });
+    await stopped.wait(e => e.type === 'system2.activity' && e.payload.kind === 'assessment' && e.payload.phase === 'preparing');
+    stopped.send('session.stop', { sessionId: ready.payload.sessionId }); await new Promise(resolve => setTimeout(resolve, 30));
+    assert.equal(cancelledLogs.length, 0); assert(!stopped.events.some(e => e.type === 'visit.ended'));
+  } finally { await stopped.close(); console.warn = warn; }
+});
+
+
+
+test('six consecutive replies plus speech during TTS keep same-visit state and the final outcome usable', async () => {
+  const silent = new SilentTts(); let releaseOld!: () => void;
+  const replies = new Map([
+    ['第一轮问题。', '第一轮回应。'], ['第二轮问题。', '第二轮回应。'], ['第三轮问题。', '第三轮旧回应。'],
+    ['第三轮改口。', '第三轮新回应。'], ['第四轮问题。', '第四轮回应。'], ['第五轮问题。', '第五轮回应。'], ['第六轮问题。', '第六轮回应。'],
+  ]);
+  const h = await session(req => reply(replies.get(req.repSpeech) ?? '没有预期的输入。'), { backend: 'held-third-reply', async *synthesize(text, signal) {
+    yield* silent.synthesize(text, signal);
+    if (text === '第三轮旧回应。') await new Promise<void>(resolve => { releaseOld = resolve; });
+  } }, { outcome: async () => ({ assessment: 'completed', stance: 'needs_evidence', doctorResponse: '本次资料我再核对。', rationale: '仍待核对', strengths: [], gaps: [], nextStep: '核对资料' }) });
+  try {
+    const ready = h.events.find(e => e.type === 'session.ready'); assert(ready?.type === 'session.ready');
+    for (const input of ['第一轮问题。', '第二轮问题。']) {
+      const from = h.events.length; h.send('speech.delta', { text: input, isFinal: true }); await h.wait(doctor(replies.get(input)!), from); await h.playback(from);
+    }
+    let from = h.events.length; h.send('speech.delta', { text: '第三轮问题。', isFinal: true });
+    await h.wait(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.text === '第三轮旧回应。', from);
+    while (!releaseOld) await new Promise<void>(resolve => setImmediate(resolve));
+    from = h.events.length; h.send('speech.delta', { text: '第三轮改口。', isFinal: true });
+    await h.wait(doctor('第三轮新回应。'), from); await h.playback(from); releaseOld();
+    for (const input of ['第四轮问题。', '第五轮问题。', '第六轮问题。']) {
+      from = h.events.length; h.send('speech.delta', { text: input, isFinal: true }); await h.wait(doctor(replies.get(input)!), from); await h.playback(from);
+    }
+    assert.equal(h.requests.length, 7);
+    assert.deepEqual(h.requests.map(req => req.repSpeech), [...replies.keys()]);
+    assert(h.requests.every(req => req.sessionId === ready.payload.sessionId));
+    assert(!h.events.some(e => e.type === 'session.error'));
+    from = h.events.length; h.send('visit.end', { sessionId: ready.payload.sessionId });
+    await h.wait(doctor('本次资料我再核对。'), from); await h.playback(from); await h.wait(e => e.type === 'visit.ended', from);
+  } finally { releaseOld?.(); await h.close(); }
+});
+
+
+
+test('the same final words after a heard doctor reply form a new turn but duplicate finals before playback do not', async () => {
+  const h = await session(() => reply('那我们换一种方式说明。'));
+  try {
+    let from = h.events.length;
+    h.send('speech.delta', { text: '我不知道。', isFinal: true });
+    await h.wait(doctor('那我们换一种方式说明。'), from);
+    const afterFirst = h.events.length;
+    h.send('speech.delta', { text: '我不知道。', isFinal: true });
+    await new Promise(resolve => setTimeout(resolve, 40));
+    assert.equal(h.requests.length, 1, 'same final while reply playback is pending is still a duplicate');
+    await h.playback(from);
+    from = h.events.length;
+    h.send('speech.delta', { text: '我不知道。', isFinal: true });
+    await h.wait(doctor('那我们换一种方式说明。'), from);
+    assert.equal(h.requests.length, 2, 'the representative may legitimately repeat after hearing the reply');
+    assert.equal(h.requests[1].repSpeech, '我不知道。');
+    assert.equal(h.requests[1].history.filter(turn => turn.who === 'rep' && turn.text === '我不知道。').length, 2);
+    assert(!h.events.slice(afterFirst).some(e => e.type === 'session.error'));
+  } finally { await h.close(); }
 });
 
 test('short natural turns get grounded replies for greeting, vague answer, wrong claim and inability without drift', async () => {

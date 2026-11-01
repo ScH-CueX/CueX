@@ -114,24 +114,22 @@ test('early farewell closes neutrally without resolving unanswered questions', a
   assert.deepEqual(draft.resolvedPointIds, []);
 });
 
-test('invented patient inference and unknown evidence or point IDs are rejected', async () => {
+test('doctor speech is not discarded by broad persona or tone checks, while optional unknown point marks are dropped', async () => {
   const { faux, s2 } = setup();
-  const invalid = [
-    answer('我有位患者 eGFR 45，能用吗？'),
-    answer('我有位患者肾功能不好，能用吗？'),
-  ];
-  for (const response of invalid) {
-    faux.setResponses([response]);
-    await assert.rejects(s2.prepareTurn!(request(supported.repQuote)), /rejected/);
-  }
+  faux.setResponses([answer('我有位患者 eGFR 45，用药时需要核对适用情况。', { resolvedAnswers: [{ ...supported, pointId: 'unknown' }] })]);
+  const draft = await s2.prepareTurn!(request('请解释一下。'));
+  assert.match(draft.text, /eGFR 45/);
+  assert.deepEqual(draft.resolvedPointIds, []);
 });
 
-test('empty output and unstructured prose cannot manufacture a turn assessment', async () => {
+test('empty output is rejected but a clean spoken answer is usable without manufactured point marks', async () => {
   const { faux, s2 } = setup();
-  for (const response of [answer(''), fauxAssistantMessage([fauxText('好，没问题。')])]) {
-    faux.setResponses([response]);
-    await assert.rejects(s2.prepareTurn!(request('不知道。')), /empty|structured/);
-  }
+  faux.setResponses([answer('')]);
+  await assert.rejects(s2.prepareTurn!(request('不知道。')), /empty/);
+  faux.setResponses([fauxAssistantMessage([fauxText('好，请先核对亚组表。')])]);
+  const draft = await s2.prepareTurn!(request('不知道。'));
+  assert.equal(draft.text, '好，请先核对亚组表。');
+  assert.deepEqual(draft.resolvedPointIds, []);
 });
 
 test('new visitor speech cancels an in-flight turn and pre-cancelled requests never call model', async () => {
@@ -188,18 +186,18 @@ test('persuasion outcome distinguishes relevant evidence, vague uncertainty and 
   }
 });
 
-test('outcome rejects invented praise quotes, nonexistent point IDs, and empty explanations', async () => {
+test('bad optional outcome rows are discarded while missing core explanations yield unavailable', async () => {
   const { faux, s2 } = setup();
-  const req = { sessionId: 'outcome', pack: ANSHU_PACK, history: [{ who: 'rep' as const, text: '我不知道。' }],
-    resolvedPointIds: [], endReason: 'user_requested' as const, signal: new AbortController().signal };
-  for (const over of [
-    { strengths: [{ quote: supported.repQuote, explanation: '说得有依据。', factIds: ['f-egfr-30-60'], supportedFactQuote: '降压幅度与总体一致' }] },
-    { gaps: [{ pointId: 'missing', explanation: '需要核实。' }] },
-    { rationale: '' },
-  ]) {
+  const req = { sessionId: 'outcome', pack: ANSHU_PACK, history: [{ who: 'rep' as const, text: '我不知道。' }], resolvedPointIds: [], endReason: 'user_requested' as const, signal: new AbortController().signal };
+  for (const over of [{ strengths: [{ quote: supported.repQuote, explanation: '有依据。', factIds: ['f-egfr-30-60'], supportedFactQuote: '降压幅度与总体一致' }] }, { gaps: [{ pointId: 'missing', explanation: '需核对。' }] }]) {
     faux.setResponses([outcomeAnswer(over)]);
-    await assert.rejects(s2.prepareOutcome!(req), /rejected/);
+    const outcome = await s2.prepareOutcome!(req);
+    assert.equal(outcome.assessment, 'completed');
+    assert.deepEqual(outcome.strengths, []);
+    assert.ok(outcome.gaps.every((gap) => gap.pointId !== 'missing'));
   }
+  faux.setResponses([outcomeAnswer({ rationale: '' })]);
+  assert.equal((await s2.prepareOutcome!(req)).assessment, 'unavailable');
 });
 
 test('grounded paraphrases and spoken Chinese numbers preserve a reply; invalid marks are dropped', async () => {
@@ -224,11 +222,13 @@ test('a heard false statement cannot become an outcome strength and silence cann
   const falseQuote = 'eGFR 30 到 60 的结果不是特别好，没有准确测量。';
   faux.setResponses([outcomeAnswer({ stance: 'willing_to_continue', strengths: [{ quote: falseQuote,
     explanation: '提供了可靠的亚组结果。', factIds: ['f-egfr-30-60'], supportedFactQuote: '降压幅度与总体一致' }] })]);
-  await assert.rejects(s2.prepareOutcome!({ sessionId: 'false-strength', pack: ANSHU_PACK,
-    history: [{ who: 'rep', text: falseQuote }], resolvedPointIds: [], endReason: 'farewell', signal: new AbortController().signal }), /contradicts/);
+  const falseOutcome = await s2.prepareOutcome!({ sessionId: 'false-strength', pack: ANSHU_PACK,
+    history: [{ who: 'rep', text: falseQuote }], resolvedPointIds: [], endReason: 'farewell', signal: new AbortController().signal });
+  assert.equal(falseOutcome.assessment, 'unavailable');
+  assert.deepEqual(falseOutcome.strengths, []);
   faux.setResponses([outcomeAnswer({ stance: 'willing_to_continue' })]);
-  await assert.rejects(s2.prepareOutcome!({ sessionId: 'silent', pack: ANSHU_PACK, history: [],
-    resolvedPointIds: ['c1', 'c2', 'c3', 'd1'], endReason: 'silence', signal: new AbortController().signal }), /actual supported evidence/);
+  assert.equal((await s2.prepareOutcome!({ sessionId: 'silent', pack: ANSHU_PACK, history: [],
+    resolvedPointIds: ['c1', 'c2', 'c3', 'd1'], endReason: 'silence', signal: new AbortController().signal })).assessment, 'unavailable');
 });
 
 test('a rep question cannot end the visit just because the model picks end_visit', async () => {
@@ -239,19 +239,11 @@ test('a rep question cannot end the visit just because the model picks end_visit
   assert.deepEqual(draft.resolvedPointIds, []);
 });
 
-test('normal turn action exposes flat provider enums and invalid schema cannot trigger hidden repair calls', async () => {
+test('unknown normal action defaults to reply without another model call', async () => {
   const { faux, s2 } = setup();
-  let enumSeen: unknown;
-  faux.setResponses([(context) => {
-    enumSeen = JSON.stringify(context).includes('\"enum\":[\"reply\",\"end_visit\"]');
-    return answer('可以先看亚组表。');
-  }]);
-  await s2.prepareTurn!(request('不知道。'));
-  assert.equal(enumSeen, true);
-  const before = faux.state.callCount;
-  faux.setResponses([answer('可以先看亚组表。', { action: 'continue' }), answer('不会被读取。')]);
-  await assert.rejects(s2.prepareTurn!(request('不知道。')), /structured/);
-  assert.equal(faux.state.callCount - before, 1);
+  faux.setResponses([answer('可以先看亚组表。', { action: 'continue' })]);
+  assert.equal((await s2.prepareTurn!(request('不知道。'))).action, 'reply');
+  assert.equal(faux.state.callCount, 1);
 });
 
 test('raw screenshot ASR false-result wording remains contradicted and receives clinical correction', async () => {
@@ -269,30 +261,12 @@ test('raw screenshot ASR false-result wording remains contradicted and receives 
   assert.deepEqual(draft.resolvedPointIds, []);
 });
 
-test('outcome stance exposes provider-compatible flat enums and stops after one structured call', async () => {
+test('outcome keeps the model judgement in one call rather than a regex-driven repair', async () => {
   const { faux, s2 } = setup();
-  let enumSeen = false;
-  faux.setResponses([(context) => {
-    enumSeen = JSON.stringify(context).includes('"enum":["willing_to_continue","needs_evidence","not_convinced"]');
-    return outcomeAnswer();
-  }]);
-  await s2.prepareOutcome!({ sessionId: 'schema', pack: ANSHU_PACK, history: [{ who: 'rep', text: '不知道。' }],
-    resolvedPointIds: [], endReason: 'user_requested', signal: new AbortController().signal });
-  assert.equal(enumSeen, true);
+  faux.setResponses([outcomeAnswer({ stance: 'not_convinced', doctorResponse: '这次还没有足够依据让我接受。' })]);
+  const outcome = await s2.prepareOutcome!({ sessionId: 'one-call', pack: ANSHU_PACK, history: [{ who: 'rep', text: '我记不清，回头核实。' }], resolvedPointIds: [], endReason: 'farewell', signal: new AbortController().signal });
+  assert.equal(outcome.stance, 'not_convinced');
   assert.equal(faux.state.callCount, 1);
-});
-
-test('vague-only negative judgement gets one bounded fresh needs-evidence response, not a relabel', async () => {
-  const { faux, s2 } = setup();
-  faux.setResponses([
-    outcomeAnswer({ stance: 'not_convinced', doctorResponse: '你连数据都不知道。' }),
-    outcomeAnswer({ stance: 'needs_evidence', doctorResponse: '我需要先核对具体数据，再做判断。' }),
-  ]);
-  const outcome = await s2.prepareOutcome!({ sessionId: 'repair', pack: ANSHU_PACK,
-    history: [{ who: 'rep', text: '我记不清，回头核实。' }], resolvedPointIds: [], endReason: 'farewell', signal: new AbortController().signal });
-  assert.equal(outcome.stance, 'needs_evidence');
-  assert.equal(outcome.doctorResponse, '我需要先核对具体数据，再做判断。');
-  assert.equal(faux.state.callCount, 2);
 });
 
 test('false-result suffix from exact ASR cannot receive resolved credit or become a strength', async () => {
@@ -304,8 +278,9 @@ test('false-result suffix from exact ASR cannot receive resolved credit or becom
   const draft = await s2.prepareTurn!(request('三十二六十的患者的' + quote));
   assert.deepEqual(draft.resolvedPointIds, []);
   faux.setResponses([outcomeAnswer({ strengths: [{ quote, explanation: '提供了亚组结果。', factIds: ['f-egfr-30-60'], supportedFactQuote: '降压幅度与总体一致' }] })]);
-  await assert.rejects(s2.prepareOutcome!({ sessionId: 'suffix', pack: ANSHU_PACK, history: [{ who: 'rep', text: quote }],
-    resolvedPointIds: [], endReason: 'farewell', signal: new AbortController().signal }), /contradicts/);
+  const outcome = await s2.prepareOutcome!({ sessionId: 'suffix', pack: ANSHU_PACK, history: [{ who: 'rep', text: quote }],
+    resolvedPointIds: [], endReason: 'farewell', signal: new AbortController().signal });
+  assert.deepEqual(outcome.strengths, []);
 });
 
 test('correct facts do not override the actual heard doctor request for further evidence', async () => {
@@ -605,7 +580,7 @@ test('general knowledge does not grant fictional-trial point credit or fabricate
   const outcome = await s2.prepareOutcome!(req);
   assert.match(outcome.rationale, /eGFR 45/);
   faux.setResponses([outcomeAnswer({ strengths: [{ quote: supported.repQuote, explanation: '亚组数据有依据。', factIds: ['f-egfr-30-60'], supportedFactQuote: '降压幅度与总体一致' }] })]);
-  await assert.rejects(s2.prepareOutcome!(req), /quote not heard/);
+  assert.deepEqual((await s2.prepareOutcome!(req)).strengths, []);
 });
 
 test('ordered rep evidence across separate turns is accepted without doctor words or reordering', async () => {
@@ -657,7 +632,7 @@ test('successful provider speech survives unknown tool names, optional bad citat
   assert.equal(draft.sourceEvidence, 'ANSHU-3 亚组分析表，第 14 页');
 });
 
-test('recovery rejects conflicting multiple calls and invalid top-level types and never recovers outcomes', async () => {
+test('recovery rejects ambiguous speech and invalid top-level types; incomplete outcome cores remain unavailable', async () => {
   const { faux, s2 } = setup();
   const payload = { text: '请核对资料。', action: 'reply', basis: '核对资料。', spokenFactIds: [] };
   for (const calls of [[fauxToolCall('unknown_a', payload), fauxToolCall('unknown_b', payload)],
@@ -666,7 +641,7 @@ test('recovery rejects conflicting multiple calls and invalid top-level types an
     await assert.rejects(s2.prepareTurn!(request('不知道。')), /structured/);
   }
   faux.setResponses([fauxAssistantMessage([fauxToolCall('unknown_outcome', { ...payload, stance: 'willing_to_continue' })], { stopReason: 'toolUse' })]);
-  await assert.rejects(s2.prepareOutcome!({ sessionId: 'no-outcome-recovery', pack: ANSHU_PACK, history: [], resolvedPointIds: [], endReason: 'silence', signal: new AbortController().signal }), /structured/);
+  assert.equal((await s2.prepareOutcome!({ sessionId: 'no-outcome-recovery', pack: ANSHU_PACK, history: [], resolvedPointIds: [], endReason: 'silence', signal: new AbortController().signal })).assessment, 'unavailable');
 });
 
 test('complete reply text is preserved up to the bounded limit, never cut mid-sentence', async () => {
@@ -675,6 +650,235 @@ test('complete reply text is preserved up to the bounded limit, never cut mid-se
   assert.ok(long.length > 93 && long.length <= 240);
   faux.setResponses([answer(long)]);
   assert.equal((await s2.prepareTurn!(request('需要看哪些证据？'))).text, long);
-  faux.setResponses([answer('需要核对资料。'.repeat(50))]);
+  faux.setResponses([answer('需要核对资料。'.repeat(200))]);
   await assert.rejects(s2.prepareTurn!(request('继续。')), /too long/);
+});
+
+test('minimal text-only, fenced JSON and missing optional reply fields all remain usable', async () => {
+  const { faux, s2 } = setup();
+  const cases = [
+    fauxAssistantMessage([fauxToolCall('submit_turn', { text: '先看一下亚组表。' })], { stopReason: 'toolUse' }),
+    fauxAssistantMessage([fauxText('```json\n{"text":"先核对具体数据。"}\n```')]),
+    fauxAssistantMessage([fauxText('我更关心这组患者的具体结果。')]),
+    fauxAssistantMessage([fauxToolCall('unexpected', { text: '可以先讲这组的数据。' })], { stopReason: 'toolUse' }),
+  ];
+  for (const response of cases) {
+    faux.setResponses([response]);
+    const draft = await s2.prepareTurn!(request('您想听什么？'));
+    assert.ok(draft.text.length > 0);
+    assert.equal(draft.action, 'reply');
+    assert.deepEqual(draft.resolvedPointIds, []);
+  }
+  for (const text of ['{"text":broken', '```json\n{"text":"不完整"}', '调用工具 submit_turn 失败，准备重试。']) {
+    faux.setResponses([fauxAssistantMessage([fauxText(text)])]);
+    await assert.rejects(s2.prepareTurn!(request('继续。')), /structured/);
+  }
+});
+
+test('mixed bad outcome evidence preserves the valid core and valid rows without fake positive assessment', async () => {
+  const { faux, s2 } = setup();
+  faux.setResponses([outcomeAnswer({
+    strengths: [{ quote: supported.repQuote, explanation: '这一组的数据有依据。', factIds: ['f-egfr-30-60'], supportedFactQuote: '降压幅度与总体一致' },
+      { quote: '从未说过的原话', explanation: '不应保留。', factIds: ['missing'] }],
+    gaps: [{ pointId: 'c3', explanation: '使用边界还需要核对。' }, { pointId: 'missing', explanation: '无效。' }],
+  })]);
+  const req = { sessionId: 'mixed', pack: ANSHU_PACK, history: [{ who: 'rep' as const, text: supported.repQuote }], resolvedPointIds: [], endReason: 'completed' as const, signal: new AbortController().signal };
+  const outcome = await s2.prepareOutcome!(req);
+  assert.equal(outcome.assessment, 'completed');
+  assert.equal(outcome.strengths.length, 1);
+  assert.equal(outcome.gaps.length, 1);
+  faux.setResponses([outcomeAnswer({ stance: 'mystery' })]);
+  assert.equal((await s2.prepareOutcome!(req)).assessment, 'unavailable');
+});
+
+test('cancelled or errored provider messages cannot be recovered as speech or outcomes', async () => {
+  const { faux, s2 } = setup();
+  faux.setResponses([fauxAssistantMessage([fauxText('这句话不能从错误响应中恢复。')], { stopReason: 'error' })]);
+  await assert.rejects(s2.prepareTurn!(request('请继续。')), (error: Error & { code?: string }) => error.code === 'S2_PROVIDER_ERROR' && !error.message.includes('credentials'));
+  const ctl = new AbortController(); ctl.abort();
+  const calls = faux.state.callCount;
+  await assert.rejects(s2.prepareOutcome!({ sessionId: 'cancel-outcome', pack: ANSHU_PACK, history: [], resolvedPointIds: [], endReason: 'silence', signal: ctl.signal }), { name: 'AbortError' });
+  assert.equal(faux.state.callCount, calls);
+});
+
+test('silence keeps usable speech while discarding model point progress and normalizes a plain idle closing', async () => {
+  const { faux, s2 } = setup();
+  faux.setResponses([answer('可以先核对一下这组的数据。', { resolvedAnswers: [supported] })]);
+  const silent = await s2.prepareTurn!(request('', { trigger: 'silence', silenceStage: 1,
+    history: [{ who: 'rep', text: supported.repQuote }] }));
+  assert.ok(silent.text);
+  assert.deepEqual(silent.resolvedPointIds, []);
+  assert.deepEqual(silent.contradictedPointIds, []);
+  faux.setResponses([fauxAssistantMessage([fauxText('今天先到这里，资料核对后再联系。')])]);
+  const close = await s2.prepareTurn!(request('', { trigger: 'silence', silenceStage: 3 }));
+  assert.equal(close.action, 'end_visit');
+  faux.setResponses([fauxAssistantMessage([fauxText('这组患者的结果怎么样？')])]);
+  assert.equal((await s2.prepareTurn!(request('', { trigger: 'silence', silenceStage: 3 }))).action, 'reply');
+});
+
+test('one public PiSystemTwo accepts consecutive accumulated-history replies despite later metadata variation', async () => {
+  const { faux, s2 } = setup();
+  const history: DoctorTurnRequest['history'] = [{ who: 'doctor', text: '研究的人群和适用边界是什么？' }];
+  const sequence = [
+    ['您最关心哪部分？', fauxAssistantMessage([fauxToolCall('submit_turn', { text: '我关心高龄和肾功能不好的患者。' })], { stopReason: 'toolUse' })],
+    ['您希望看原表还是说明书？', fauxAssistantMessage([fauxText('先看亚组表，再核对说明书边界。')])],
+    ['我只记得这组有412人。', fauxAssistantMessage([fauxToolCall('unexpected', { text: '人数有了，降压结果还要核对。' })], { stopReason: 'toolUse' })],
+    [supported.repQuote, answer('这组结果已经补充。', { assessments: [{ pointId: 'c2', repQuote: ['类型错误，不影响说话'] }] })],
+    ['那我们核对下一项。', fauxAssistantMessage([fauxText('```json\n{"text":"接着看低于30的证据和使用建议。","action":"continue"}\n```')])],
+    ['我回去核对资料。', answer('好，核对原文后再交流。', { action: 'continue' })],
+  ] as const;
+  for (const [rep, response] of sequence) {
+    history.push({ who: 'rep', text: rep });
+    faux.setResponses([response]);
+    const draft = await s2.prepareTurn!(request(rep, { history: [...history] }));
+    assert.ok(draft.text.length > 0);
+    assert.equal(draft.action, 'reply');
+    history.push({ who: 'doctor', text: draft.text });
+  }
+  assert.equal(faux.state.callCount, sequence.length);
+  assert.equal(history.length, 13);
+});
+
+test('provider failure is propagated as a safe typed category rather than a payload format error', async () => {
+  const { faux, s2 } = setup();
+  faux.setResponses([fauxAssistantMessage([], { stopReason: 'error', errorMessage: 'private credentials and upstream body must not escape' })]);
+  await assert.rejects(s2.prepareTurn!(request('请说一下。')), (error: Error & { code?: string }) => {
+    assert.equal(error.code, 'S2_PROVIDER_ERROR');
+    assert.equal(error.message, 'System 2 provider response failed');
+    return true;
+  });
+});
+
+const proxyEightTurnOutcomeFixture = {
+  "history": [
+    {
+      "who": "doctor",
+      "text": "我门诊里高龄和肾功能不好的患者不少。研究覆盖了哪些人？"
+    },
+    {
+      "who": "rep",
+      "text": "陈主任，您好。您为什么特别关心高龄和肾功能不好的患者？"
+    },
+    {
+      "who": "doctor",
+      "text": "高龄和肾功能不全的患者在门诊非常普遍，他们的药物代谢和耐受性跟普通成人不一样，用药风险高。研究里 75 岁以上的患者有多少？降压效果跟总体比怎么样？"
+    },
+    {
+      "who": "rep",
+      "text": "这个具体数字我记不清了。"
+    },
+    {
+      "who": "doctor",
+      "text": "查一下第 14 页的亚组分析表吧，研究里 75 岁以上的患者有多少？"
+    },
+    {
+      "who": "rep",
+      "text": "这个具体数字我记不清了。"
+    },
+    {
+      "who": "doctor",
+      "text": "第14页的亚组分析表上写得很清楚，你再翻翻看，75 岁以上患者在研究里有多少，降压幅度跟总体比怎么样？"
+    },
+    {
+      "who": "rep",
+      "text": "我核对清楚了，eGFR30到60亚组有412人，降压幅度与总体一致，不是效果不好。"
+    },
+    {
+      "who": "doctor",
+      "text": "eGFR 30 到 60 的数据清楚了。那 75 岁以上的患者在研究里有多少，结果怎么样？"
+    },
+    {
+      "who": "rep",
+      "text": "75岁以上约占11%，降压幅度也与总体一致。"
+    },
+    {
+      "who": "doctor",
+      "text": "75 岁以上的数据清楚了。那 eGFR 低于 30 的患者能不能用？"
+    },
+    {
+      "who": "rep",
+      "text": "eGFR低于30被排除，没有证据，说明书不建议使用。"
+    },
+    {
+      "who": "doctor",
+      "text": "那高龄患者的起始剂量要调整吗？"
+    },
+    {
+      "who": "rep",
+      "text": "高龄起始剂量要调整，75岁以上从每日2.5mg开始，两周后按血压调整。我把对应的说明书和亚组表留给您。"
+    },
+    {
+      "who": "doctor",
+      "text": "行，资料和说明书我收下了。辛苦你跑这一趟。"
+    },
+    {
+      "who": "rep",
+      "text": "好的，资料和页码我会发给您，今天先不打扰了，再见。"
+    }
+  ],
+  "resolvedPointIds": [],
+  "endReason": "farewell",
+  "payload": {
+    "nextStep": "核对说明书和亚组分析表中的具体数据。",
+    "rationale": "代表在提示下完整回答了 75 岁以上患者比例及降压效果、eGFR 30-60 人数及效果、eGFR 低于 30 的说明书建议以及高龄起始剂量调整方案。证据完整，我愿意收下资料并进一步核对。",
+    "strengths": [
+      {
+        "supportedFactQuote": "75 岁以上患者约占 11%，降压幅度与总体一致。",
+        "quote": "75岁以上约占11%，降压幅度也与总体一致。",
+        "factId": "f-elderly"
+      },
+      {
+        "factId": "f-egfr-30-60",
+        "supportedFactQuote": "eGFR 30 到 60 的亚组有 412 人，降压幅度与总体一致。",
+        "quote": "eGFR30到60亚组有412人，降压幅度与总体一致，不是效果不好。"
+      },
+      {
+        "supportedFactQuote": "eGFR 低于 30 的患者被排除在研究之外，没有证据，说明书不建议使用。",
+        "factId": "f-egfr-lt30",
+        "quote": "eGFR低于30被排除，没有证据，说明书不建议使用。"
+      },
+      {
+        "supportedFactQuote": "常规起始剂量每日 5 mg；75 岁以上患者从每日 2.5 mg 起始，两周后按血压调整。",
+        "factId": "f-dose-elderly",
+        "quote": "高龄起始剂量要调整，75岁以上从每日2.5mg开始，两周后按血压调整。"
+      }
+    ],
+    "doctorResponse": "资料和说明书我收下了。后续我先仔细核对一下这些数据，再看怎么结合门诊患者的情况来考虑。",
+    "stance": "willing_to_continue",
+    "gaps": [],
+    "factIds": [
+      "f-elderly",
+      "f-egfr-30-60",
+      "f-egfr-lt30",
+      "f-dose-elderly"
+    ]
+  }
+};
+
+test('the actual eight-turn outcome keeps grounded singular factId evidence and its valid positive core', async () => {
+  const { faux, s2 } = setup();
+  const fixture = proxyEightTurnOutcomeFixture;
+  faux.setResponses([fauxAssistantMessage([fauxToolCall('submit_outcome', fixture.payload)], { stopReason: 'toolUse' })]);
+  const outcome = await s2.prepareOutcome!({ sessionId: 'actual-eight-turn-outcome', pack: ANSHU_PACK,
+    history: fixture.history as DoctorTurnRequest['history'], resolvedPointIds: fixture.resolvedPointIds,
+    endReason: 'farewell', signal: new AbortController().signal });
+  assert.equal(outcome.assessment, 'completed');
+  assert.equal(outcome.stance, 'willing_to_continue');
+  assert.equal(outcome.doctorResponse, fixture.payload.doctorResponse);
+  assert.equal(outcome.strengths.length, 4);
+  assert.deepEqual(outcome.strengths.map((row) => row.explanation), fixture.payload.strengths.map((row) => row.supportedFactQuote));
+});
+
+test('singular factId normalization never admits an unknown fact or an unheard positive quote', async () => {
+  const { faux, s2 } = setup();
+  const fixture = proxyEightTurnOutcomeFixture;
+  for (const change of [{ factId: 'unknown' }, { quote: '从未说过的正确结果。' }]) {
+    faux.setResponses([fauxAssistantMessage([fauxToolCall('submit_outcome', { ...fixture.payload,
+      strengths: [{ ...fixture.payload.strengths[0], ...change }],
+    })], { stopReason: 'toolUse' })]);
+    const outcome = await s2.prepareOutcome!({ sessionId: 'invalid-singular-evidence', pack: ANSHU_PACK,
+      history: fixture.history as DoctorTurnRequest['history'], resolvedPointIds: [], endReason: 'farewell', signal: new AbortController().signal });
+    assert.equal(outcome.assessment, 'unavailable');
+    assert.deepEqual(outcome.strengths, []);
+  }
 });

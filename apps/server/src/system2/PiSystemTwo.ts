@@ -26,6 +26,10 @@ export interface PiSystemTwoOptions {
   runtime?: S2Runtime;
   /** Hard deadline for one draft. A hung model must not stall the demo. Default: CUEX_S2_TIMEOUT_MS or 10000. */
   timeoutMs?: number;
+  /** Independent normal dialogue deadline; default CUEX_S2_TURN_TIMEOUT_MS or 20000. */
+  turnTimeoutMs?: number;
+  /** Independent visit outcome deadline; default CUEX_S2_OUTCOME_TIMEOUT_MS or 20000. */
+  outcomeTimeoutMs?: number;
   /** Where PROFILE.md and MEMORY.md live. Default: apps/server/agents/doctors, or CUEX_AGENTS_DIR. */
   doctors?: DoctorStore;
 }
@@ -69,6 +73,7 @@ export class PiSystemTwo implements SystemTwo {
   private readonly retrieval: RetrievalMode;
   private readonly thinking: ThinkingLevel;
   private readonly timeoutMs: number;
+  private readonly outcomeTimeoutMs: number;
   private readonly doctors: DoctorStore;
   /** The second worker: writes the doctor's opening, retry and closing lines. It never shares an Agent with prepareFollowup. */
   private readonly lineAgent: DoctorLineAgent;
@@ -82,12 +87,15 @@ export class PiSystemTwo implements SystemTwo {
     this.thinking = opts.thinkingLevel ?? 'off';
     const envTimeout = Number(process.env.CUEX_S2_TIMEOUT_MS);
     this.timeoutMs = opts.timeoutMs ?? (Number.isFinite(envTimeout) && envTimeout > 0 ? envTimeout : 10_000);
+    const operationBudget = (value: string | undefined) => { const parsed = Number(value); return Number.isFinite(parsed) && parsed > 0 ? parsed : 20_000; };
+    const turnTimeoutMs = opts.turnTimeoutMs ?? opts.timeoutMs ?? operationBudget(process.env.CUEX_S2_TURN_TIMEOUT_MS);
+    this.outcomeTimeoutMs = opts.outcomeTimeoutMs ?? opts.timeoutMs ?? operationBudget(process.env.CUEX_S2_OUTCOME_TIMEOUT_MS);
     this.backend = `${this.rt.backend}:${this.retrieval}`;
     // The constructor runs once per session. Read every doctor's files here so the live loop never touches the disk.
     this.doctors = opts.doctors ?? defaultDoctorStore();
     this.doctors.reload();
     this.lineAgent = new DoctorLineAgent({ runtime: this.rt, doctors: this.doctors, timeoutMs: this.timeoutMs, thinkingLevel: this.thinking });
-    this.turnAgent = new DoctorTurnAgent({ runtime: this.rt, doctors: this.doctors, timeoutMs: this.timeoutMs, thinkingLevel: this.thinking });
+    this.turnAgent = new DoctorTurnAgent({ runtime: this.rt, doctors: this.doctors, timeoutMs: turnTimeoutMs, thinkingLevel: this.thinking });
   }
 
   /**
@@ -108,7 +116,7 @@ export class PiSystemTwo implements SystemTwo {
   }
 
   prepareOutcome(req: DoctorOutcomeRequest): Promise<import('@cuex/protocol').VisitOutcome> {
-    return this.turnAgent.outcome(req);
+    return this.turnAgent.outcome(req, false, this.outcomeTimeoutMs);
   }
 
   async prepareFollowup(req: FollowupRequest, onPhase?: (phase: FollowupPhase, partialText?: string) => void): Promise<FollowupDraft> {

@@ -47,6 +47,7 @@ export class TurnController {
   private idleStage = 0;
   private normalRepSpeech = '';
   private normalSpeechKey = '';
+  private heardReplySinceLastRep = false;
   private lastRepChangeAt = 0;
   private playbackPending?: SpeechOutput;
   private readonly startedAt = Date.now();
@@ -96,7 +97,7 @@ export class TurnController {
     this.lines = doctorLines;
     this.normalTurns = !!engines.system2.prepareTurn;
     this.retryConcernId = retryConcernId;
-    this.timing = { debounceMs: 280, minDriftMs: 900, minDriftChars: 35, candidateHoldMs: 650, minInterruptGapMs: 2000, finalQuietMs: 1100, partialQuietMs: 1800, idleFirstMs: 7000, idleSecondMs: 12000, idleCloseMs: 20000, turnTimeoutMs: 12000, outcomeTimeoutMs: 11000, playbackAckGraceMs: 15000, ...timing };
+    this.timing = { debounceMs: 280, minDriftMs: 900, minDriftChars: 35, candidateHoldMs: 650, minInterruptGapMs: 2000, finalQuietMs: 1100, partialQuietMs: 1800, idleFirstMs: 7000, idleSecondMs: 12000, idleCloseMs: 20000, turnTimeoutMs: 22000, outcomeTimeoutMs: 22000, playbackAckGraceMs: 15000, ...timing };
     const retryIndex = pack.scenario.concerns.findIndex(concern => concern.id === retryConcernId);
     if (retryIndex >= 0) {
       this.concernIndex = retryIndex;
@@ -173,7 +174,8 @@ export class TurnController {
     const concernId = this.concern.id;
     const abort = new AbortController();
     this.turnAbort = abort;
-    const task = { taskId: randomUUID(), kind: (trigger === 'silence' ? 'silence_prompt' : 'reply') as SystemTwoActivity['kind'] };
+    const kind = (trigger === 'silence' ? 'silence_prompt' : 'reply') as SystemTwoActivity['kind'];
+    const task = this.normalFailures > 0 && this.turnActivity?.kind === kind ? this.turnActivity : { taskId: randomUUID(), kind };
     this.turnActivity = task; this.activity(task, 'preparing');
     const startedAt = Date.now();
     let timedOut = false;
@@ -213,10 +215,12 @@ export class TurnController {
           : /^S2_TURN_/.test(failure?.code ?? '') || /^System 2 (?:turn rejected:|requires structured )/.test(message) || message === 'empty doctor turn' ? 'TURN_RESULT_REJECTED'
           : 'TURN_PROVIDER_ERROR';
         console.warn(JSON.stringify({ event: 'system2.turn.failed', category, sessionId: this.sessionId, taskId: task.taskId, revision, elapsedMs: Date.now() - startedAt, timeoutMs: this.timing.turnTimeoutMs }));
-        this.activity(task, 'error');
         this.normalFailures++;
-        if (this.normalFailures <= 1) this.turnTimer = setTimeout(() => { this.turnTimer = undefined; void this.prepareNormalTurn(trigger, silenceStage); }, 350);
-        else {
+        if (this.normalFailures <= 1) {
+          this.activity(task, 'preparing', '正在重新准备回应。');
+          this.turnTimer = setTimeout(() => { this.turnTimer = undefined; void this.prepareNormalTurn(trigger, silenceStage); }, 350);
+        } else {
+          this.activity(task, 'error');
           this.error('SYSTEM2_TURN_ERROR', '回应暂未生成，请重试。');
           this.turnAbort = undefined;
           this.turnActivity = undefined;
@@ -267,15 +271,45 @@ export class TurnController {
     const unavailable: VisitOutcome = { assessment: 'unavailable', stance: 'needs_evidence', doctorResponse: '', rationale: '复盘暂未生成，请重试。', strengths: [], gaps: [], nextStep: '重试复盘' };
     if (!this.engines.system2.prepareOutcome) return unavailable;
     const task = { taskId: randomUUID(), kind: 'assessment' as const };
-    this.activity(task, 'preparing');
+    const revision = this.revision;
+    const startedAt = Date.now();
     const abort = new AbortController(); this.outcomeAbort = abort;
+    const current = () => !this.stopped && revision === this.revision && this.outcomeAbort === abort;
+    this.activity(task, 'preparing');
+    let timedOut = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<undefined>(resolve => { timer = setTimeout(() => { timedOut = true; abort.abort(); resolve(undefined); }, this.timing.outcomeTimeoutMs); });
     try {
-      const outcome = await Promise.race([this.engines.system2.prepareOutcome({ sessionId: this.sessionId, pack: this.pack, history: this.actualHistory(), resolvedPointIds: [...this.committedResolved], endReason: this.endReason, signal: abort.signal }), new Promise<undefined>(resolve => { timer = setTimeout(() => { abort.abort(); resolve(undefined); }, this.timing.outcomeTimeoutMs); })]);
-      if (!outcome || abort.signal.aborted || this.stopped) { this.activity(task, 'error'); return unavailable; }
-      this.activity(task, 'completed'); return outcome;
-    } catch { this.activity(task, 'error'); return unavailable; }
-    finally { clearTimeout(timer); if (this.outcomeAbort === abort) this.outcomeAbort = undefined; }
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        let category = 'OUTCOME_UNAVAILABLE';
+        try {
+          const outcome = await Promise.race([this.engines.system2.prepareOutcome({ sessionId: this.sessionId, pack: this.pack, history: this.actualHistory(), resolvedPointIds: [...this.committedResolved], endReason: this.endReason, signal: abort.signal }), deadline]);
+          if (!current()) return unavailable;
+          if (outcome && !abort.signal.aborted) {
+            if (outcome.assessment === 'completed') { this.activity(task, 'completed'); return outcome; }
+            // A typed unavailable result is final. Do not multiply model calls to repair it.
+          } else category = timedOut ? 'OUTCOME_TIMEOUT' : 'OUTCOME_ABORTED';
+        } catch (error) {
+          if (!current()) return unavailable;
+          const failure = error as { name?: string; code?: string; message?: string } | undefined;
+          const message = typeof failure?.message === 'string' ? failure.message : '';
+          category = timedOut || /^System 2 timed out after /.test(message) ? 'OUTCOME_TIMEOUT'
+            : abort.signal.aborted || failure?.name === 'AbortError' || message === 'System 2 request aborted' ? 'OUTCOME_ABORTED'
+            : /^S2_(?:TURN|OUTCOME)_/.test(failure?.code ?? '') || /^System 2 (?:turn rejected:|outcome rejected:|requires structured )/.test(message) ? 'OUTCOME_RESULT_REJECTED'
+            : 'OUTCOME_PROVIDER_ERROR';
+        }
+        if (!current()) return unavailable;
+        console.warn(JSON.stringify({ event: 'system2.outcome.failed', category, sessionId: this.sessionId, taskId: task.taskId, revision, attempt, elapsedMs: Date.now() - startedAt, timeoutMs: this.timing.outcomeTimeoutMs }));
+        // Retry only a transient thrown provider failure, within the same total deadline.
+        if (attempt === 1 && category === 'OUTCOME_PROVIDER_ERROR' && Date.now() - startedAt < this.timing.outcomeTimeoutMs && !abort.signal.aborted) {
+          this.activity(task, 'preparing', '正在重新准备复盘。');
+          continue;
+        }
+        this.activity(task, 'error');
+        return unavailable;
+      }
+      return unavailable;
+    } finally { clearTimeout(timer); if (this.outcomeAbort === abort) this.outcomeAbort = undefined; }
   }
 
   private prefetchNextVisit(): void {
@@ -330,10 +364,10 @@ export class TurnController {
   private acceptTranscript(text: string, isFinal: boolean, recent: string): void {
     if (this.stopped || (!text.trim() && !isFinal)) return;
     const speechKey = this.normalizeSpeech(text);
-    const changed = speechKey !== this.normalSpeechKey;
+    const changed = speechKey !== this.normalSpeechKey || (isFinal && this.heardReplySinceLastRep);
     if (this.normalTurns && !changed && (!isFinal || this.lastRepSegment.isFinal)) return;
     if (this.normalTurns && changed) {
-      this.normalSpeechKey = speechKey; this.lastRepChangeAt = Date.now(); this.idleStage = 0;
+      this.normalSpeechKey = speechKey; this.heardReplySinceLastRep = false; this.lastRepChangeAt = Date.now(); this.idleStage = 0; this.normalFailures = 0;
       this.cancelNormalWork();
       if (this.playbackPending && this.speech !== this.playbackPending) {
         const playing = this.playbackPending; playing.playbackDone = true; clearTimeout(playing.fallbackTimer);
@@ -751,6 +785,8 @@ export class TurnController {
     if (this.playbackPending === speech) this.playbackPending = undefined;
     this.outputs.delete(report.utteranceId);
     if (this.normalTurns && speech.lineKind !== 'closing' && !speech.playbackTimedOut) {
+      // Identical words can be a new representative turn only after a reply was actually heard.
+      if (report.status === 'finished' && speech.normalTurn && this.lastRepChangeAt <= speech.start) this.heardReplySinceLastRep = true;
       if (this.normalRepSpeech && this.lastRepChangeAt > speech.start) this.scheduleNormalTurn(this.lastRepSegment.isFinal);
       else this.armIdleAfterPlayback();
     }

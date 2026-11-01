@@ -8,8 +8,6 @@ import { isExplicitFarewell } from '../conversation/visitIntent';
 import { cleanLine } from './DoctorLineAgent';
 import type { DoctorStore } from './doctors';
 import { memoryBullets } from './doctors';
-import { DISMISSIVE, EARLIER_VISIT } from './linePrompt';
-import { numbersIn } from './numbers';
 import { communicationContext } from './prompt';
 import { abortError, runAgentGuarded } from './run';
 import { ensureEnding, stripFiller } from './spoken';
@@ -17,7 +15,6 @@ import { ensureEnding, stripFiller } from './spoken';
 interface Options { runtime: S2Runtime; doctors: DoctorStore; timeoutMs: number; thinkingLevel?: ThinkingLevel }
 type Request = DoctorTurnRequest | DoctorOutcomeRequest;
 type Answer = { pointId: string; repQuote: string; claimContext: string[]; factIds: string[]; status: 'complete' | 'partial' | 'uncertain' | 'contradicted'; missingAspects: string[]; coveredAspects: Array<{ requirementIndex: number; quote: string }>; withdrawalQuote: string; populationQuote: string; factPopulationQuote: string };
-type Strength = VisitOutcome['strengths'][number] & { factIds: string[]; supportedFactQuote: string };
 const normalized = (s: string) => s.toLowerCase().replace(/[\s，。、；：？！,.;:?!“”"'（）()–—-]/g, '').replace(/到/g, '');
 const reject = (reason: string): never => { throw new Error(`System 2 turn rejected: ${reason}`); };
 
@@ -64,24 +61,33 @@ function validateAnswers(answers: Answer[], req: DoctorTurnRequest, contradicted
   }))];
 }
 
-// Speech must remain usable when optional assessment evidence is incomplete.
-// The per-entry checks below decide point progress, independently of the tool boundary.
-const answerSchema = Type.Unknown({ description: '可选要点评估对象；仅处理类型正确且有实际代表原话与资料依据的条目。错误类型只丢弃该条，不影响医生说话。' });
 function turnSchema() {
   return Type.Object({
-    text: Type.String(), action: Type.String({ enum: ['reply', 'end_visit'], description: '正常回应严格填写 reply；结束拜访严格填写 end_visit' }), basis: Type.String(),
-    assessments: Type.Optional(Type.Array(answerSchema, { description: '仅评估代表实际回答的要点；问候或问题可省略或填空数组。完整/部分/不确定/矛盾分开，不能把医生提供的事实算代表答对' })),
-    spokenFactIds: Type.Array(Type.String(), { description: '这句话引用的资料 ID；一般医学知识、寒暄或告别可为空，不要求为常识补资料引用' }),
+    text: Type.String(),
+    action: Type.Optional(Type.String({ description: 'reply 或 end_visit；未填写则继续交流' })),
+    basis: Type.Optional(Type.String()), assessments: Type.Optional(Type.Unknown()),
+    spokenFactIds: Type.Optional(Type.Unknown({ description: '引用的资料 ID；一般医学解释可省略' })),
   });
 }
 function outcomeSchema() {
   return Type.Object({
-    stance: Type.String({ enum: ['willing_to_continue', 'needs_evidence', 'not_convinced'], description: '不知道、没材料、含糊=needs_evidence；明确未纠正的错误断言才=not_convinced；相关可信证据值得继续核对=willing_to_continue' }),
-    doctorResponse: Type.String(), rationale: Type.String(),
-    strengths: Type.Array(Type.Object({ quote: Type.String(), explanation: Type.String(), factIds: Type.Array(Type.String()), supportedFactQuote: Type.String({ description: '支持这段代表原话的资料逐字原文；有矛盾的代表原话不能列入 strengths' }) })),
-    gaps: Type.Array(Type.Object({ pointId: Type.Optional(Type.String()), quote: Type.Optional(Type.String()), explanation: Type.String() })),
-    nextStep: Type.String(), factIds: Type.Array(Type.String()),
+    stance: Type.Optional(Type.Unknown()), doctorResponse: Type.Optional(Type.Unknown()),
+    rationale: Type.Optional(Type.Unknown()), nextStep: Type.Optional(Type.Unknown()),
+    strengths: Type.Optional(Type.Unknown()), gaps: Type.Optional(Type.Unknown()), factIds: Type.Optional(Type.Unknown()),
   });
+}
+function objectPayload(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+}
+function textPayload(text: string): Record<string, unknown> | undefined {
+  const value = text.trim();
+  if (!value) return undefined;
+  const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(value);
+  if (fenced || value.startsWith('{')) {
+    try { return objectPayload(JSON.parse(fenced?.[1] ?? value)); } catch { return undefined; }
+  }
+  if (/^[\[```]|```|submit_|tool_?call|function_?call|工具调用|调用工具/i.test(value)) return undefined;
+  return { text: value };
 }
 
 export class DoctorTurnAgent {
@@ -114,7 +120,7 @@ export class DoctorTurnAgent {
     const { runtime: rt } = this.opts;
     let submitted: Record<string, unknown> | undefined;
     const submit: AgentTool = { ...tool, execute: async (_id, params) => {
-      submitted = params as Record<string, unknown>;
+      submitted = objectPayload(params);
       return { content: [{ type: 'text', text: 'ok' }], details: {}, terminate: true };
     } };
     const agent = new Agent({
@@ -136,19 +142,30 @@ export class DoctorTurnAgent {
       throw new Error(rt.redact((err as Error).message));
     }
     if (req.signal.aborted) throw abortError();
-    if (!submitted && tool.name === 'submit_turn') {
+    const finalAssistant = [...agent.state.messages].reverse().find((message) => message.role === 'assistant');
+    if (finalAssistant?.role === 'assistant' && finalAssistant.stopReason === 'error') {
+      this.diagnostic('S2_PROVIDER_ERROR');
+      const error = new Error('System 2 provider response failed');
+      Object.assign(error, { code: 'S2_PROVIDER_ERROR' });
+      throw error;
+    }
+    if (finalAssistant?.role === 'assistant' && finalAssistant.stopReason === 'aborted') throw abortError();
+    if (!submitted) {
       const last = [...agent.state.messages].reverse().find((message) => message.role === 'assistant');
       if (last?.role === 'assistant' && (last.stopReason === 'toolUse' || last.stopReason === 'stop')) {
         const calls = last.content.filter((block) => block.type === 'toolCall');
-        const candidate = calls.length === 1 ? calls[0].arguments : undefined;
-        if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
-          const data = candidate as Record<string, unknown>;
-          if (typeof data.text === 'string' && data.text.trim() && (data.action === 'reply' || data.action === 'end_visit')
-            && typeof data.basis === 'string' && Array.isArray(data.spokenFactIds) && data.spokenFactIds.every((id) => typeof id === 'string')) {
-            // Read one typed speech payload only. Never execute an unknown function or recover optional point progress.
-            submitted = { text: data.text, action: 'reply', basis: data.basis, spokenFactIds: data.spokenFactIds, assessments: [] };
-            this.diagnostic('S2_TURN_PAYLOAD_RECOVERED');
-          }
+        const texts = last.content.filter((block) => block.type === 'text' && block.text.trim());
+        let data: Record<string, unknown> | undefined;
+        if (calls.length === 1 && texts.length === 0) data = objectPayload(calls[0].arguments);
+        else if (calls.length === 0 && texts.length === 1 && texts[0].type === 'text') data = textPayload(texts[0].text);
+        if (data && tool.name === 'submit_turn' && typeof data.text === 'string' && data.text.trim()) {
+          // Extract speech data only. Never execute a function named by the model or recover point progress.
+          submitted = { text: data.text, action: 'reply', basis: typeof data.basis === 'string' ? data.basis : '',
+            spokenFactIds: Array.isArray(data.spokenFactIds) ? data.spokenFactIds : [], assessments: [] };
+          this.diagnostic('S2_TURN_PAYLOAD_RECOVERED');
+        } else if (data && tool.name === 'submit_outcome') {
+          submitted = data;
+          this.diagnostic('S2_OUTCOME_PAYLOAD_RECOVERED');
         }
       }
     }
@@ -181,9 +198,7 @@ export class DoctorTurnAgent {
     ].join('\n'), { name: 'submit_turn', label: '医生回应', description: '提交本轮医生回应和有据的要点判定', parameters: turnSchema(), execute: async () => ({ content: [], details: {} }) });
     const text = ensureEnding(stripFiller(cleanLine(String(raw.text ?? ''), req.pack.scenario.doctor.name)));
     if (!text) { this.diagnostic('S2_TURN_EMPTY'); reject('empty response'); }
-    if (text.length > 240) { this.diagnostic('S2_TURN_TOO_LONG'); reject('response too long'); }
-    if (/我(?:手上|这里|这儿)?(?:有|收治|接诊|看过).{0,6}(?:位|个|名)?患者|我的.{0,6}患者/.test(text)) reject('invented individual patient');
-    if (EARLIER_VISIT.test(text) || DISMISSIVE.test(text)) reject('unsupported visit or dismissive speech');
+    if (text.length > 1200) { this.diagnostic('S2_TURN_TOO_LONG'); reject('response too long'); }
     const validAnswers = (answers: Answer[], contradicted: boolean): Answer[] => answers.filter((answer) => {
       try { validateAnswers([answer], req, contradicted); return true; } catch { this.diagnostic('S2_TURN_ASSESSMENT_DROPPED'); return false; }
     });
@@ -198,21 +213,23 @@ export class DoctorTurnAgent {
     }));
     const resolvedAnswers = validAnswers(assessments.filter((a) => a.status === 'complete'), false);
     const contradictedAnswers = validAnswers(assessments.filter((a) => a.status === 'contradicted'), true);
-    const contradicted = contradictedAnswers.map((a) => a.pointId);
+    let contradicted = contradictedAnswers.map((a) => a.pointId);
     const knownIds = new Set(req.pack.scenario.concerns.flatMap((c) => c.points.map((p) => p.id)));
-    const reopened = assessments.filter((a) => a.status === 'uncertain' && req.resolvedPointIds.includes(a.pointId) && knownIds.has(a.pointId)
+    let reopened = assessments.filter((a) => a.status === 'uncertain' && req.resolvedPointIds.includes(a.pointId) && knownIds.has(a.pointId)
       && a.withdrawalQuote && heardQuote(a.withdrawalQuote, req)
       && /撤回|收回|不可靠|不能确认|不再确认/.test(a.withdrawalQuote)).map((a) => a.pointId);
-    const resolved = resolvedAnswers.map((a) => a.pointId).filter((id) => !contradicted.includes(id) && !reopened.includes(id));
+    let resolved = resolvedAnswers.map((a) => a.pointId).filter((id) => !contradicted.includes(id) && !reopened.includes(id));
     const spokenIds = Array.isArray(raw.spokenFactIds) ? raw.spokenFactIds.filter((id): id is string => typeof id === 'string') : [];
     const knownSpokenIds = spokenIds.filter((id) => req.pack.facts.some((fact) => fact.id === id));
     if (knownSpokenIds.length !== spokenIds.length) this.diagnostic('S2_TURN_CITATION_DROPPED', spokenIds.length - knownSpokenIds.length);
     const facts = checkedFacts(knownSpokenIds, req.pack);
     for (const a of [...resolvedAnswers, ...contradictedAnswers]) facts.push(...checkedFacts(a.factIds, req.pack));
-    if (req.trigger === 'silence' && (resolved.length || contradicted.length || reopened.length)) reject('silence cannot assess new answers');
-    let action = raw.action as DoctorTurnDraft['action'];
-    if (action !== 'reply' && action !== 'end_visit') reject('unknown action');
-    if (req.trigger === 'silence' && req.silenceStage >= 3 && action !== 'end_visit') reject('idle visit must close');
+    if (req.trigger === 'silence') {
+      if (resolved.length || contradicted.length || reopened.length) this.diagnostic('S2_TURN_SILENCE_PROGRESS_DROPPED');
+      resolved = []; contradicted = []; reopened = [];
+    }
+    let action: DoctorTurnDraft['action'] = raw.action === 'end_visit' ? 'end_visit' : 'reply';
+    if (req.trigger === 'silence' && req.silenceStage >= 3) action = 'end_visit';
     const farewell = isExplicitFarewell(req.repSpeech);
     const allComplete = req.pack.scenario.concerns.flatMap((c) => c.points).every((p) => [...req.resolvedPointIds, ...resolved].includes(p.id) && !contradicted.includes(p.id));
     if (action === 'end_visit' && (!(farewell || (req.trigger === 'silence' && req.silenceStage >= 3) || allComplete)
@@ -220,16 +237,12 @@ export class DoctorTurnAgent {
       action = 'reply';
       this.diagnostic('S2_TURN_ACTION_DOWNGRADED');
     }
-    return { text, action, resolvedPointIds: resolved, contradictedPointIds: contradicted, reopenedPointIds: reopened, basis: String(raw.basis),
+    return { text, action, resolvedPointIds: resolved, contradictedPointIds: contradicted, reopenedPointIds: reopened, basis: typeof raw.basis === 'string' ? raw.basis : '',
       sourceEvidence: facts.length ? [...new Set(facts.map((f) => f.source))].join('；') : undefined };
   }
 
-  async outcome(req: DoctorOutcomeRequest, repairing = false, budgetMs = this.opts.timeoutMs): Promise<VisitOutcome> {
-    const started = performance.now();
-    const repText = req.history.filter((t) => t.who === 'rep').map((t) => t.text).join('');
-    const uncertaintyOnly = !repText.trim() || (/不知道|不清楚|不确定|记不清|回头核实|回去核实/.test(repText) && !/\d|[百千万]|一致|总体|不建议|被排除|可以用|放心用|没有准确|结果.{0,5}(?:不好|不太好|不是特别)/.test(repText));
+  async outcome(req: DoctorOutcomeRequest, _repairing = false, budgetMs = this.opts.timeoutMs): Promise<VisitOutcome> {
     const raw = await this.run(req, [
-      repairing ? '【修正】本次只有未知或未提供信息，没有明确错误断言。stance 必须 needs_evidence；重新写与此立场一致的温和 doctorResponse 和 rationale，不能沿用尖锐评语。' : '',
       '【任务】拜访已经结束。根据本次实际听到的对话，判断你是否愿意继续交流，以及为什么。只调用 submit_outcome 一次。',
       '输出是专业判断，不是考试分数，也不是按 resolvedPointIds 数量自动判定。资料正确只是基础：还要看代表是否把证据与门诊患者关联、承认适用边界、回应质疑。',
       '先检查本次最新仍成立的明确错误断言。后来说不知道或告别不等于纠正，不能把未纠正的错误改写成单纯信息不足；只有代表明确撤回错误并给出有据更正才算修正。',
@@ -242,36 +255,42 @@ export class DoctorTurnAgent {
       'nextStep 是一个具体可做的后续动作，例如核对某亚组表或说明书边界；不要求现场处方。不声称未发生的后续。factIds 引用支持本判断的资料编号。',
       '根据本次双方实际听到的对话判断立场，不能只看代表事实答对。医生如果已说仍需其他资料、尚不足以改变判断或不愿继续，必须尊重这一实际立场，除非后面实际对话给出了足够的新依据。不能虚构医生已被说服；strengths 只引用代表原话。没有代表发言时 needs_evidence，说明没收到可判断的证据。',
     ].join('\n'), { name: 'submit_outcome', label: '拜访判断', description: '提交真实会话支持的医生立场及理由', parameters: outcomeSchema(), execute: async () => ({ content: [], details: {} }) }, budgetMs);
-    checkedFacts(raw.factIds as string[], req.pack);
-    const strengthEvidence = raw.strengths as Strength[];
-    for (const item of strengthEvidence) {
-      const facts = checkedFacts(item.factIds, req.pack);
-      if (!heardQuote(item.quote, req)) reject('outcome strength quote not heard');
-      if (!facts.length || !item.supportedFactQuote || !facts.some((f) => normalized(f.text).includes(normalized(item.supportedFactQuote)))) reject('outcome strength missing fact evidence');
-      if (obviousConflict(item.quote, facts)) reject('outcome strength contradicts cited evidence');
-      const allowedNumbers = new Set(facts.flatMap((f) => numbersIn(f.text)));
-      if (numbersIn(item.quote).some((n) => !allowedNumbers.has(n))) reject('outcome strength number contradicts cited evidence');
+    const unavailable = (): VisitOutcome => {
+      this.diagnostic('S2_OUTCOME_UNAVAILABLE');
+      return { assessment: 'unavailable', stance: 'needs_evidence', doctorResponse: '本次复盘暂未生成。',
+        rationale: '复盘暂未生成，请重试。', strengths: [], gaps: [], nextStep: '重试生成本次复盘。' };
+    };
+    const core = [raw.doctorResponse, raw.rationale, raw.nextStep];
+    if (!['willing_to_continue', 'needs_evidence', 'not_convinced'].includes(String(raw.stance))
+      || core.some((value) => typeof value !== 'string' || !value.trim() || value.length > 1200)) return unavailable();
+    const strengths: VisitOutcome['strengths'] = [];
+    for (const candidate of Array.isArray(raw.strengths) ? raw.strengths : []) {
+      const item = objectPayload(candidate);
+      try {
+        if (!item || typeof item.quote !== 'string' || !heardQuote(item.quote, req)) throw new Error();
+        const ids = Array.isArray(item.factIds) ? item.factIds.filter((id): id is string => typeof id === 'string')
+          : typeof item.factId === 'string' ? [item.factId] : [];
+        const facts = checkedFacts(ids, req.pack);
+        if (!facts.length || typeof item.supportedFactQuote !== 'string' || !item.supportedFactQuote.trim()
+          || !facts.some((fact) => normalized(fact.text).includes(normalized(item.supportedFactQuote as string))) || obviousConflict(item.quote, facts)) throw new Error();
+        strengths.push({ quote: item.quote, explanation: typeof item.explanation === 'string' && item.explanation.trim()
+          ? item.explanation : item.supportedFactQuote as string });
+      } catch { this.diagnostic('S2_OUTCOME_ROW_DROPPED'); }
     }
-    const strengths = strengthEvidence.map(({ quote, explanation }) => ({ quote, explanation }));
-    if (!['willing_to_continue', 'needs_evidence', 'not_convinced'].includes(String(raw.stance))) reject('unknown outcome stance');
-    if (raw.stance === 'willing_to_continue' && (!req.history.some((t) => t.who === 'rep' && t.text.trim()) || strengths.length === 0)) reject('willing stance needs actual supported evidence');
-    const gaps = raw.gaps as VisitOutcome['gaps'];
-    const ids = new Set(req.pack.scenario.concerns.flatMap((c) => c.points.map((p) => p.id)));
-    for (const item of strengths) if (!heardQuote(item.quote, req)) reject('outcome strength quote not heard');
-    for (const item of gaps) {
-      if (item.quote && !heardQuote(item.quote, req)) reject('outcome gap quote not heard');
-      if (item.pointId && !ids.has(item.pointId)) reject('unknown outcome point ID');
+    const gaps: VisitOutcome['gaps'] = [];
+    const ids = new Set(req.pack.scenario.concerns.flatMap((concern) => concern.points.map((point) => point.id)));
+    for (const candidate of Array.isArray(raw.gaps) ? raw.gaps : []) {
+      const item = objectPayload(candidate);
+      if (!item || typeof item.explanation !== 'string' || !item.explanation.trim()
+        || (item.quote !== undefined && (typeof item.quote !== 'string' || !heardQuote(item.quote, req)))
+        || (item.pointId !== undefined && (typeof item.pointId !== 'string' || !ids.has(item.pointId)))) {
+        this.diagnostic('S2_OUTCOME_ROW_DROPPED'); continue;
+      }
+      gaps.push({ explanation: item.explanation, ...(typeof item.quote === 'string' ? { quote: item.quote } : {}),
+        ...(typeof item.pointId === 'string' ? { pointId: item.pointId } : {}) });
     }
-    for (const text of [raw.doctorResponse, raw.rationale, raw.nextStep, ...strengths.map((s) => s.explanation), ...gaps.map((g) => g.explanation)]) {
-      if (typeof text !== 'string' || !text.trim()) reject('empty outcome explanation');
-    }
-    if (uncertaintyOnly && raw.stance !== 'needs_evidence') {
-      if (repairing) reject('uncertainty outcome must seek evidence');
-      const remaining = budgetMs - (performance.now() - started);
-      if (remaining <= 0) reject('outcome repair deadline');
-      return this.outcome(req, true, remaining);
-    }
-    return { assessment: 'completed', stance: raw.stance as VisitOutcome['stance'], doctorResponse: String(raw.doctorResponse),
-      rationale: String(raw.rationale), strengths, gaps, nextStep: String(raw.nextStep) };
+    if (raw.stance === 'willing_to_continue' && (!req.history.some((turn) => turn.who === 'rep' && turn.text.trim()) || strengths.length === 0)) return unavailable();
+    return { assessment: 'completed', stance: raw.stance as VisitOutcome['stance'], doctorResponse: raw.doctorResponse as string,
+      rationale: raw.rationale as string, strengths, gaps, nextStep: raw.nextStep as string };
   }
 }
