@@ -3,8 +3,9 @@ import {spawn} from 'node:child_process';
 import {existsSync, mkdtempSync, rmSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {resolveTtsSshConfig} from './tts-ssh-config.mjs';
 
-const config=process.env.CUEX_TTS_SSH_CONFIG??path.join(os.homedir(),'.ssh','cuex-rtx-tts','ssh-config');
+const config=resolveTtsSshConfig();
 if(!existsSync(config))throw new Error('Missing private SSH config; see infra/windows/tts/README.md.');
 const dir=mkdtempSync(path.join(os.tmpdir(),'cuex-tts-bridge-'));
 const socket=path.join(dir,'control');

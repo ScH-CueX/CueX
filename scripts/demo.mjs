@@ -92,7 +92,7 @@ try {
   await waitFor('CueX server', () => http(`${env.CUEX_SERVER_ORIGIN}/health`), 30000);
   start('web', executable, [path.join(root, 'apps/web/node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', String(webPort), '--strictPort'], { cwd: path.join(root, 'apps/web') });
   await waitFor('CueX web', () => http(`http://127.0.0.1:${webPort}`), 20000);
-  console.log(`[demo] Ready: http://127.0.0.1:${webPort} — Ctrl-C stops this launcher’s processes.`);
+  console.log(`[demo] Ready: http://127.0.0.1:${webPort}/?view=stage — Ctrl-C stops this launcher’s processes.`);
 } catch (error) {
   if (!stopping) console.error(`[demo] ${error instanceof Error ? error.message : 'Startup failed'}`);
   await stop(1);

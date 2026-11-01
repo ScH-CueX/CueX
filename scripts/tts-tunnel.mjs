@@ -1,6 +1,6 @@
 import {spawn} from 'node:child_process';
 import {existsSync} from 'node:fs';
-import os from 'node:os';
+import {resolveTtsSshConfig} from './tts-ssh-config.mjs';
 import path from 'node:path';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 
@@ -9,7 +9,7 @@ export async function probeTts() {
   try {const r=await fetch('http://127.0.0.1:18766/health',{signal:AbortSignal.timeout(5000)});const s=await r.json();return r.ok&&s.ok&&s.model==='Ming-3.0-tts-0.5b';}catch{return false;}
 }
 export function openTtsTunnel() {
-  const config=process.env.CUEX_TTS_SSH_CONFIG??path.join(os.homedir(),'.ssh','cuex-rtx-tts','ssh-config');
+  const config=resolveTtsSshConfig();
   if(!existsSync(config))throw new Error('Set CUEX_TTS_SSH_CONFIG to the private, pinned-host SSH config. See infra/windows/tts/README.md.');
   const child=spawn(process.execPath,[fileURLToPath(new URL('./tts-ssh-bridge.mjs',import.meta.url))],{stdio:'inherit'});
   child.once('error',error=>{child.cuexError=error;});

@@ -32,7 +32,7 @@ The isolated environment is `.venv`, the source checkout is `Ming-3.0-tts` at `9
 
 On Windows, run `E:\CueX-TTS\start-ming.ps1`. It uses a WMI-owned background process, survives SSH logout and waits for model warmup. It does not install boot autostart. After a reboot, start it again.
 
-On the Mac, keep the supplied private key, pinned known_hosts and SSH config outside the repository. Default config path: `~/.ssh/cuex-rtx-tts/ssh-config`; override with `CUEX_TTS_SSH_CONFIG`. The config must define `rtx-home`. Run `pnpm tts:connect` for a standalone bridge, or `pnpm demo` for the complete launcher. The bridge listens only at `127.0.0.1:18766` and uses a private, owned SSH multiplex socket.
+On the Mac, keep the supplied private key, pinned known_hosts and SSH config outside the repository. Set `CUEX_TTS_SSH_CONFIG` to select a config explicitly. Otherwise, the launcher uses `~/.ssh/cuex-rtx-tts/ssh-config` when present, then `~/.ssh/rtx-home/ssh-config`. The config must define `rtx-home` and pin its host key. No keys or configs are copied. Run `pnpm tts:connect` for a standalone bridge, or `pnpm demo` for the complete launcher. The bridge listens only at `127.0.0.1:18766` and uses a private, owned SSH multiplex socket.
 
 ## Measured validation (2026-11-01)
 
