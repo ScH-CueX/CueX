@@ -40,6 +40,13 @@ server {
         proxy_buffering off;
     }
 
+    location /api/ {
+        proxy_pass http://127.0.0.1:8765;
+        proxy_set_header Host $host;
+        proxy_read_timeout 60s;
+        client_max_body_size 32k;
+    }
+
     location = /health {
         proxy_pass http://127.0.0.1:8765;
     }

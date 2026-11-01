@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { ViewKey } from '@/components/layout/Navbar';
 import { DoctorCanvas } from '@/components/r3f/DoctorCanvas';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,9 @@ import { Play, ArrowRight, BookOpen, ShieldCheck, Zap, RotateCcw, Brain, CheckCi
 import { cn } from '@/lib/utils';
 import { ScenarioSynthesizerModal } from '@/components/ScenarioSynthesizerModal';
 
+import { listScenarios } from '@/lib/library';
+import type { ScenarioSummary } from '@cuex/protocol';
+
 interface HomepageViewProps {
   onNavigate: (view: ViewKey, params?: { t?: number; jury?: boolean }) => void;
 }
@@ -14,6 +17,21 @@ interface HomepageViewProps {
 export const HomepageView: React.FC<HomepageViewProps> = ({ onNavigate }) => {
   const [heroPose, setHeroPose] = useState<'listening' | 'holding' | 'withdrawing'>('holding');
   const [isSynthesizerOpen, setIsSynthesizerOpen] = useState<boolean>(false);
+
+  const [scenarios, setScenarios] = useState<ScenarioSummary[]>([]);
+  const [libraryError, setLibraryError] = useState(false);
+  const [libraryReload, setLibraryReload] = useState(0);
+  useEffect(() => {
+    if (isSynthesizerOpen) return;
+    let active = true;
+    listScenarios().then(rows => { if (active) { setScenarios(rows.filter(row => row.generated)); setLibraryError(false); } }).catch(() => { if (active) setLibraryError(true); });
+    return () => { active = false; };
+  }, [isSynthesizerOpen, libraryReload]);
+  const startScenario = (scenario: ScenarioSummary) => {
+    const url = new URL(window.location.href); url.search = '';
+    url.searchParams.set('view', 'stage'); url.searchParams.set('scenarioId', scenario.id);
+    window.location.assign(url.toString());
+  };
 
   return (
     <div className="min-h-screen bg-ground text-ink selection:bg-held-tint selection:text-ink">
@@ -216,7 +234,7 @@ export const HomepageView: React.FC<HomepageViewProps> = ({ onNavigate }) => {
                 AI 自动情境合成 · 团队经验沉淀飞轮
               </h2>
               <p className="text-xs sm:text-sm text-ink-2 max-w-2xl leading-relaxed">
-                针对传统培训成本高、脱离真实市场的痛点。AI 自动合成含真实医生情境的拜访演练素材，把老资历实战经验转化为结构化认知模型，让新人低成本反复演练，沉淀为团队群体竞争力。
+                录入团队的拜访心得，结合资料包生成不同风格的医生场景。保存后的场景可随时进入，反复练习临场应对。
               </p>
             </div>
             <Button
@@ -235,20 +253,20 @@ export const HomepageView: React.FC<HomepageViewProps> = ({ onNavigate }) => {
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5 text-ink font-bold">
                 <UserCheck className="w-4 h-4 text-held" />
-                <span>1. 资深老代表经验萃取</span>
+                <span>1. 录入团队经验</span>
               </div>
               <p className="text-ink-2 leading-relaxed text-[11px]">
-                结构化沉淀销冠拜访心得（如“面对学术钻研型医生严禁空谈疗效，前30秒直给亚组证据”），输入 PiAgent 记忆中枢。
+                记录适用情境、应对方法与容易踩的坑，保存到团队经验库。
               </p>
             </div>
 
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5 text-ink font-bold">
                 <Brain className="w-4 h-4 text-ink" />
-                <span>2. AI 自动合成高保真情境</span>
+                <span>2. AI 编排演练场景</span>
               </div>
               <p className="text-ink-2 leading-relaxed text-[11px]">
-                智能体将药械文献指南与医生偏好参数结合，自动派生关切逻辑树、突发打断点与禁忌陷阱，素材生成成本趋近于零。
+                结合资料与所选经验，调整医生风格和关切顺序，保存为可再次进入的演练。
               </p>
             </div>
 
@@ -258,11 +276,13 @@ export const HomepageView: React.FC<HomepageViewProps> = ({ onNavigate }) => {
                 <span>3. 新人低成本反复实战</span>
               </div>
               <p className="text-ink-2 leading-relaxed text-[11px]">
-                新代表在带智能反馈的演练中抗打断、学应变；复盘时对照销冠最佳实践与决策时序，把个体经验内化为群体竞争力。
+                进入保存的场景，练习回应与追问，通过演练后的对话记录和关切反馈回看应对。
               </p>
             </div>
           </div>
 
+          {libraryError && <p className="text-sm text-ink-2" role="status">场景库暂时无法读取。<button className="underline ml-2" onClick={() => setLibraryReload(n => n + 1)}>重试</button></p>}
+          {scenarios.length > 0 && <div className="divide-y divide-line border-y border-line">{scenarios.map(scene => <div key={scene.id} className="py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div><h3 className="text-xl">{scene.sceneTitle}</h3><p className="mt-1 text-sm text-ink-2">{scene.doctor.name} · {scene.doctor.timeConstraintSec} 秒 · {scene.experienceCount} 条团队经验</p></div><Button size="sm" onClick={() => startScenario(scene)} className="gap-2">进入演练 <ArrowRight size={15} /></Button></div>)}</div>}
           {/* 演练素材库卡片 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div
@@ -270,7 +290,7 @@ export const HomepageView: React.FC<HomepageViewProps> = ({ onNavigate }) => {
               className="group border border-line hover:border-ink bg-surface p-6 rounded-[2px] cursor-pointer transition-all space-y-4"
             >
               <div className="flex items-center justify-between">
-                <Badge variant="held">已合成 · 立即演练</Badge>
+                <Badge variant="held">示例 · 立即演练</Badge>
                 <span className="text-xs font-mono text-ink-3">68s · 核心片段</span>
               </div>
               <div className="space-y-1">
@@ -280,7 +300,7 @@ export const HomepageView: React.FC<HomepageViewProps> = ({ onNavigate }) => {
                 <p className="text-xs text-ink-2">陈主任 · 心内科门诊 · 严谨学术型</p>
               </div>
               <p className="text-xs text-ink-3 leading-relaxed">
-                降压药“安舒平”ANSHU-3 循证拜访。融入销冠防打断规则，医生突然追问 75 岁以上高龄及 eGFR &lt; 60 肾功能人群证据。
+                降压药“安舒平”ANSHU-3 循证拜访。医生围绕资料追问 75 岁以上高龄及 eGFR &lt; 60 肾功能人群证据。
               </p>
               <Button variant="quiet" size="sm" className="w-full text-xs">
                 开启演练
@@ -321,10 +341,7 @@ export const HomepageView: React.FC<HomepageViewProps> = ({ onNavigate }) => {
         <ScenarioSynthesizerModal
           isOpen={isSynthesizerOpen}
           onClose={() => setIsSynthesizerOpen(false)}
-          onSynthesizeAndStart={(scenario) => {
-            setIsSynthesizerOpen(false);
-            onNavigate('live');
-          }}
+          onSynthesizeAndStart={startScenario}
         />
 
       </main>

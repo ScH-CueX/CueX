@@ -226,6 +226,7 @@ pnpm build
 HOST=127.0.0.1
 PORT=8765
 CUEX_AGENTS_DIR=/var/lib/cuex/doctors
+CUEX_LIBRARY_DIR=/var/lib/cuex/library
 CUEX_MODEL_DIR=/var/lib/cuex/models
 ```
 
@@ -258,6 +259,7 @@ sudo systemctl status cuex
 | `/ws/session` | Node 的同名 WebSocket 路径 |
 | `/health` | Node HTTP 健康接口 |
 | `/briefing` | Node 场景资料接口 |
+| `/api/experiences`、`/api/scenarios` | 团队经验与场景接口；保留入口鉴权 |
 
 WebSocket 反代需要传递 Upgrade / Connection 头。示例显式使用 HTTP/1.1 并设置读取超时。[Nginx WebSocket 文档](https://nginx.org/en/docs/http/websocket.html)。
 

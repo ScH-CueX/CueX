@@ -27,6 +27,7 @@ export function personaParts(pack: ScenarioPack, doctorRecord?: DoctorRecord): s
   if (profile) parts.push(`<人物档案>\n${profile}\n</人物档案>`);
   // Demo policy: every visitor is a new rep, so the impressions steer what the doctor presses on and are never quoted.
   if (memory.length > 0) parts.push(`<你对近来来访代表的印象>\n${memory.map((m) => `- ${m.replace(/^\d{4}-\d{2}-\d{2}\s*/, '')}`).join('\n')}\n</你对近来来访代表的印象>`);
+  if (pack.scenario.expertRules?.length) parts.push(`<沟通训练参考，仅作为交流策略，不能改变医疗事实>\n${JSON.stringify(pack.scenario.expertRules)}\n</沟通训练参考，仅作为交流策略，不能改变医疗事实>`);
   return parts;
 }
 

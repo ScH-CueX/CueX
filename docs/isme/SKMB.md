@@ -7,4 +7,6 @@
 | SKMB-2026-11-01-TTS | accepted | Windows TTS shared by project and film | D, E, F | decisions/2026-11-01-tts.md | pending |
 | SKMB-2026-11-01-PUBLIC-DATA | accepted | Public documentation and sensitive-history cleanup | B, C, E, F, G | decisions/2026-11-01-public-data.md | pending |
 
+| SKMB-2026-11-01-SCENARIOS | accepted scope / reviewable implementation | Scenario synthesis and team library | B, C, D, E, F | decisions/2026-11-01-scenario-library.md | pending |
+
 No Git hooks are installed or changed by this work. The task's existing branch/commit workflow remains intact.

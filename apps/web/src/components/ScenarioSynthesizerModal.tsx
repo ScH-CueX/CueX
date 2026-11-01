@@ -1,285 +1,78 @@
-import React, { useState } from 'react';
-import { cn } from '@/lib/utils';
+import React, { useEffect, useRef, useState } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { X, Sparkles, ArrowRight, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Sparkles, Brain, Upload, X, Check, ArrowRight, UserCheck } from 'lucide-react';
-import type { TrainingScenarioDef } from '@cuex/protocol';
+import type { ExperienceInput, ScenarioSummary, SynthesisInput, TeamExperience } from '@cuex/protocol';
+import { listExperiences, saveExperience, synthesizeScenario } from '@/lib/library';
 
-interface ScenarioSynthesizerModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSynthesizeAndStart: (scenario: TrainingScenarioDef) => void;
-}
-
-export const ScenarioSynthesizerModal: React.FC<ScenarioSynthesizerModalProps> = ({
-  isOpen,
-  onClose,
-  onSynthesizeAndStart,
-}) => {
-  const [docStyle, setDocStyle] = useState<'rigorous' | 'impatient' | 'exploratory'>('rigorous');
-  const [timeWindow, setTimeWindow] = useState<number>(60);
-  const [includeSeniorExperience, setIncludeSeniorExperience] = useState<boolean>(true);
-  const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
-  const [synthesizedScenario, setSynthesizedScenario] = useState<TrainingScenarioDef | null>(null);
-
-  if (!isOpen) return null;
-
-  const handleSynthesize = () => {
-    setIsSynthesizing(true);
-
-    setTimeout(() => {
-      const result: TrainingScenarioDef = {
-        id: `synth-${Date.now()}`,
-        productName: '安舒平',
-        packTitle: '安舒平 · 降压适应证临床资料包',
-        studyName: 'ANSHU-3 多中心循证研究',
-        doctor: {
-          id: 'doc-synth-01',
-          name: '陈主任',
-          department: '心内科',
-          title: '主任医师',
-          style: docStyle,
-          timeConstraintSec: timeWindow,
-          skepticismLevel: 'high',
-          note: '看重安全性与特殊亚组，听到空谈获益必打断',
-        },
-        sceneTitle: '门诊快速拜访 · 临床适用范围质询',
-        concerns: [
-          {
-            id: 'c-synth-1',
-            title: '高龄与肾功能亚组适用证据',
-            anchorSpeaker: 'doctor',
-            points: [
-              { id: 'p1', label: '75 岁以上高龄占比 (11%)', anchorQuestion: '高龄患者有多少？' },
-              { id: 'p2', label: 'eGFR 30–60 亚组降幅 (412例)', anchorQuestion: '中度肾功能不全患者数据呢？' },
-              { id: 'p3', label: 'eGFR < 30 禁忌症排除说明', anchorQuestion: '重度肾衰能用吗？' },
-            ],
-          },
-        ],
-        expertRules: includeSeniorExperience
-          ? [
-              {
-                id: 'exp-01',
-                sourceSeniorRep: '李主管（5年销售冠军）',
-                scenarioContext: '周三上午心内科大门诊，候诊患者超50人',
-                goldenTactic: '开场30秒内直给亚组客观数字，绝不强行下定论，顺带反问剂量调整建议。',
-                antiPatternWarning: '面对陈主任切忌背诵总体降压幅度与安全性，否则在第20秒必被追问打断。',
-              },
-            ]
-          : [],
-        syntheticProvenance: {
-          synthesizedAt: new Date().toLocaleTimeString(),
-          sourceDocument: 'ANSHU-3-Clinical-Report.pdf',
-          model: 'PiAgent Scenario Synthesizer',
-        },
-      };
-
-      setSynthesizedScenario(result);
-      setIsSynthesizing(false);
-    }, 900);
+interface Props { isOpen: boolean; onClose: () => void; onSynthesizeAndStart: (scenario: ScenarioSummary) => void }
+const emptyExperience: ExperienceInput = { sourceSeniorRep: '', scenarioContext: '', goldenTactic: '', antiPatternWarning: '' };
+export function ScenarioSynthesizerModal({ isOpen, onClose, onSynthesizeAndStart }: Props) {
+  const [style, setStyle] = useState<SynthesisInput['doctorStyle']>('rigorous');
+  const [seconds, setSeconds] = useState(60);
+  const [experiences, setExperiences] = useState<TeamExperience[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [draft, setDraft] = useState<ExperienceInput>(emptyExperience);
+  const [adding, setAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<ScenarioSummary>();
+  const abort = useRef<AbortController>();
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    setResult(undefined); setError(''); setLoading(true); setSelected([]);
+    listExperiences().then(rows => { if (active) setExperiences(rows); }).catch(() => { if (active) setError('经验库读取失败，请关闭后重试。'); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; abort.current?.abort(); };
+  }, [isOpen]);
+  const add = async () => {
+    setSaving(true); setError('');
+    try { const entry = await saveExperience(draft); setExperiences(rows => [...rows, entry]); setSelected(ids => [...ids, entry.id].slice(-10)); setDraft(emptyExperience); setAdding(false); }
+    catch (e) { setError(e instanceof Error ? e.message : '保存失败，请重试。'); }
+    finally { setSaving(false); }
   };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-2xl bg-surface border border-line rounded-[2px] shadow-2xl overflow-hidden flex flex-col text-xs text-ink">
-        {/* Modal 头部 */}
-        <div className="flex items-center justify-between p-4 border-b border-line bg-ground-2/50">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-held" />
-            <span className="font-bold text-sm tracking-tight text-ink">
-              AI 自动合成实战演练素材 · 团队经验沉淀
-            </span>
+  const generate = async () => {
+    abort.current?.abort(); const controller = new AbortController(); abort.current = controller;
+    setBusy(true); setError('');
+    try { setResult(await synthesizeScenario({ doctorStyle: style, timeConstraintSec: seconds, experienceIds: selected }, controller.signal)); }
+    catch (e) { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : '生成失败，请重试。'); }
+    finally { setBusy(false); }
+  };
+  const inputClass = 'w-full bg-surface border border-line px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-held';
+  return <Dialog.Root open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
+    <Dialog.Portal>
+      <Dialog.Overlay className="fixed inset-0 z-50 bg-ink/40" />
+      <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-2xl max-h-[90dvh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto bg-ground border border-line p-6 sm:p-8 text-ink font-ui">
+        <Dialog.Close aria-label="关闭" className="absolute right-4 top-4 p-2 hover:bg-ground-2"><X size={18} /></Dialog.Close>
+        <Dialog.Title className="text-2xl pr-8">把经验变成下一场演练</Dialog.Title>
+        <Dialog.Description className="mt-2 text-sm text-ink-2 leading-relaxed">基于安舒平资料包，调整医生风格、关切顺序和提问方式。保存后可反复演练。</Dialog.Description>
+        {error && <p role="alert" className="mt-4 text-sm text-held">{error}</p>}
+        {result ? <div className="mt-8 space-y-5">
+          <p className="text-sm text-resolved" role="status">场景已生成并保存</p>
+          <h3 className="text-xl">{result.sceneTitle}</h3>
+          <p className="text-sm text-ink-2">{result.doctor.name} · {result.doctor.timeConstraintSec} 秒 · 融合 {result.experienceCount} 条团队经验</p>
+          <p className="text-sm text-ink-2">{result.doctor.note}</p>
+          <Button onClick={() => onSynthesizeAndStart(result)} className="gap-2">进入这场演练 <ArrowRight size={16} /></Button>
+        </div> : <div className="mt-6 space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="space-y-2 text-sm"><span>医生风格</span><select aria-label="医生风格" value={style} disabled={busy} onChange={e => setStyle(e.target.value as SynthesisInput['doctorStyle'])} className={inputClass}><option value="rigorous">严谨学术型</option><option value="impatient">急躁紧迫型</option><option value="exploratory">探索质疑型</option></select></label>
+            <label className="space-y-2 text-sm"><span>门诊时间</span><select aria-label="门诊时间" value={seconds} disabled={busy} onChange={e => setSeconds(Number(e.target.value))} className={inputClass}>{[45, 60, 90].map(n => <option key={n} value={n}>{n} 秒</option>)}</select></label>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 hover:bg-ground-2 rounded-[2px] text-ink-3 hover:text-ink"
-            aria-label="关闭"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Modal 内容 */}
-        <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
-          {!synthesizedScenario ? (
-            <>
-              {/* 1. 资料包与文献 */}
-              <div className="space-y-2">
-                <span className="font-bold text-ink block text-xs">1. 选择产品资料包与文献来源</span>
-                <div className="p-3 bg-ground-2/40 border border-line rounded-[2px] flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <strong className="block text-ink font-semibold">安舒平 · ANSHU-3 临床文献与说明书 (默认)</strong>
-                    <span className="text-ink-3 text-[11px]">包含入组标准、多终点数据、亚组分析及肾功能禁忌</span>
-                  </div>
-                  <Badge variant="outline" className="text-[11px]">已挂载</Badge>
-                </div>
-              </div>
-
-              {/* 2. 真实医生情境特征配置 */}
-              <div className="space-y-2">
-                <span className="font-bold text-ink block text-xs">2. 设定真实门诊医生情境</span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1.5 p-3 bg-ground-2/30 border border-line rounded-[2px]">
-                    <span className="text-ink-3 text-[11px] block">医生性格与质询风格</span>
-                    <div className="seg w-full text-center" role="group">
-                      <button
-                        type="button"
-                        className="flex-1"
-                        aria-pressed={docStyle === 'rigorous'}
-                        onClick={() => setDocStyle('rigorous')}
-                      >
-                        严谨学术型
-                      </button>
-                      <button
-                        type="button"
-                        className="flex-1"
-                        aria-pressed={docStyle === 'impatient'}
-                        onClick={() => setDocStyle('impatient')}
-                      >
-                        急躁紧迫型
-                      </button>
-                      <button
-                        type="button"
-                        className="flex-1"
-                        aria-pressed={docStyle === 'exploratory'}
-                        onClick={() => setDocStyle('exploratory')}
-                      >
-                        探索质疑型
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5 p-3 bg-ground-2/30 border border-line rounded-[2px]">
-                    <span className="text-ink-3 text-[11px] block">门诊时间窗口压力</span>
-                    <div className="seg w-full text-center" role="group">
-                      <button
-                        type="button"
-                        className="flex-1"
-                        aria-pressed={timeWindow === 45}
-                        onClick={() => setTimeWindow(45)}
-                      >
-                        45 秒极限
-                      </button>
-                      <button
-                        type="button"
-                        className="flex-1"
-                        aria-pressed={timeWindow === 60}
-                        onClick={() => setTimeWindow(60)}
-                      >
-                        60 秒标准
-                      </button>
-                      <button
-                        type="button"
-                        className="flex-1"
-                        aria-pressed={timeWindow === 90}
-                        onClick={() => setTimeWindow(90)}
-                      >
-                        90 秒充裕
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. 注入老代表沉淀实战经验 */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-ink block text-xs">3. 融合老资历销冠沉淀经验（个体经验 → 团队竞争力）</span>
-                  <label className="flex items-center gap-1.5 cursor-pointer text-ink-2 text-[11px]">
-                    <input
-                      type="checkbox"
-                      checked={includeSeniorExperience}
-                      onChange={(e) => setIncludeSeniorExperience(e.target.checked)}
-                      className="accent-ink"
-                    />
-                    <span>启用资深代表经验库</span>
-                  </label>
-                </div>
-
-                {includeSeniorExperience && (
-                  <div className="p-3 bg-ground-2/50 border-l-2 border-held rounded-[2px] space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-ink font-semibold">
-                      <UserCheck className="w-3.5 h-3.5 text-held" />
-                      <span>李主管（大区 5 年销售冠军）实战心得注入</span>
-                    </div>
-                    <p className="text-ink-2 leading-relaxed text-[11px]">
-                      “陈主任在面对代表空谈大样本获益时极为反感，通常在第 20 秒打断；若直接回应 75 岁及 30–60 亚组数字，他会点头继续听。”
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-2">
-                <Button
-                  variant="default"
-                  size="default"
-                  onClick={handleSynthesize}
-                  disabled={isSynthesizing}
-                  className="w-full text-xs h-10 gap-2"
-                >
-                  <Brain className="w-4 h-4" />
-                  <span>{isSynthesizing ? 'AI 智能体正在合成实战演练素材...' : '立即由 AI 自动合成演练素材'}</span>
-                </Button>
-              </div>
-            </>
-          ) : (
-            /* 合成成功展示卡 */
-            <div className="space-y-4 animate-in fade-in duration-300">
-              <div className="p-3 bg-resolved-tint/50 border border-resolved/40 rounded-[2px] flex items-center gap-2 text-resolved font-medium">
-                <Check className="w-4 h-4" />
-                <span>演练素材已成功由 AI 合成，并沉淀入团队实战库！</span>
-              </div>
-
-              <div className="border border-line bg-surface p-4 rounded-[2px] space-y-3">
-                <div className="flex items-center justify-between">
-                  <strong className="text-sm font-bold text-ink">{synthesizedScenario.sceneTitle}</strong>
-                  <Badge variant="held">合成演练素材</Badge>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-ink-2 text-[11px]">
-                  <div>医生：{synthesizedScenario.doctor.name}（{synthesizedScenario.doctor.style === 'rigorous' ? '严谨学术型' : '急躁型'}）</div>
-                  <div>时间限制：{synthesizedScenario.doctor.timeConstraintSec} 秒门诊窗口</div>
-                </div>
-
-                <div className="space-y-1 border-t border-line/60 pt-2">
-                  <span className="font-semibold text-ink text-[11px] block">合成的关切核心与追问陷阱：</span>
-                  <ul className="list-disc pl-4 space-y-0.5 text-ink-3 text-[11px]">
-                    <li>第 20 秒代表若仅介绍获益，医生将前倾追问高龄人群证据</li>
-                    <li>包含 eGFR &lt; 30 禁忌症撤销追问机制，检验代表是否自主补正</li>
-                  </ul>
-                </div>
-
-                {synthesizedScenario.expertRules && synthesizedScenario.expertRules.length > 0 && (
-                  <div className="p-2.5 bg-ground-2/50 rounded-[2px] border border-line text-[11px] text-ink-2 space-y-1">
-                    <span className="font-bold text-ink block">已融合老代表实战经验：</span>
-                    <p className="text-ink-3">{synthesizedScenario.expertRules[0].goldenTactic}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-3">
-                <Button
-                  variant="quiet"
-                  size="sm"
-                  onClick={() => setSynthesizedScenario(null)}
-                  className="flex-1 text-xs"
-                >
-                  重新配置
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => onSynthesizeAndStart(synthesizedScenario)}
-                  className="flex-1 text-xs gap-1.5"
-                >
-                  <span>立即进入该场景演练</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
+          <section className="border-t border-line pt-5">
+            <div className="flex justify-between items-center gap-3"><h3 className="text-lg">团队经验</h3><Button variant="quiet" size="sm" disabled={busy || saving} onClick={() => setAdding(!adding)} className="gap-1"><Plus size={15} />录入经验</Button></div>
+            <p className="text-sm text-ink-2 mt-2">选入这次练习，或直接根据资料生成。最多选择 10 条。</p>
+            {loading ? <p className="text-sm mt-4" role="status">正在读取经验库…</p> : experiences.length === 0 ? <p className="text-sm mt-4 text-ink-2">还没有经验，录入第一条实际心得。</p> : <div className="max-h-48 overflow-y-auto mt-3 divide-y divide-line">{experiences.map(e => <label key={e.id} className="flex items-start gap-3 py-3 text-sm cursor-pointer"><input type="checkbox" className="mt-1 accent-ink" disabled={busy || (!selected.includes(e.id) && selected.length >= 10)} checked={selected.includes(e.id)} onChange={event => setSelected(ids => event.target.checked ? [...ids, e.id] : ids.filter(id => id !== e.id))} /><span><strong className="font-medium block">{e.scenarioContext}</strong><span className="block text-ink-2 mt-1">{e.goldenTactic}</span></span></label>)}</div>}
+            {adding && <div className="mt-4 space-y-3">
+              {([['scenarioContext', '适用情境', 500], ['goldenTactic', '应对经验', 1500], ['antiPatternWarning', '避免的做法（选填）', 500], ['sourceSeniorRep', '经验来源（选填）', 100]] as const).map(([key, label, max]) => <label key={key} className="block space-y-1 text-sm"><span>{label}</span><textarea className={inputClass} rows={key === 'goldenTactic' ? 3 : 1} maxLength={max} value={draft[key]} disabled={saving} onChange={e => setDraft(d => ({ ...d, [key]: e.target.value }))} /></label>)}
+              <Button size="sm" disabled={saving || !draft.scenarioContext.trim() || !draft.goldenTactic.trim()} onClick={() => void add()}>{saving ? '正在保存…' : '保存到经验库'}</Button>
+            </div>}
+          </section>
+          <Button className="w-full gap-2" disabled={busy || loading || saving} onClick={() => void generate()}><Sparkles size={16} />{busy ? 'AI 正在生成场景…' : '生成演练场景'}</Button>
+          {busy && <p role="status" className="text-sm text-ink-2">正在结合资料与所选经验编排，请稍候。</p>}
+        </div>}
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>;
+}

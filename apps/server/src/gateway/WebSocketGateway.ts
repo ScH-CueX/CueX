@@ -6,6 +6,7 @@ import type { AudioChunkPayload, BriefingResponse, ServerMessage } from '@cuex/p
 import type { AsrEngine, AsrStream, ScenarioPack } from '../contracts';
 import { DoctorLinePrefetch } from '../controller/DoctorLinePrefetch';
 import { TurnController, type ControllerEngines, type ControllerOptions } from '../controller/TurnController';
+import type { LibraryApi } from '../library/LibraryApi';
 import { correctAsrText } from '../voice/corrections';
 
 export interface SessionEngines extends ControllerEngines { asr: AsrEngine }
@@ -13,11 +14,13 @@ export interface GatewayOptions {
   port?: number;
   host?: string;
   pack: ScenarioPack;
-  createEngines: () => SessionEngines | Promise<SessionEngines>;
+  createEngines: (pack: ScenarioPack) => SessionEngines | Promise<SessionEngines>;
+  library?: LibraryApi;
   controller?: Omit<ControllerOptions, 'doctorLines'>;
-  onSessionEnd?: (snapshot: ReturnType<TurnController['snapshot']>) => void;
+  onSessionEnd?: (snapshot: ReturnType<TurnController['snapshot']>, pack: ScenarioPack) => void;
 }
 interface Connection {
+  pack: ScenarioPack;
   controller?: TurnController;
   engines?: SessionEngines;
   enginePromise: Promise<SessionEngines>;
@@ -41,12 +44,16 @@ export class WebSocketGateway {
   async start(): Promise<void> {
     if (this.http) return;
     const http = createServer((req, res) => {
+      const url = new URL(req.url ?? '/', 'http://localhost');
+      if (url.pathname.startsWith('/api/') && this.options.library) { void this.options.library.handle(req, res); return; }
       if (req.url === '/health') {
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
         res.end(JSON.stringify({ ok: true, service: 'cuex', sessions: this.inspectSessions().length }));
-      } else if (req.method === 'GET' && req.url === '/briefing') {
-        const { productName, packTitle, studyName, doctor } = this.options.pack.scenario;
-        const briefing: BriefingResponse = { productName, packTitle, studyName, doctor: { name: doctor.name, department: doctor.department, title: doctor.title }, facts: this.options.pack.facts.map(({ id, text, source }) => ({ id, text, source })) };
+      } else if (req.method === 'GET' && url.pathname === '/briefing') {
+        const pack = this.resolvePack(url.searchParams.get('scenarioId') ?? this.options.pack.scenario.id);
+        if (!pack) { res.writeHead(404); res.end('Unknown scenario'); return; }
+        const { productName, packTitle, studyName, doctor } = pack.scenario;
+        const briefing: BriefingResponse = { productName, packTitle, studyName, doctor: { name: doctor.name, department: doctor.department, title: doctor.title }, facts: pack.facts.map(({ id, text, source }) => ({ id, text, source })) };
         res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
         res.end(JSON.stringify(briefing));
       } else { res.writeHead(404); res.end('Not found'); }
@@ -54,12 +61,15 @@ export class WebSocketGateway {
     this.http = http;
     this.wss = new WebSocketServer({ server: http, path: '/ws/session', maxPayload: 1024 * 1024, perMessageDeflate: false });
     this.wss.on('error', () => { /* The HTTP listen promise reports bind failures. */ });
-    this.wss.on('connection', ws => {
-      const enginePromise = Promise.resolve().then(() => this.options.createEngines());
+    this.wss.on('connection', (ws, request) => {
+      const id = new URL(request.url ?? '/', 'http://localhost').searchParams.get('scenarioId') ?? this.options.pack.scenario.id;
+      const pack = this.resolvePack(id);
+      if (!pack) { this.error(ws, 'UNKNOWN_SCENARIO', '没有找到这个演练场景。'); ws.close(1008); return; }
+      const enginePromise = Promise.resolve().then(() => this.options.createEngines(pack));
       void enginePromise.catch(() => {});
-      const lines = new DoctorLinePrefetch(this.options.pack, () => enginePromise.then(engines => engines.system2), event => this.send(ws, event), randomUUID());
-      const connection: Connection = { generation: 0, closed: false, enginePromise, lines };
-      lines.prefetch('opening', this.options.pack.scenario.concerns[0].id);
+      const lines = new DoctorLinePrefetch(pack, () => enginePromise.then(engines => engines.system2), event => this.send(ws, event), randomUUID());
+      const connection: Connection = { pack, generation: 0, closed: false, enginePromise, lines };
+      lines.prefetch('opening', pack.scenario.concerns[0].id);
       this.connections.set(ws, connection);
       ws.on('message', (raw, binary) => {
         if (binary) { this.error(ws, 'INVALID_MESSAGE', '请使用 JSON 消息发送音频。'); return; }
@@ -77,6 +87,10 @@ export class WebSocketGateway {
     this.actualPort = (http.address() as AddressInfo).port;
   }
 
+  private resolvePack(id: string): ScenarioPack | undefined {
+    return this.options.library?.store.pack(id) ?? (id === this.options.pack.scenario.id ? this.options.pack : undefined);
+  }
+
   private async handle(ws: WebSocket, connection: Connection, message: unknown): Promise<void> {
     if (!isRecord(message) || typeof message.type !== 'string') { this.error(ws, 'INVALID_MESSAGE', '消息格式错误。'); return; }
     if (message.type === 'ping') return; // LiveWSDriver application heartbeat.
@@ -85,12 +99,12 @@ export class WebSocketGateway {
     const payload = message.payload;
     if (!isRecord(payload)) { this.error(ws, 'INVALID_MESSAGE', '消息缺少 payload。'); return; }
     if (message.type === 'session.start') {
-      if (payload.scenarioId !== this.options.pack.scenario.id) { this.error(ws, 'UNKNOWN_SCENARIO', '没有找到这个演练场景。'); return; }
+      if (payload.scenarioId !== connection.pack.scenario.id) { this.error(ws, 'UNKNOWN_SCENARIO', '没有找到这个演练场景。'); return; }
       if (payload.mode !== 'performance' && payload.mode !== 'learning') { this.error(ws, 'INVALID_MESSAGE', '请选择有效的演练模式。'); return; }
       let retryConcernId: string | undefined;
       const retry = payload.retry;
       if (retry !== undefined) {
-        if (!isRecord(retry) || typeof retry.concernId !== 'string' || !this.options.pack.scenario.concerns.some(concern => concern.id === retry.concernId)) {
+        if (!isRecord(retry) || typeof retry.concernId !== 'string' || !connection.pack.scenario.concerns.some(concern => concern.id === retry.concernId)) {
           this.error(ws, 'INVALID_MESSAGE', '重试关切不存在。'); return;
         }
         retryConcernId = retry.concernId;
@@ -102,8 +116,8 @@ export class WebSocketGateway {
       const sessionId = randomUUID();
       connection.engines = engines;
       connection.lines.setSession(sessionId);
-      connection.controller = new TurnController(sessionId, this.options.pack, engines, event => this.send(ws, event), { ...this.options.controller, retryConcernId, doctorLines: connection.lines });
-      this.send(ws, { type: 'session.ready', payload: { sessionId, serverTime: Date.now(), scenario: this.options.pack.scenario } });
+      connection.controller = new TurnController(sessionId, connection.pack, engines, event => this.send(ws, event), { ...this.options.controller, retryConcernId, doctorLines: connection.lines });
+      this.send(ws, { type: 'session.ready', payload: { sessionId, serverTime: Date.now(), scenario: connection.pack.scenario } });
       connection.controller.start();
       return;
     }
@@ -133,8 +147,8 @@ export class WebSocketGateway {
         const controller = connection.controller;
         connection.sampleRate = audio.sampleRate;
         connection.asrOpening = connection.engines.asr.open({ sampleRate: audio.sampleRate }, {
-          onPartial: text => { if (generation === connection.generation && !connection.closed) controller.onAsrTranscript(correctAsrText(text, this.options.pack.asrCorrections), false); },
-          onFinal: text => { if (generation === connection.generation && !connection.closed) controller.onAsrTranscript(correctAsrText(text, this.options.pack.asrCorrections), true); },
+          onPartial: text => { if (generation === connection.generation && !connection.closed) controller.onAsrTranscript(correctAsrText(text, connection.pack.asrCorrections), false); },
+          onFinal: text => { if (generation === connection.generation && !connection.closed) controller.onAsrTranscript(correctAsrText(text, connection.pack.asrCorrections), true); },
           onError: () => { if (generation === connection.generation && !connection.closed) this.error(ws, 'ASR_ERROR', '语音识别暂时不可用，请重试。'); },
         }).then(stream => {
           if (generation !== connection.generation || connection.closed) { stream.end(); return stream; }
@@ -161,13 +175,13 @@ export class WebSocketGateway {
     connection.generation++;
     if (connection.controller) {
       const snapshot = connection.controller.snapshot();
-      this.options.onSessionEnd?.(snapshot);
+      this.options.onSessionEnd?.(snapshot, connection.pack);
       connection.controller.stop();
       if (!connection.closed) {
-        connection.lines.prefetch('opening', this.options.pack.scenario.concerns[0].id);
+        connection.lines.prefetch('opening', connection.pack.scenario.concerns[0].id);
         const retryConcerns = new Set(snapshot.candidates.filter(candidate => candidate.fate).map(candidate => candidate.targetConcernId));
         for (const concernId of snapshot.completed ? [] : retryConcerns) {
-          const missed = this.options.pack.scenario.concerns.find(concern => concern.id === concernId)!.points.filter(point => !snapshot.resolvedPointIds.includes(point.id)).map(point => point.id);
+          const missed = connection.pack.scenario.concerns.find(concern => concern.id === concernId)!.points.filter(point => !snapshot.resolvedPointIds.includes(point.id)).map(point => point.id);
           connection.lines.refresh('retry', concernId, snapshot.history, missed);
         }
       }

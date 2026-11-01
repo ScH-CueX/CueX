@@ -16,6 +16,7 @@ export default defineConfig({
     watch: { ignored: ['**/assets/captures/**', '**/assets/qa/**', '**/assets/audio/**', '**/assets/captions/**'] },
     // Dev proxy to apps/server, so LiveWSDriver's same-host /ws/session URL reaches the backend.
     proxy: {
+      '/api': { target: process.env.CUEX_SERVER_ORIGIN ?? 'http://127.0.0.1:8765' },
       '/ws': { target: process.env.CUEX_SERVER_ORIGIN ?? 'http://127.0.0.1:8765', ws: true },
       '/health': { target: process.env.CUEX_SERVER_ORIGIN ?? 'http://127.0.0.1:8765' },
       '/briefing': { target: process.env.CUEX_SERVER_ORIGIN ?? 'http://127.0.0.1:8765' },
