@@ -34,7 +34,7 @@ export function StageView() {
   const [retryConcern, setRetryConcern] = useState<string>();
   const micStarted = useRef(false);
 
-  useEffect(() => { document.title = 'CueX'; }, []);
+  useEffect(() => { document.title = 'CueX｜医药代表临场应对训练'; }, []);
 
   // The socket opens when the page loads, so the server can write the doctor's opening while the audience reads the start screen.
   useEffect(() => { live.open(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
