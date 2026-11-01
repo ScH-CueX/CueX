@@ -105,3 +105,99 @@ test('two scene connections keep their own engine pack and reject a mismatched s
     assert.equal(f.gateway.inspectSessions().length, 2);
   } finally { sockets.forEach(ws => ws.terminate()); await f.gateway.stop(); rmSync(f.dir, { recursive: true }); }
 });
+
+
+test('malformed HTTP targets return 400 without dropping a live session', async () => {
+  const { request } = await import('node:http');
+  const f = fixture(generator); await f.gateway.start();
+  const ws = new WebSocket(`ws://127.0.0.1:${f.gateway.port}/ws/session`);
+  const messages: any[] = []; ws.on('message', raw => messages.push(JSON.parse(raw.toString())));
+  const waitFor = async (predicate: () => boolean) => {
+    for (let n = 0; n < 200 && !predicate(); n++) await new Promise(r => setTimeout(r, 10));
+    assert.ok(predicate());
+  };
+  try {
+    await new Promise<void>(resolve => ws.once('open', resolve));
+    ws.send(JSON.stringify({ type: 'session.start', payload: { scenarioId: ANSHU_PACK.scenario.id, mode: 'performance' } }));
+    await waitFor(() => messages.some(m => m.type === 'session.ready'));
+    const ready = messages.find(m => m.type === 'session.ready');
+    const status = await new Promise<number | undefined>((resolve, reject) => {
+      const req = request({ host: '127.0.0.1', port: f.gateway.port, path: '//%', method: 'GET' }, res => { res.resume(); resolve(res.statusCode); });
+      req.on('error', reject); req.end();
+    });
+    assert.equal(status, 400);
+    assert.equal((await fetch(`http://127.0.0.1:${f.gateway.port}/health`)).status, 200);
+    assert.equal(f.gateway.inspectSessions()[0]?.sessionId, ready.payload.sessionId);
+    ws.send(JSON.stringify({ type: 'session.stop', payload: { sessionId: ready.payload.sessionId } }));
+    await waitFor(() => f.ended.length === 1);
+    assert.equal(ws.readyState, WebSocket.OPEN);
+  } finally { ws.terminate(); await f.gateway.stop(); rmSync(f.dir, { recursive: true }); }
+});
+
+test('synthesis rejects a duration used as a dose but accepts the selected time in seconds', async t => {
+  const { Agent } = await import('@earendil-works/pi-agent-core');
+  const { ScenarioSynthesizer } = await import('../src/library/ScenarioSynthesizer');
+  const savedEnv = { ...process.env };
+  process.env.CUEX_S2_BASE_URL = 'http://127.0.0.1:1'; process.env.CUEX_S2_API_KEY = 'test';
+  process.env.PRIME_MODELS_JSON = '/tmp/cuex-review-no-models.json';
+  let opening = '75 岁以上患者从每日 45 mg 起始。';
+  let doctorNote = '这次交流只有 45 秒。';
+  t.mock.method(Agent.prototype, 'prompt', async function(this: InstanceType<typeof Agent>) {
+    await this.state.tools[0].execute('test', {
+      sceneTitle: '45 秒门诊交流', doctorNote, concernIds: ['concern-scope'],
+      opening, closing: '谢谢，资料留下，我再核对。', retries: [{ concernId: 'concern-scope', text: '先核对高龄患者的研究结果。' }],
+    }, new AbortController().signal);
+  });
+  const f = fixture(new ScenarioSynthesizer()); await f.gateway.start();
+  try {
+    const url = `http://127.0.0.1:${f.gateway.port}/api/scenarios`;
+    assert.equal((await post(url, input)).status, 503);
+    assert.equal(f.store.scenarios().length, 1);
+    opening = '我只有 45 秒，先说高龄患者的证据。';
+    doctorNote = '高龄患者从每日 45 mg 起始。';
+    assert.equal((await post(url, input)).status, 503);
+    assert.equal(f.store.scenarios().length, 1);
+    doctorNote = '这次交流只有 45 秒。';
+    const response = await post(url, input); assert.equal(response.status, 201);
+    const saved = await response.json() as { id: string };
+    const pack = new LibraryStore(f.dir, ANSHU_PACK).pack(saved.id)!;
+    assert.equal(pack.scenario.sceneTitle, '45 秒门诊交流');
+    assert.equal(pack.scenario.doctor.note, '这次交流只有 45 秒。');
+    assert.deepEqual(pack.lineExamples.opening, [opening]);
+  } finally {
+    for (const key of Object.keys(process.env)) if (!(key in savedEnv)) delete process.env[key];
+    Object.assign(process.env, savedEnv);
+    await f.gateway.stop(); rmSync(f.dir, { recursive: true });
+  }
+});
+
+test('selected experience, style and time reach normal dialogue and the visit outcome', async () => {
+  const { createModels, fauxProvider, fauxAssistantMessage, fauxToolCall } = await import('@earendil-works/pi-ai');
+  const { PiSystemTwo } = await import('../src/system2/PiSystemTwo');
+  const { createDoctorStore } = await import('../src/system2/doctors');
+  const faux = fauxProvider(); const models = createModels(); models.setProvider(faux.provider); const model = faux.getModel();
+  const runtime = { models, model, providerId: model.provider, modelId: model.id, api: model.api, baseUrl: 'faux://local', backend: 'faux-library', redact: (s: string) => s, listModelIds: () => [model.id] };
+  const contexts: string[] = [];
+  const rule = '先询问医生希望核对哪一份原始资料';
+  const pack = structuredClone(ANSHU_PACK); pack.scenario.id = 'synth-dialogue'; pack.scenario.doctor.id = 'dr-synth-dialogue';
+  pack.scenario.doctor.style = 'impatient'; pack.scenario.doctor.timeConstraintSec = 45; pack.scenario.doctor.note = '按资料沟通。';
+  pack.scenario.expertRules = [{ id: 'exp-dialogue', sourceSeniorRep: '团队', scenarioContext: '核对资料时', goldenTactic: rule, antiPatternWarning: '' }];
+  const dir = mkdtempSync(join(tmpdir(), 'cuex-library-dialogue-'));
+  try {
+    const store = new LibraryStore(dir, ANSHU_PACK); store.addScenario(pack);
+    const savedPack = new LibraryStore(dir, ANSHU_PACK).pack(pack.scenario.id)!;
+    const system2 = new PiSystemTwo({ runtime, doctors: createDoctorStore(join(dir, 'doctors')) });
+    faux.setResponses([
+      context => { contexts.push(JSON.stringify(context)); return fauxAssistantMessage([fauxToolCall('submit_turn', { text: '先看研究原表吧。', action: 'reply', basis: '先核对原始证据。', assessments: [], spokenFactIds: [] })], { stopReason: 'toolUse' }); },
+      context => { contexts.push(JSON.stringify(context)); return fauxAssistantMessage([fauxToolCall('submit_outcome', { stance: 'needs_evidence', doctorResponse: '我还需要核对亚组原表。', rationale: '当前证据不足。', strengths: [], gaps: [{ explanation: '需要亚组原表。' }], nextStep: '请补充亚组原表。', factIds: [] })], { stopReason: 'toolUse' }); },
+    ]);
+    const history = [{ who: 'rep' as const, text: '您想先核对哪份资料？' }];
+    const common = { sessionId: 'dialogue', pack: savedPack, history, resolvedPointIds: [], signal: new AbortController().signal };
+    const reply = await system2.prepareTurn({ ...common, concernId: 'concern-scope', repSpeech: history[0].text, trigger: 'turn_end', silenceStage: 0 });
+    assert.equal(reply.text, '先看研究原表吧。');
+    const outcome = await system2.prepareOutcome({ ...common, endReason: 'user_requested' });
+    assert.equal(outcome.stance, 'needs_evidence');
+    assert.equal(contexts.length, 2);
+    for (const context of contexts) { assert.ok(context.includes(rule)); assert.ok(context.includes('时间紧')); assert.ok(context.includes('45')); }
+  } finally { rmSync(dir, { recursive: true }); }
+});

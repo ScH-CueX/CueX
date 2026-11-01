@@ -28,6 +28,7 @@ export function ScenarioSynthesizerModal({ isOpen, onClose, onSynthesizeAndStart
     return () => { active = false; abort.current?.abort(); };
   }, [isOpen]);
   const add = async () => {
+    if (loading || saving) return;
     setSaving(true); setError('');
     try { const entry = await saveExperience(draft); setExperiences(rows => [...rows, entry]); setSelected(ids => [...ids, entry.id].slice(-10)); setDraft(emptyExperience); setAdding(false); }
     catch (e) { setError(e instanceof Error ? e.message : '保存失败，请重试。'); }
@@ -61,12 +62,12 @@ export function ScenarioSynthesizerModal({ isOpen, onClose, onSynthesizeAndStart
             <label className="space-y-2 text-sm"><span>门诊时间</span><select aria-label="门诊时间" value={seconds} disabled={busy} onChange={e => setSeconds(Number(e.target.value))} className={inputClass}>{[45, 60, 90].map(n => <option key={n} value={n}>{n} 秒</option>)}</select></label>
           </div>
           <section className="border-t border-line pt-5">
-            <div className="flex justify-between items-center gap-3"><h3 className="text-lg">团队经验</h3><Button variant="quiet" size="sm" disabled={busy || saving} onClick={() => setAdding(!adding)} className="gap-1"><Plus size={15} />录入经验</Button></div>
+            <div className="flex justify-between items-center gap-3"><h3 className="text-lg">团队经验</h3><Button variant="quiet" size="sm" disabled={busy || loading || saving} onClick={() => setAdding(!adding)} className="gap-1"><Plus size={15} />录入经验</Button></div>
             <p className="text-sm text-ink-2 mt-2">选入这次练习，或直接根据资料生成。最多选择 10 条。</p>
             {loading ? <p className="text-sm mt-4" role="status">正在读取经验库…</p> : experiences.length === 0 ? <p className="text-sm mt-4 text-ink-2">还没有经验，录入第一条实际心得。</p> : <div className="max-h-48 overflow-y-auto mt-3 divide-y divide-line">{experiences.map(e => <label key={e.id} className="flex items-start gap-3 py-3 text-sm cursor-pointer"><input type="checkbox" className="mt-1 accent-ink" disabled={busy || (!selected.includes(e.id) && selected.length >= 10)} checked={selected.includes(e.id)} onChange={event => setSelected(ids => event.target.checked ? [...ids, e.id] : ids.filter(id => id !== e.id))} /><span><strong className="font-medium block">{e.scenarioContext}</strong><span className="block text-ink-2 mt-1">{e.goldenTactic}</span></span></label>)}</div>}
             {adding && <div className="mt-4 space-y-3">
               {([['scenarioContext', '适用情境', 500], ['goldenTactic', '应对经验', 1500], ['antiPatternWarning', '避免的做法（选填）', 500], ['sourceSeniorRep', '经验来源（选填）', 100]] as const).map(([key, label, max]) => <label key={key} className="block space-y-1 text-sm"><span>{label}</span><textarea className={inputClass} rows={key === 'goldenTactic' ? 3 : 1} maxLength={max} value={draft[key]} disabled={saving} onChange={e => setDraft(d => ({ ...d, [key]: e.target.value }))} /></label>)}
-              <Button size="sm" disabled={saving || !draft.scenarioContext.trim() || !draft.goldenTactic.trim()} onClick={() => void add()}>{saving ? '正在保存…' : '保存到经验库'}</Button>
+              <Button size="sm" disabled={loading || saving || !draft.scenarioContext.trim() || !draft.goldenTactic.trim()} onClick={() => void add()}>{saving ? '正在保存…' : '保存到经验库'}</Button>
             </div>}
           </section>
           <Button className="w-full gap-2" disabled={busy || loading || saving} onClick={() => void generate()}><Sparkles size={16} />{busy ? 'AI 正在生成场景…' : '生成演练场景'}</Button>

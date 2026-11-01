@@ -52,8 +52,11 @@ export class ScenarioSynthesizer implements ScenarioGenerator {
       retry[concern.id] = [shortText(line?.text, '重练问题', 80)];
       concern.nextConcernId = concerns[i + 1]?.id;
     }
-    const allowedNumbers = new Set(numbersIn(base.facts.map(f => f.text).join('\n') + input.timeConstraintSec));
-    if (numbersIn([sceneTitle, note, opening, closing, ...Object.values(retry).flat()].join('\n')).some(n => !allowedNumbers.has(n))) throw new Error('场景包含资料外的数值，请重新生成。');
+    const allowedNumbers = new Set(numbersIn(base.facts.map(f => f.text).join('\n')));
+    // A selected duration is context, not a new allowed dose or clinical figure.
+    const generatedText = [sceneTitle, note, opening, closing, ...Object.values(retry).flat()].join('\n')
+      .replace(/\d+(?:\.\d+)?\s*秒/g, duration => Number(duration.replace(/\s*秒$/, '')) === input.timeConstraintSec ? '' : duration);
+    if (numbersIn(generatedText).some(n => !allowedNumbers.has(n))) throw new Error('场景包含资料外的数值，请重新生成。');
     const id = `synth-${randomUUID()}`;
     return { ...structuredClone(base), facts: structuredClone(base.facts), asrCorrections: base.asrCorrections,
       scenario: { ...structuredClone(base.scenario), id, sceneTitle, concerns,

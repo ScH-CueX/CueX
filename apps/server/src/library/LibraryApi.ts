@@ -7,7 +7,9 @@ export class LibraryApi {
   private generating = 0;
   constructor(readonly store: LibraryStore, private readonly generator: ScenarioGenerator = new ScenarioSynthesizer()) {}
   async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const route = new URL(req.url ?? '/', 'http://localhost').pathname;
+    let route: string;
+    try { route = new URL(req.url ?? '/', 'http://localhost').pathname; }
+    catch { json(res, 400, { error: '请求地址无效。' }); return; }
     if (!['/api/experiences', '/api/scenarios'].includes(route)) { json(res, 404, { error: '接口不存在。' }); return; }
     if (req.method === 'GET') { json(res, 200, route === '/api/experiences' ? this.store.experiences() : this.store.scenarios()); return; }
     if (req.method !== 'POST') { json(res, 405, { error: '请求方法不支持。' }); return; }

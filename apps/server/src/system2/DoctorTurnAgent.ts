@@ -10,6 +10,7 @@ import type { DoctorStore } from './doctors';
 import { memoryBullets } from './doctors';
 import { DISMISSIVE, EARLIER_VISIT } from './linePrompt';
 import { numbersIn } from './numbers';
+import { communicationContext } from './prompt';
 import { abortError, runAgentGuarded } from './run';
 import { ensureEnding, stripFiller } from './spoken';
 
@@ -93,6 +94,7 @@ export class DoctorTurnAgent {
       `你是${doctor.name}，${doctor.department}${doctor.title}，正在听医药代表介绍${req.pack.scenario.productName}。${doctor.note}`,
       `人物与口吻提示：${record.profile.slice(0, 1000)}`,
       `近来印象（仅作口吻提示）：${memoryBullets(record.memory).slice(-3).join('；').slice(0, 400)}`,
+      ...communicationContext(req.pack),
       '你是有临床判断的医生。解释你为什么关心某类患者，回应可信证据，指出矛盾，回答代表的问题。不要只机械追问，也不要替代表演讲。',
       '可以运用医学常识解释临床顾虑、回答一般医学问题。安舒平、ANSHU-3 的具体数据与结论，以及明确归属于该药说明书的建议，按资料包核对；不能把一般医学知识写成这款药或这项研究已经证明的事实。人物档案和印象只影响口吻。眼前是首次拜访，不能说上次。',
       '高龄、肾功能不好只说明门诊人群；不能虚构某一位患者、年龄、eGFR、合并症、疗效或用药经验。不能从亚组结果推断具体患者效果或承诺处方、采用。',

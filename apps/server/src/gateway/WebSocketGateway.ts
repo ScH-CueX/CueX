@@ -44,7 +44,9 @@ export class WebSocketGateway {
   async start(): Promise<void> {
     if (this.http) return;
     const http = createServer((req, res) => {
-      const url = new URL(req.url ?? '/', 'http://localhost');
+      let url: URL;
+      try { url = new URL(req.url ?? '/', 'http://localhost'); }
+      catch { res.writeHead(400); res.end('Bad request'); return; }
       if (url.pathname.startsWith('/api/') && this.options.library) { void this.options.library.handle(req, res); return; }
       if (req.url === '/health') {
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
@@ -62,7 +64,10 @@ export class WebSocketGateway {
     this.wss = new WebSocketServer({ server: http, path: '/ws/session', maxPayload: 1024 * 1024, perMessageDeflate: false });
     this.wss.on('error', () => { /* The HTTP listen promise reports bind failures. */ });
     this.wss.on('connection', (ws, request) => {
-      const id = new URL(request.url ?? '/', 'http://localhost').searchParams.get('scenarioId') ?? this.options.pack.scenario.id;
+      let url: URL;
+      try { url = new URL(request.url ?? '/', 'http://localhost'); }
+      catch { this.error(ws, 'INVALID_MESSAGE', '请求地址无效。'); ws.close(1008); return; }
+      const id = url.searchParams.get('scenarioId') ?? this.options.pack.scenario.id;
       const pack = this.resolvePack(id);
       if (!pack) { this.error(ws, 'UNKNOWN_SCENARIO', '没有找到这个演练场景。'); ws.close(1008); return; }
       const enginePromise = Promise.resolve().then(() => this.options.createEngines(pack));
