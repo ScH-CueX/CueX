@@ -695,3 +695,68 @@ test('a long current pitch can prepare after two drift revisions without thirty-
     assert.equal(h.events.slice(last).filter(isPhase('retrieving')).length, 0, 'revised responding evidence clears the old drift');
   } finally { await h.close(); }
 });
+
+
+test('an ASR tail 137 ms after final retries a pending dose question once and early stop cancels recovery', async () => {
+  let callbacks!: import('../src/contracts').AsrCallbacks;
+  let attempts = 0;
+  const system2 = new FakeSystemTwo(10);
+  system2.prepareDoctorLine = async req => req.kind === 'closing' ? '今天的问题说清楚了，资料留下。' : req.concernId === 'concern-dose' ? '高龄患者起始剂量要调整吗？' : '先说患者范围。';
+  const silent = new SilentTts();
+  const h = await setup({ createEngines: () => ({ system1: new FakeSystemOne(), system2, asr: { backend: 'controlled-asr', async open(_opts, cb) { callbacks = cb; return { write() {}, end() {} }; } }, tts: { backend: 'slow-transition', async *synthesize(text, signal) { if (text.includes('高龄患者起始剂量')) { attempts++; await new Promise<void>(resolve => setTimeout(resolve, 250)); } if (!signal.aborted) yield* silent.synthesize(text, signal); } } }) });
+  try {
+    h.send('audio.chunk', { format: 'pcm16', sampleRate: 16000, channels: 1, data: Buffer.alloc(4).toString('base64'), timestamp: Date.now() });
+    while (!callbacks) await new Promise<void>(resolve => setImmediate(resolve));
+    const from = h.events.length;
+    callbacks.onFinal('75岁以上约占11%，eGFR30到60有412人，eGFR低于30被排除，没有证据。');
+    await h.waitFor(e => e.type === 'controller.dispatch' && e.payload.action.textToSpeak === '高龄患者起始剂量要调整吗？', from);
+    await new Promise<void>(resolve => setTimeout(resolve, 137));
+    callbacks.onPartial('明');
+    callbacks.onFinal('明书不建议使用。');
+    await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.text === '高龄患者起始剂量要调整吗？' && e.payload.isFinal, from);
+    assert.equal(attempts, 2, 'one initial request plus one quiet-tail retry');
+    assert.equal(h.gateway.inspectSessions()[0].history.filter(turn => turn.who === 'doctor' && turn.text === '高龄患者起始剂量要调整吗？').length, 1);
+    // A fresh visit is stopped while the same transition waits: no retry or doctor history leaks out.
+    const next = h.events.length;
+    h.send('session.start', { scenarioId: ANSHU_PACK.scenario.id, mode: 'performance' });
+    const nextReady = await h.waitFor(e => e.type === 'session.ready', next);
+    assert(nextReady.type === 'session.ready');
+    await h.waitFor(e => e.type === 'controller.dispatch' && e.payload.sessionId === nextReady.payload.sessionId && e.payload.pose === 'listening', next);
+    const previousCallbacks = callbacks;
+    h.send('audio.chunk', { format: 'pcm16', sampleRate: 16000, channels: 1, data: Buffer.alloc(4).toString('base64'), timestamp: Date.now() });
+    while (callbacks === previousCallbacks) await new Promise<void>(resolve => setImmediate(resolve));
+    callbacks.onFinal('75岁以上约占11%，eGFR30到60有412人，eGFR低于30被排除，没有证据。');
+    await h.waitFor(e => e.type === 'controller.dispatch' && e.payload.action.textToSpeak === '高龄患者起始剂量要调整吗？', next);
+    await new Promise<void>(resolve => setTimeout(resolve, 137));
+    callbacks.onPartial('明');
+    h.send('session.stop', { sessionId: 'current' });
+    h.send('speech.delta', { text: '先停。', isFinal: true });
+    await h.waitFor(e => e.type === 'session.error' && e.payload.code === 'SESSION_NOT_STARTED', next);
+    await new Promise<void>(resolve => setTimeout(resolve, 1000));
+    assert.equal(h.events.slice(next).filter(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.text === '高龄患者起始剂量要调整吗？').length, 0);
+  } finally { await h.close(); }
+});
+
+
+test('a tail during slow closing synthesis does not start a duplicate closing request', async () => {
+  let callbacks!: import('../src/contracts').AsrCallbacks;
+  let closingRequests = 0;
+  const silent = new SilentTts();
+  const system2 = new FakeSystemTwo(10);
+  system2.prepareDoctorLine = async req => req.kind === 'closing' ? '今天的问题说清楚了，资料留下。' : '先确认高龄起始剂量。';
+  const h = await setup({ createEngines: () => ({ system1: new FakeSystemOne(), system2, asr: { backend: 'controlled-asr', async open(_opts, cb) { callbacks = cb; return { write() {}, end() {} }; } }, tts: { backend: 'slow-closing', async *synthesize(text, signal) { if (text.startsWith('今天的问题')) { closingRequests++; await new Promise<void>(resolve => setTimeout(resolve, 1000)); } if (!signal.aborted) yield* silent.synthesize(text, signal); } } }) }, true, 'concern-dose');
+  try {
+    h.send('audio.chunk', { format: 'pcm16', sampleRate: 16000, channels: 1, data: Buffer.alloc(4).toString('base64'), timestamp: Date.now() });
+    while (!callbacks) await new Promise<void>(resolve => setImmediate(resolve));
+    const from = h.events.length;
+    callbacks.onFinal('高龄起始剂量需要调整，应核对说明书。');
+    await h.waitFor(e => e.type === 'controller.dispatch' && e.payload.action.textToSpeak === '今天的问题说清楚了，资料留下。', from);
+    await new Promise<void>(resolve => setTimeout(resolve, 137));
+    callbacks.onPartial('明');
+    callbacks.onFinal('明书上的用法。');
+    await h.waitFor(e => e.type === 'asr.transcript' && e.payload.speaker === 'doctor' && e.payload.text === '今天的问题说清楚了，资料留下。' && e.payload.isFinal, from);
+    assert.equal(closingRequests, 1, 'the quiet timer must not replace an active closing synth');
+    assert.equal(h.events.slice(from).filter(e => e.type === 'tts.abort').length, 0);
+    assert.equal(h.gateway.inspectSessions()[0].history.filter(turn => turn.who === 'doctor' && turn.text === '今天的问题说清楚了，资料留下。').length, 1);
+  } finally { await h.close(); }
+});

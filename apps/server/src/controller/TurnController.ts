@@ -57,6 +57,8 @@ export class TurnController {
   private drift?: { since: number; revision: number; observations: number };
   private lastInterruptAt = 0;
   private speech?: SpeechOutput;
+  private pendingLine?: { text: string; kind: 'retry' | 'closing'; concernId: string; attempts: number; expiresAt: number };
+  private pendingLineTimer?: ReturnType<typeof setTimeout>;
   private readonly outputs = new Map<string, SpeechOutput>();
 
   constructor(
@@ -85,11 +87,28 @@ export class TurnController {
   private async speakLine(kind: 'opening' | 'retry' | 'closing', concernId?: string): Promise<void> {
     const revision = this.revision;
     const line = await this.lines.take(kind, concernId, this.actualHistory());
-    if (!this.stopped && revision === this.revision) {
-      await this.speak(line, 'speaking', undefined, kind, !this.history.some(turn => turn.who === 'doctor'));
-      if (kind === 'closing' && !this.stopped) this.prefetchNextVisit();
-    }
+    if (this.stopped) return;
+    const isOpening = !this.history.some(turn => turn.who === 'doctor');
+    if (!isOpening && (kind === 'retry' || kind === 'closing')) {
+      this.pendingLine = { text: line, kind, concernId: concernId ?? this.concern.id, attempts: 0, expiresAt: Date.now() + 6000 };
+      if (revision !== this.revision) { this.schedulePendingLine(); return; }
+    } else if (revision !== this.revision) return;
+    await this.speak(line, 'speaking', undefined, kind, isOpening);
+    if (kind === 'closing' && !this.stopped && !this.pendingLine) this.prefetchNextVisit();
   }
+  private schedulePendingLine(): void {
+    clearTimeout(this.pendingLineTimer);
+    const pending = this.pendingLine;
+    if (!pending || this.stopped || pending.attempts >= 2 || Date.now() >= pending.expiresAt || pending.concernId !== this.concern.id || (pending.kind !== 'closing' && this.unresolved.length === 0)) { this.pendingLine = undefined; return; }
+    this.pendingLineTimer = setTimeout(() => {
+      this.pendingLineTimer = undefined;
+      if (this.stopped || this.pendingLine !== pending || Date.now() >= pending.expiresAt || pending.concernId !== this.concern.id || (pending.kind !== 'closing' && this.unresolved.length === 0)) { this.pendingLine = undefined; return; }
+      if (this.speech && !this.speech.abort.signal.aborted && this.speech.lineKind === pending.kind && !this.speech.text) return;
+      pending.attempts++;
+      void this.speak(pending.text, 'speaking', undefined, pending.kind);
+    }, Math.min(700, Math.max(0, pending.expiresAt - Date.now())));
+  }
+
   private prefetchNextVisit(): void {
     const history = this.actualHistory();
     this.lines.prefetch('opening', this.pack.scenario.concerns[0].id);
@@ -138,7 +157,9 @@ export class TurnController {
   }
 
   private acceptTranscript(text: string, isFinal: boolean, recent: string): void {
-    if (this.stopped || this.completed || (!text.trim() && !isFinal)) return;
+    if (this.stopped || (!text.trim() && !isFinal)) return;
+    if (this.pendingLine && !this.speech?.text) this.schedulePendingLine();
+    if (this.completed) return;
     if (this.speech && (this.speech.text || !this.held)) this.interruptDoctor();
     const previous = this.sentence;
     const extendsEvidence = (evidence: string) => this.normalizeSpeech(text).startsWith(this.normalizeSpeech(evidence));
@@ -359,6 +380,7 @@ export class TurnController {
   }
 
   private advanceConcern(): void {
+    this.pendingLine = undefined; clearTimeout(this.pendingLineTimer);
     if (this.held) this.withdrawCandidate('concern_changed');
     const nextIndex = this.pack.scenario.concerns.findIndex(c => c.id === this.concern.nextConcernId);
     if (nextIndex < 0) {
@@ -446,6 +468,7 @@ export class TurnController {
             } catch { speech.audioDurationMs += segment.length / 4 * 1000; }
             if (speech.abort.signal.aborted || this.stopped) return;
           }
+          if (lineKind && this.pendingLine?.text === text) { this.pendingLine = undefined; clearTimeout(this.pendingLineTimer); }
           speech.chunks.push(sent ? '' : segment);
           this.emit({ type: 'tts.stream_chunk', payload: { sessionId: this.sessionId, utteranceId: speech.utteranceId, chunkIndex: chunkIndex++, isLastChunk: false, audioBase64: chunk.audio.toString('base64') } });
           if (!sent) {
@@ -483,6 +506,7 @@ export class TurnController {
     if (!speech) return;
     this.speech = undefined;
     speech.abort.abort();
+    if (reason === 'user_interrupted' && !speech.text && this.pendingLine && speech.lineKind === this.pendingLine.kind) this.schedulePendingLine();
     this.emit({ type: 'tts.abort', payload: { sessionId: this.sessionId, utteranceId: speech.utteranceId, reason, timestamp: Date.now() } });
     this.doctorTranscript(speech, '', true);
     this.dispatch('listening', { type: 'idle' });
@@ -527,7 +551,7 @@ export class TurnController {
     if (this.stopped) return;
     this.interruptDoctor('turn_switched');
     this.stopped = true;
-    clearTimeout(this.evaluationTimer); clearTimeout(this.candidateTimer);
+    clearTimeout(this.evaluationTimer); clearTimeout(this.candidateTimer); clearTimeout(this.pendingLineTimer); this.pendingLine = undefined;
     this.evaluationAbort?.abort(); this.held?.abort.abort(); this.held = undefined;
     for (const output of this.outputs.values()) clearTimeout(output.fallbackTimer);
   }
