@@ -7,12 +7,13 @@ import type { DoctorTurnDraft, DoctorTurnRequest, SystemTwo, TtsEngine, DoctorOu
 import { WebSocketGateway } from '../src/gateway/WebSocketGateway';
 import { ANSHU_PACK } from '../src/scenario/anshu';
 import { FakeSystemOne, SilentTts, TextOnlyAsr } from '../src/fakes/engines';
+import { readConfig } from '../src/config';
 
 const reply = (text: string, extra: Partial<DoctorTurnDraft> = {}): DoctorTurnDraft => ({ text, action: 'reply', resolvedPointIds: [], contradictedPointIds: [], basis: 'grounded turn assessment', ...extra });
-async function session(prepare: (req: DoctorTurnRequest) => Promise<DoctorTurnDraft> | DoctorTurnDraft, tts: TtsEngine = new SilentTts(), options: { outcome?: (req: DoctorOutcomeRequest) => Promise<VisitOutcome>; retryConcernId?: string; outcomeTimeoutMs?: number; playbackAckGraceMs?: number } = {}) {
+async function session(prepare: (req: DoctorTurnRequest) => Promise<DoctorTurnDraft> | DoctorTurnDraft, tts: TtsEngine = new SilentTts(), options: { outcome?: (req: DoctorOutcomeRequest) => Promise<VisitOutcome>; retryConcernId?: string; outcomeTimeoutMs?: number; playbackAckGraceMs?: number; turnTimeoutMs?: number } = {}) {
   const requests: DoctorTurnRequest[] = [];
   const system2: SystemTwo = { backend: 'prepared-turns', prepareOutcome: options.outcome, async prepareFollowup() { return { text: '尚未回应的患者呢？', basis: '持续偏离', triggerCondition: '仍偏离', targetPointIds: ['c1'] }; }, async prepareTurn(req) { requests.push(req); return prepare(req); } };
-  const gateway = new WebSocketGateway({ port: 0, pack: ANSHU_PACK, createEngines: () => ({ system1: new FakeSystemOne(), system2, asr: new TextOnlyAsr(), tts }), controller: { debounceMs: 1, minDriftMs: 900, minDriftChars: 35, finalQuietMs: 25, partialQuietMs: 45, idleFirstMs: 45, idleSecondMs: 60, idleCloseMs: 80, turnTimeoutMs: 100, outcomeTimeoutMs: options.outcomeTimeoutMs ?? 100, playbackAckGraceMs: options.playbackAckGraceMs ?? 15000 } });
+  const gateway = new WebSocketGateway({ port: 0, pack: ANSHU_PACK, createEngines: () => ({ system1: new FakeSystemOne(), system2, asr: new TextOnlyAsr(), tts }), controller: { debounceMs: 1, minDriftMs: 900, minDriftChars: 35, finalQuietMs: 25, partialQuietMs: 45, idleFirstMs: 45, idleSecondMs: 60, idleCloseMs: 80, turnTimeoutMs: options.turnTimeoutMs ?? 100, outcomeTimeoutMs: options.outcomeTimeoutMs ?? 100, playbackAckGraceMs: options.playbackAckGraceMs ?? 15000 } });
   await gateway.start();
   const ws = new WebSocket(`ws://127.0.0.1:${gateway.port}/ws/session`); const events: ServerMessage[] = [];
   const waiters = new Set<{ pred: (event: ServerMessage) => boolean; done: (event: ServerMessage) => void }>();
@@ -82,6 +83,85 @@ test('a partial farewell corrected before final quiet does not end the visit', a
     assert.equal(h.requests.length, 1);
     assert(!h.events.some(e => e.type === 'visit.ended'));
   } finally { await h.close(); }
+});
+
+
+
+test('normal-turn budget is bounded, configurable and gives the default ten-second engine budget room', () => {
+  assert.equal(readConfig({}).controller.turnTimeoutMs, 12000);
+  assert.equal(readConfig({ CUEX_TURN_TIMEOUT_MS: '13500' }).controller.turnTimeoutMs, 13500);
+  assert.throws(() => readConfig({ CUEX_TURN_TIMEOUT_MS: '0' }));
+});
+
+test('normal-turn diagnostics separate timeout, rejected result and provider error without raw content', async () => {
+  const logs: string[] = [];
+  const warn = console.warn;
+  console.warn = (...args: unknown[]) => { logs.push(args.join(' ')); };
+  try {
+    for (const [message, expected] of [
+      ['System 2 turn rejected: private transcript SECRET https://provider.invalid/key', 'TURN_RESULT_REJECTED'],
+      ['upstream failed SECRET https://provider.invalid/key', 'TURN_PROVIDER_ERROR'],
+      ['System 2 timed out after 10000 ms (SECRET https://provider.invalid/key)', 'TURN_TIMEOUT'],
+    ]) {
+      const h = await session(() => { throw new Error(message); });
+      try {
+        h.send('speech.delta', { text: '我想问一下具体数据。', isFinal: true });
+        await h.wait(e => e.type === 'session.error' && e.payload.code === 'SYSTEM2_TURN_ERROR');
+        const rows = logs.map(line => { try { return JSON.parse(line); } catch { return {}; } }).filter(row => row.sessionId === h.gateway.inspectSessions()[0].sessionId);
+        assert.equal(rows.length, 2);
+        assert(rows.every(row => row.category === expected && row.taskId && Number.isInteger(row.revision)));
+      } finally { await h.close(); }
+    }
+    const stalled = await session(() => new Promise(() => {}), new SilentTts(), { turnTimeoutMs: 30 });
+    try {
+      stalled.send('speech.delta', { text: '这个问题需要核对。', isFinal: true });
+      await stalled.wait(e => e.type === 'session.error' && e.payload.code === 'SYSTEM2_TURN_ERROR');
+      const rows = logs.map(line => { try { return JSON.parse(line); } catch { return {}; } }).filter(row => row.sessionId === stalled.gateway.inspectSessions()[0].sessionId);
+      assert.equal(rows.length, 2);
+      assert(rows.every(row => row.category === 'TURN_TIMEOUT' && row.timeoutMs === 30));
+    } finally { await stalled.close(); }
+    assert(!logs.join('\n').includes('SECRET'));
+    assert(!logs.join('\n').includes('provider.invalid'));
+    assert(!logs.join('\n').includes('具体数据'));
+  } finally { console.warn = warn; }
+});
+
+
+
+test('the controller timeout flag survives an engine AbortError race', async () => {
+  const logs: string[] = [];
+  const warn = console.warn;
+  console.warn = (...args: unknown[]) => { logs.push(args.join(' ')); };
+  const h = await session(req => new Promise((_resolve, reject) => req.signal.addEventListener('abort', () => { const error = new Error('System 2 request aborted'); error.name = 'AbortError'; reject(error); }, { once: true })), new SilentTts(), { turnTimeoutMs: 25 });
+  try {
+    h.send('speech.delta', { text: '我需要核对这个问题。', isFinal: true });
+    await h.wait(e => e.type === 'session.error' && e.payload.code === 'SYSTEM2_TURN_ERROR');
+    const rows = logs.map(line => JSON.parse(line));
+    assert.equal(rows.length, 2);
+    assert(rows.every(row => row.category === 'TURN_TIMEOUT'));
+  } finally { await h.close(); console.warn = warn; }
+});
+
+test('a valid response inside the configured budget succeeds and stale aborts stay out of failure logs', async () => {
+  const logs: string[] = [];
+  const warn = console.warn;
+  console.warn = (...args: unknown[]) => { logs.push(args.join(' ')); };
+  let release!: () => void;
+  const h = await session(async req => {
+    if (req.repSpeech === '旧问题。') await new Promise<void>(resolve => { release = resolve; });
+    else await new Promise(resolve => setTimeout(resolve, 120));
+    return reply(req.repSpeech === '旧问题。' ? '旧回复不能说。' : '新的问题我听到了。');
+  }, new SilentTts(), { turnTimeoutMs: 180 });
+  try {
+    h.send('speech.delta', { text: '旧问题。', isFinal: true });
+    while (!release) await new Promise<void>(resolve => setImmediate(resolve));
+    h.send('speech.delta', { text: '新的问题。', isFinal: true });
+    release();
+    await h.wait(doctor('新的问题我听到了。'));
+    assert(!h.events.some(doctor('旧回复不能说。')));
+    assert(!h.events.some(e => e.type === 'session.error'));
+    assert.equal(logs.length, 0);
+  } finally { await h.close(); console.warn = warn; }
 });
 
 test('short natural turns get grounded replies for greeting, vague answer, wrong claim and inability without drift', async () => {

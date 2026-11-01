@@ -96,7 +96,7 @@ export class TurnController {
     this.lines = doctorLines;
     this.normalTurns = !!engines.system2.prepareTurn;
     this.retryConcernId = retryConcernId;
-    this.timing = { debounceMs: 280, minDriftMs: 900, minDriftChars: 35, candidateHoldMs: 650, minInterruptGapMs: 2000, finalQuietMs: 1100, partialQuietMs: 1800, idleFirstMs: 7000, idleSecondMs: 12000, idleCloseMs: 20000, turnTimeoutMs: 8000, outcomeTimeoutMs: 11000, playbackAckGraceMs: 15000, ...timing };
+    this.timing = { debounceMs: 280, minDriftMs: 900, minDriftChars: 35, candidateHoldMs: 650, minInterruptGapMs: 2000, finalQuietMs: 1100, partialQuietMs: 1800, idleFirstMs: 7000, idleSecondMs: 12000, idleCloseMs: 20000, turnTimeoutMs: 12000, outcomeTimeoutMs: 11000, playbackAckGraceMs: 15000, ...timing };
     const retryIndex = pack.scenario.concerns.findIndex(concern => concern.id === retryConcernId);
     if (retryIndex >= 0) {
       this.concernIndex = retryIndex;
@@ -175,9 +175,11 @@ export class TurnController {
     this.turnAbort = abort;
     const task = { taskId: randomUUID(), kind: (trigger === 'silence' ? 'silence_prompt' : 'reply') as SystemTwoActivity['kind'] };
     this.turnActivity = task; this.activity(task, 'preparing');
+    const startedAt = Date.now();
+    let timedOut = false;
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
-      const draft = await Promise.race([this.engines.system2.prepareTurn({ sessionId: this.sessionId, pack: this.pack, concernId, resolvedPointIds: [...this.committedResolved], history: this.actualHistory(), repSpeech: this.normalRepSpeech, trigger, silenceStage, signal: abort.signal }), new Promise<never>((_resolve, reject) => { timeout = setTimeout(() => { abort.abort(); reject(new Error('turn timeout')); }, this.timing.turnTimeoutMs); })]);
+      const draft = await Promise.race([this.engines.system2.prepareTurn({ sessionId: this.sessionId, pack: this.pack, concernId, resolvedPointIds: [...this.committedResolved], history: this.actualHistory(), repSpeech: this.normalRepSpeech, trigger, silenceStage, signal: abort.signal }), new Promise<never>((_resolve, reject) => { timeout = setTimeout(() => { timedOut = true; abort.abort(); reject(new Error('turn timeout')); }, this.timing.turnTimeoutMs); })]);
       if (abort.signal.aborted || this.stopped || revision !== this.revision || concernId !== this.concern.id) return;
       if (!draft.text.trim()) throw new Error('empty doctor turn');
       this.normalFailures = 0;
@@ -201,8 +203,16 @@ export class TurnController {
       }
       if (revision === this.revision) this.normalRepSpeech = '';
       this.activity(task, revision === this.revision ? 'completed' : 'cancelled');
-    } catch {
-      if (!this.stopped && revision === this.revision) {
+    } catch (error) {
+      if (!this.stopped && revision === this.revision && concernId === this.concern.id && this.turnAbort === abort) {
+        // Classify locally, but never log provider messages, transcript text, URLs or credentials.
+        const failure = error as { name?: string; code?: string; message?: string } | undefined;
+        const message = typeof failure?.message === 'string' ? failure.message : '';
+        const category = timedOut || /^System 2 timed out after /.test(message) ? 'TURN_TIMEOUT'
+          : abort.signal.aborted || failure?.name === 'AbortError' || message === 'System 2 request aborted' ? 'TURN_ABORTED'
+          : /^S2_TURN_/.test(failure?.code ?? '') || /^System 2 (?:turn rejected:|requires structured )/.test(message) || message === 'empty doctor turn' ? 'TURN_RESULT_REJECTED'
+          : 'TURN_PROVIDER_ERROR';
+        console.warn(JSON.stringify({ event: 'system2.turn.failed', category, sessionId: this.sessionId, taskId: task.taskId, revision, elapsedMs: Date.now() - startedAt, timeoutMs: this.timing.turnTimeoutMs }));
         this.activity(task, 'error');
         this.normalFailures++;
         if (this.normalFailures <= 1) this.turnTimer = setTimeout(() => { this.turnTimer = undefined; void this.prepareNormalTurn(trigger, silenceStage); }, 350);

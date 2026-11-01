@@ -119,7 +119,6 @@ test('invented patient inference and unknown evidence or point IDs are rejected'
   const invalid = [
     answer('我有位患者 eGFR 45，能用吗？'),
     answer('我有位患者肾功能不好，能用吗？'),
-    answer('好。', { spokenFactIds: ['unknown'] }),
   ];
   for (const response of invalid) {
     faux.setResponses([response]);
@@ -235,7 +234,9 @@ test('a heard false statement cannot become an outcome strength and silence cann
 test('a rep question cannot end the visit just because the model picks end_visit', async () => {
   const { faux, s2 } = setup();
   faux.setResponses([answer('今天先到这里，资料留下。', { action: 'end_visit' })]);
-  await assert.rejects(s2.prepareTurn!(request('主任为什么关心这个亚组？')), /unrequested visit ending/);
+  const draft = await s2.prepareTurn!(request('主任为什么关心这个亚组？'));
+  assert.equal(draft.action, 'reply');
+  assert.deepEqual(draft.resolvedPointIds, []);
 });
 
 test('normal turn action exposes flat provider enums and invalid schema cannot trigger hidden repair calls', async () => {
@@ -361,9 +362,9 @@ test('authorized natural farewells accept varied closing phrases but never a new
     assert.deepEqual(draft.resolvedPointIds, []);
   }
   faux.setResponses([answer('那低于 30 的患者呢？', { action: 'end_visit' })]);
-  await assert.rejects(s2.prepareTurn!(request('我先走了，再见。')), /must not ask/);
+  assert.equal((await s2.prepareTurn!(request('我先走了，再见。'))).action, 'reply');
   faux.setResponses([answer('再见。', { action: 'end_visit' })]);
-  await assert.rejects(s2.prepareTurn!(request('现在就要结束了吗？')), /unrequested visit ending/);
+  assert.equal((await s2.prepareTurn!(request('现在就要结束了吗？'))).action, 'reply');
 });
 
 test('contextual population pronouns and full answers retain supported progress without confusing counts or dose', async () => {
@@ -550,7 +551,7 @@ test('a prompted full dose answer remains heard rep evidence while other grounds
 });
 
 
-test('the native OpenAI-compatible request pins the registered tool and never accepts hallucinated tool names', async () => {
+test('the native request pins the tool; a single typed speech payload can be read without executing its unknown function', async () => {
   const faux = fauxProvider(); const models = createModels(); models.setProvider(faux.provider);
   const model = faux.getModel() as Model<Api>;
   const runtime: S2Runtime = { models, model, providerId: model.provider, modelId: model.id, api: 'openai-completions',
@@ -566,7 +567,10 @@ test('the native OpenAI-compatible request pins the registered tool and never ac
   assert.deepEqual(selections[1], { type: 'function', function: { name: 'submit_outcome' } });
   const calls = faux.state.callCount;
   faux.setResponses([fauxAssistantMessage([fauxToolCall('submit_text_and_assessments', { text: '好。', action: 'reply', basis: '不能信任未知工具名。', spokenFactIds: [], assessments: [] })], { stopReason: 'toolUse' })]);
-  await assert.rejects(s2.prepareTurn!(request('您好。')), /structured/);
+  const recovered = await s2.prepareTurn!(request('您好。'));
+  assert.equal(recovered.text, '好。');
+  assert.equal(recovered.action, 'reply');
+  assert.deepEqual(recovered.resolvedPointIds, []);
   assert.equal(faux.state.callCount - calls, 1);
 });
 
@@ -638,4 +642,39 @@ test('wrong array-type assessment quote is dropped without discarding the clinic
   const draft = await s2.prepareTurn!(request(supported.repQuote));
   assert.equal(draft.text, '资料里的结果与总体一致，请核对原表。');
   assert.deepEqual(draft.resolvedPointIds, []);
+});
+
+test('successful provider speech survives unknown tool names, optional bad citations, and premature end actions without progress', async () => {
+  const { faux, s2 } = setup();
+  faux.setResponses([fauxAssistantMessage([fauxToolCall('submit_trigger_eval', {
+    text: '这组人数和结果有依据，接下来核对使用边界。', action: 'end_visit', basis: '提供自然回复。',
+    spokenFactIds: ['unknown', 'f-egfr-30-60'], assessments: [{ ...assessment(supported, 'supported') }],
+  })], { stopReason: 'toolUse' })]);
+  const draft = await s2.prepareTurn!(request(supported.repQuote));
+  assert.equal(draft.action, 'reply');
+  assert.deepEqual(draft.resolvedPointIds, []);
+  assert.deepEqual(draft.contradictedPointIds, []);
+  assert.equal(draft.sourceEvidence, 'ANSHU-3 亚组分析表，第 14 页');
+});
+
+test('recovery rejects conflicting multiple calls and invalid top-level types and never recovers outcomes', async () => {
+  const { faux, s2 } = setup();
+  const payload = { text: '请核对资料。', action: 'reply', basis: '核对资料。', spokenFactIds: [] };
+  for (const calls of [[fauxToolCall('unknown_a', payload), fauxToolCall('unknown_b', payload)],
+    [fauxToolCall('unknown', { ...payload, text: ['不接受数组'] })]]) {
+    faux.setResponses([fauxAssistantMessage(calls, { stopReason: 'toolUse' })]);
+    await assert.rejects(s2.prepareTurn!(request('不知道。')), /structured/);
+  }
+  faux.setResponses([fauxAssistantMessage([fauxToolCall('unknown_outcome', { ...payload, stance: 'willing_to_continue' })], { stopReason: 'toolUse' })]);
+  await assert.rejects(s2.prepareOutcome!({ sessionId: 'no-outcome-recovery', pack: ANSHU_PACK, history: [], resolvedPointIds: [], endReason: 'silence', signal: new AbortController().signal }), /structured/);
+});
+
+test('complete reply text is preserved up to the bounded limit, never cut mid-sentence', async () => {
+  const { faux, s2 } = setup();
+  const long = '我关心的是患者的具体情况，先核对研究证据和用药边界。'.repeat(5);
+  assert.ok(long.length > 93 && long.length <= 240);
+  faux.setResponses([answer(long)]);
+  assert.equal((await s2.prepareTurn!(request('需要看哪些证据？'))).text, long);
+  faux.setResponses([answer('需要核对资料。'.repeat(50))]);
+  await assert.rejects(s2.prepareTurn!(request('继续。')), /too long/);
 });
