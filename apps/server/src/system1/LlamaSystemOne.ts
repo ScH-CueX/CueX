@@ -72,7 +72,7 @@ export class LlamaSystemOne implements SystemOneClient {
     try {
       const full = JSON.parse(state);
       if (typeof full.repSpeechSinceConcern === 'string') {
-        let recent = String(full.recentSpeech ?? full.repSpeechSinceConcern).slice(-120);
+        let recent = full.repSpeechSinceConcern.slice(-80);
         // ASR partials include the prior pitch. An explicit turn-back cue starts the latest response.
         const correction = /(?:我先回答|我直接回答|抱歉[，,]?我|不过我(?:得|要)?先说明|回到您(?:的)?问题)/g;
         const lastCorrection = [...recent.matchAll(correction)].at(-1);
@@ -137,7 +137,7 @@ export class LlamaSystemOne implements SystemOneClient {
   private renderQuestion(id: string, question: JevQuestion, state: string): JevQuestion {
     if (this.questionLanguage !== 'en') return question;
     const questions: Record<string, string> = {
-      responding: 'Is the latest rep speech responding to the doctor concern, including explicitly starting to answer? An intention to answer is responding but does not resolve a point. Judge recentSpeech only.',
+      responding: 'Is the rep talking about the patient population or patient subgroup the doctor asked about, including a partial answer or an intention to answer? Answer false for overall blood pressure benefit, tolerability, real-world outcomes, adherence, availability or cost alone.',
       drift: 'Is the latest rep speech continuing unrelated benefits, endpoints, safety or marketing instead of the unresolved doctor concern? Judge recentSpeech only.',
       resolved_c1: 'Has the rep substantively answered the concern about patients over 75? A concrete subgroup proportion or result consistent with the overall population counts. Merely mentioning age, asking a question, promising later data, or claiming all elderly can use it does not count. Judge all repSpeechSinceConcern.',
       resolved_c2: 'Has the rep substantively answered the eGFR 30-60 subgroup concern? A concrete subgroup count or result consistent with overall population counts. Merely mentioning the group or promising an answer does not count. Judge all repSpeechSinceConcern.',

@@ -190,3 +190,26 @@ test('remote JEV prepares a c3-only follow-up after natural price and adherence 
     assert(h.gateway.inspectSessions()[0].resolvedPointIds.includes('c3'));
   }finally{await h.close();}
 });
+
+
+test('streamed speech keeps prior pitch across an ASR segment and an explicit answer cue replaces it',async()=>{
+  const captured:Array<{state:any;question:string}>=[];
+  const server=createServer(async(req,res)=>{
+    let raw='';for await(const chunk of req)raw+=chunk;
+    const prompt=JSON.parse(raw).prompt;
+    captured.push({state:JSON.parse(prompt.split('[state] ')[1].split('\n[question] ')[0]),question:prompt.split('[question] ')[1].split('\n[options]')[0]});
+    res.setHeader('content-type','application/json');res.end(JSON.stringify({probs:[{top_probs:[{id:3721,token:'false',prob:.8},{id:1802,token:'true',prob:.2}]}]}));
+  });
+  await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const client=new LlamaSystemOne({baseUrl:`http://127.0.0.1:${(server.address() as {port:number}).port}`,timeoutMs:1000});
+  const questions={responding:{kind:'noul' as const,question:'是否回应？'},drift:{kind:'noul' as const,question:'是否偏离？'},resolved_c1:{kind:'noul' as const,question:'c1是否回答？'}};
+  const pitch='主要终点多降6.2毫米汞柱，不良反应与安慰剂相当，另外还有两万多人的真实世界研究。';
+  try{
+    await client.decide(encodeSystemOneState({concernId:'concern-scope',concern:'适用范围',unresolvedPointIds:['c1','c2','c3'],repSpeechSinceConcern:pitch+'研究华东',recentSpeech:'研究华东'}),questions);
+    for(const request of captured.slice(0,2)){assert.match(request.state.recentSpeech,/主要终点.*真实世界研究/);assert.match(request.state.repSpeechSinceConcern,/主要终点.*真实世界研究/);assert.match(request.state.recentSpeech,/研究华东$/);}
+    captured.length=0;
+    const result=await client.decide(encodeSystemOneState({concernId:'concern-scope',concern:'适用范围',unresolvedPointIds:['c1','c2','c3'],repSpeechSinceConcern:pitch+'我先回答您的人群问题，',recentSpeech:'我先回答您的人群问题，'}),questions);
+    for(const request of captured.slice(0,2)){assert.equal(request.state.recentSpeech,'我先回答您的人群问题，');assert.equal(request.state.repSpeechSinceConcern,'我先回答您的人群问题，');}
+    assert.equal(result.answers.responding.top,'true');assert.equal(result.answers.drift.top,'false');assert.equal(result.answers.resolved_c1.top,'false');assert.match(result.backend,/response-cue/);
+  }finally{server.closeAllConnections();await new Promise<void>((resolve,reject)=>server.close(e=>e?reject(e):resolve()));}
+});

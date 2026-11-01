@@ -112,3 +112,23 @@ A's two responding errors were **false responding on pitches** (`safety` p=0.504
 A+C live ordinary decide p50/p95: **409.7 / 742.9 ms** over the 40 states. Explicit “我先回答” stayed responding and resolved no point. All four natural-dose variants still resolved d1 only after the actual answer. Four real gateway flows passed: listen/advance, interrupt continued speech, explicit-promise withdrawal, and a new c3-only price/adherence pitch followed by c3-answer withdrawal. No controller threshold or lifecycle code changed in this fix.
 
 Evidence: `/tmp/cuex-s1-matrix/drift-variation-{before,hybrid,hybrid-tiebreak}.json`, `RTX5080-{hybrid,hybrid-tiebreak}-ordinary40.json`; fixtures/probes are saved in the same directory, outside the repository.
+
+## Continuous 28-second pitch regression
+
+The recorded browser pitch had 18 `on_topic` ticks from 15.654–22.791 s and no prepared follow-up. Replaying all five questions showed two causes: in the long first segment, responding was **0.74–0.85** despite drift **0.88–0.97**; after ASR finalized it, the next short segment hid the preceding pitch and drift fell to **0.18–0.46**.
+
+The two-line System 1 fix reads the last **80 characters of whole rep speech**, not only the newest ASR segment, and narrows the responding question to the requested population/subgroup. Drift wording, controller thresholds, point resolution and the response-cue guard are unchanged. All **18/18** missed reconstructed input ticks became drifting. Reconstruction uses the latest ASR received at `verdict.t - latencyMs`, because the original query revision was not logged.
+
+A new **actual gateway replay** used production **900 ms / 35 characters**, real relay **JEV + FakeSystemTwo (35 ms) + silent valid TTS**. The candidate was ready at **18.307 s during the pitch** and spoken at **29.931 s**. This is not the full-real browser/Ming rehearsal. Whole-context-only with the old question still gave high responding in the query comparison; its full timed gateway run was interrupted when the parent prioritized the accepted candidate, so no completed gateway result is claimed for it.
+
+The accepted candidate scored **197/200 (98.50%)** on ordinary 40, responding **39/40**, c1/c2/c3 resolution **40/40 each**, decide p50/p95 **513.2 / 674.4 ms**. Its three label errors do not cause false interruption at the actual action gate:
+
+| State | Rep text / context | Responding | Drift | Action error |
+| --- | --- | ---: | ---: | --- |
+| rwe-after-answer | `75岁以上约占11%，eGFR30到60亚组412人。另有一项覆盖两万多名患者的真实世界研究。` | 0.792956 | 0.570110 | Missed drift, no false interrupt |
+| age-overclaim | `高龄患者肯定都能用，我们产品很安全。` | 0.860720 | 0.668348 | No false interrupt; responding blocks it |
+| full-demo | Full fixture, ending `不过eGFR低于30被排除，没有证据，说明书不建议使用。` | 0.792077 | 0.538617 | No false interrupt; all points resolve |
+
+Latest candidate checks: full server typecheck passed; local System 1 feature tests passed with remote opt-ins skipped. Cue/d1 behavior is covered locally. No new real cue/d1 inference ran while the controller owned the browser GPU window; earlier real cue/d1 checks predate this two-line fix. Controller owns the full-real browser/Ming closing/review/retry report.
+
+Evidence: `/tmp/cuex-s1-matrix/stage-{before,after}.json`, `stage-question-candidates.json`, `stage-gateway-candidate.json`, `RTX5080-whole-speech-ordinary40.json`; replay sources are saved there, outside the repo.
