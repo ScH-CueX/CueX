@@ -664,3 +664,34 @@ test('continuous microphone updates do not withdraw a still-valid question while
     assert(!ended.payload.moments.some(moment => moment.kind === 'withdrawn'));
   } finally { await h.close(); }
 });
+
+
+test('a long current pitch can prepare after two drift revisions without thirty-five more characters after detection', async () => {
+  const h = await setup({ controller: { debounceMs: 0, minDriftMs: 900, minDriftChars: 35, candidateHoldMs: 1000, minInterruptGapMs: 0 } });
+  try {
+    await h.speech('陈主任您好。', true);
+    assert(!h.events.some(isPhase('retrieving')), 'a short greeting is not drift');
+    const detected = '回到刚才的结果主要终点是十二周的诊室收缩压多降了六十二毫米汞柱不良反应和安慰剂相当真实世界研究覆盖';
+    await h.speech(detected, false);
+    assert(!h.events.some(isPhase('retrieving')), 'one drift observation is not sustained');
+    await new Promise<void>(resolve => setTimeout(resolve, 950));
+    const continued = detected + '了两万多名患者华东地区上市后的结果也很好还有更多结果可以给';
+    assert(continued.length - detected.length < 35);
+    await h.speech(continued, false);
+    await h.waitFor(isPhase('ready'));
+    const from = h.events.length;
+    await h.speech(continued + '我先回答您的人群问题。', false);
+    await h.waitFor(isPhase('withdrawn'), from);
+    assert(!h.events.some(isPhase('spoken')));
+    // A new visit receives a real ASR revision instead of a continuation. The old drift must be gone.
+    const next = h.events.length;
+    h.send('session.start', { scenarioId: ANSHU_PACK.scenario.id, mode: 'performance' });
+    await h.waitFor(e => e.type === 'controller.dispatch' && e.payload.pose === 'listening', next);
+    await h.speech(detected, false);
+    await h.speech('我先回答您的人群问题。', true);
+    await new Promise<void>(resolve => setTimeout(resolve, 950));
+    const last = h.events.length;
+    await h.speech(continued, false);
+    assert.equal(h.events.slice(last).filter(isPhase('retrieving')).length, 0, 'revised responding evidence clears the old drift');
+  } finally { await h.close(); }
+});

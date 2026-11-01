@@ -54,7 +54,7 @@ export class TurnController {
   private evaluationTimer?: ReturnType<typeof setTimeout>;
   private candidateTimer?: ReturnType<typeof setTimeout>;
   private held?: HeldCandidate;
-  private drift?: { since: number; chars: number; revision: number; observations: number };
+  private drift?: { since: number; revision: number; observations: number };
   private lastInterruptAt = 0;
   private speech?: SpeechOutput;
   private readonly outputs = new Map<string, SpeechOutput>();
@@ -254,11 +254,12 @@ export class TurnController {
     const withdrawalReason: WithdrawalReason | undefined = targetAnswered || this.unresolved.length === 0 ? 'target_answered' : responding ? 'response_cue' : revisedBasis ? 'basis_revised' : undefined;
     const withdraw = !!this.held && !!withdrawalReason;
     if (drifting) {
-      if (!this.drift) this.drift = { since: Date.now(), chars: this.repSpeech.length, revision: this.revision, observations: 1 };
+      if (!this.drift) this.drift = { since: Date.now(), revision: this.revision, observations: 1 };
       else if (this.drift.revision !== this.revision) { this.drift.revision = this.revision; this.drift.observations++; }
     } else this.drift = undefined;
     const sustained = !!this.drift && this.drift.observations >= 2 && Date.now() - this.drift.since >= this.timing.minDriftMs
-      && this.repSpeech.length - this.drift.chars >= this.timing.minDriftChars;
+      // Preparation is speculative: count the speech already judged as drift, not only words added after detection.
+      && this.normalizeSpeech(this.recentSpeech).length >= this.timing.minDriftChars;
     const canInterrupt = recheck && this.held?.event.phase === 'ready' && !this.speech && drifting && !withdraw
       && Date.now() - this.lastInterruptAt >= this.timing.minInterruptGapMs;
     const action: JevDecisionResponse['action'] = this.unresolved.length === 0 ? 'resolve_and_move_on' : withdraw ? 'withdraw_followup'
