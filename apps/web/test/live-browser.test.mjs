@@ -49,8 +49,8 @@ async function waitEvent(events, predicate, timeout = real ? 60000 : 15000) {
   }
   throw new Error(`No expected event; events=${events.map(event => event.type + (event.payload?.candidate ? ':' + event.payload.candidate.phase : '')).join(',')}`);
 }
-async function pageSession({ longAudio = false } = {}) {
-  await fetch(`http://127.0.0.1:${fixture.metricsPort}/${longAudio ? 'long' : 'short'}-audio`);
+async function pageSession({ longAudio = false, longAudioSeconds = 3 } = {}) {
+  await fetch(`http://127.0.0.1:${fixture.metricsPort}/${longAudio ? 'long' : 'short'}-audio${longAudio ? `?seconds=${longAudioSeconds}` : ''}`);
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 1000 });
   page.on('pageerror', error => errors.push(error.message));
@@ -77,7 +77,7 @@ async function pageSession({ longAudio = false } = {}) {
     };
   });
   await page.goto(`${origin}/?view=live&jury=1`, { waitUntil: 'networkidle0' });
-  await button(page, '实时连线');
+  await button(page, '开始拜访');
   await page.waitForFunction(() => document.querySelector('[data-testid="connection-status"]')?.textContent.includes('已连接'));
   await waitEvent(received, event => event.type === 'tts.stream_chunk');
   if (!longAudio) await waitEvent(sent, event => event.type === 'tts.playback' && event.payload.status === 'finished');
@@ -208,7 +208,7 @@ test('disconnect exposes an error and reconnect starts a fresh usable visit', { 
 test('replay keeps its scripted transcript, withdrawal and keyboard timeline', { timeout: 30000 }, async () => {
   const page = await browser.newPage();
   try {
-    await page.goto(`${origin}/?view=live&t=55.5&jury=1`, { waitUntil: 'networkidle0' });
+    await page.goto(`${origin}/?view=live&mode=replay&t=55.5&jury=1`, { waitUntil: 'networkidle0' });
     await button(page, '暂停');
     await page.waitForSelector('[data-testid="candidate"][data-phase="withdrawn"]');
     assert.equal(await page.$('[data-testid="connection-status"]'), null);
@@ -218,4 +218,37 @@ test('replay keeps its scripted transcript, withdrawal and keyboard timeline', {
     assert.equal(await page.$eval('[aria-label="回放进度"]', element => element.getAttribute('aria-valuenow')), '0');
   } finally { await page.close(); }
   assert.deepEqual(errors, []);
+});
+
+
+test('functional UI: disconnect during doctor playback stops audio, then reconnect starts a fresh visit', { timeout: 60000, skip: real }, async () => {
+  const { page, received, sent } = await pageSession({ longAudio: true, longAudioSeconds: 20 });
+  try {
+    await page.waitForFunction(() => window.__audioSources.some(source => source.duration === 20 && source.start && !source.end));
+    console.log(JSON.stringify({ edge: 'playback-active' }));
+    const oldId = received.find(event => event.type === 'session.ready').payload.sessionId;
+    const opening = received.find(event => event.type === 'tts.stream_chunk').payload.utteranceId;
+    await page.setOfflineMode(true);
+    await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+    await page.waitForSelector('[data-testid="live-error"]');
+    await page.waitForFunction(() => window.__audioSources.some(source => source.duration === 20 && source.stop));
+    console.log(JSON.stringify({ edge: 'offline-audio-stopped' }));
+    assert.equal(await page.$eval('#rep-speech', element => element.disabled), true);
+    assert.equal(await page.$('[data-testid="live-outcome"]'), null, 'disconnect does not invent a visit result');
+    assert(!sent.some(event => event.type === 'visit.end'), 'disconnect is not graceful completion');
+    const report = await waitEvent(sent, event => event.type === 'tts.playback' && event.payload.utteranceId === opening);
+    assert.equal(report.payload.status, 'stopped');
+    assert(report.payload.playedMs < 20000);
+    assert.equal(sent.filter(event => event.type === 'tts.playback' && event.payload.utteranceId === opening).length, 1);
+    console.log(JSON.stringify({ edge: 'stopped-report', report: report.payload }));
+    await fetch(`http://127.0.0.1:${fixture.metricsPort}/short-audio`);
+    await page.setOfflineMode(false);
+    await button(page, '重新连接');
+    const fresh = await waitEvent(received, event => event.type === 'session.ready' && event.payload.sessionId !== oldId);
+    await page.waitForFunction(() => !document.querySelector('#rep-speech').disabled);
+    console.log(JSON.stringify({ edge: 'fresh-session', fresh: fresh.payload.sessionId }));
+    await waitEvent(sent, event => event.type === 'tts.playback' && event.payload.sessionId === fresh.payload.sessionId && event.payload.status === 'finished');
+    assert.equal(await page.$('[data-testid="candidate"]'), null, 'no follow-up leaks into the fresh visit');
+    console.log(JSON.stringify({ flow: 'functional-ui-disconnect-during-playback', oldSessionId: oldId, newSessionId: fresh.payload.sessionId, stoppedOnce: true }));
+  } finally { await page.close(); }
 });

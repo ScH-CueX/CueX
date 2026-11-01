@@ -54,7 +54,7 @@ export const HomepageView: React.FC<HomepageViewProps> = ({ onNavigate }) => {
                 onClick={() => onNavigate('review')}
                 className="h-12 px-6 text-base"
               >
-                查看复盘对谈稿
+                查看复盘示例
               </Button>
             </div>
 
@@ -122,7 +122,7 @@ export const HomepageView: React.FC<HomepageViewProps> = ({ onNavigate }) => {
             </div>
 
             <p className="text-xs text-ink-3 leading-relaxed">
-              石膏材质诚实表明这是模拟角色，绕开恐怖谷。身体前倾、吸气挑眉与背侧朱砂侧光承担全部轮次感知，练习中绝不剧透文字。
+              石膏医生用前倾、点头和侧光表达对话状态。演练中可以查看医生的判断与追问准备过程。
             </p>
           </div>
         </section>
@@ -144,7 +144,7 @@ export const HomepageView: React.FC<HomepageViewProps> = ({ onNavigate }) => {
               </div>
               <h3 className="text-lg font-bold text-ink">实时理解 · 不等句号</h3>
               <p className="text-xs text-ink-2 leading-relaxed">
-                在代表说话的同时，System 1（Jev-like 决策模型）毫秒级持续研判当前语义与医生关切的偏离程度，在合适的节奏点果断打断，杜绝“等你背完全文再纠正”。
+                你说话时，System 1 持续判断你是否回应了医生的关切，并选择继续听、准备追问或发起追问。
               </p>
             </div>
 
@@ -152,9 +152,9 @@ export const HomepageView: React.FC<HomepageViewProps> = ({ onNavigate }) => {
               <div className="w-9 h-9 rounded-[2px] bg-ground-2 flex items-center justify-center text-ink">
                 <Brain className="w-5 h-5" />
               </div>
-              <h3 className="text-lg font-bold text-ink">并行准备 · 毫秒开口</h3>
+              <h3 className="text-lg font-bold text-ink">结合上下文 · 自然回应</h3>
               <p className="text-xs text-ink-2 leading-relaxed">
-                System 2（基于 TypeScript 的 PiAgent 基座）在后台调用临床资料包与临床指南 Skills 异步拟定候选追问。快层触发时内容早已就绪，实现零延迟顺畅接入。
+                System 2 根据医生的风格、已听到的对话和临床资料准备回应。你补正后，已准备的追问可以撤销；结束时，医生说明自己的态度和依据。
               </p>
             </div>
 
@@ -164,7 +164,7 @@ export const HomepageView: React.FC<HomepageViewProps> = ({ onNavigate }) => {
               </div>
               <h3 className="text-lg font-bold text-ink">动态撤销 · 不进历史</h3>
               <p className="text-xs text-ink-2 leading-relaxed">
-                Controller 在输出前持续复核依据。代表一旦自行补全答案，已就绪的追问在输出前静默撤销。留在时间线上供复盘，绝不进入对话历史。
+                你主动补充证据后，医生会重新判断已准备的追问。撤销的内容保留在复盘中，帮助你看清自己的表达如何改变了对话。
               </p>
             </div>
           </div>
@@ -238,7 +238,7 @@ export const HomepageView: React.FC<HomepageViewProps> = ({ onNavigate }) => {
                 <span>1. 资深老代表经验萃取</span>
               </div>
               <p className="text-ink-2 leading-relaxed text-[11px]">
-                结构化沉淀销冠拜访心得（如“面对学术钻研型医生严禁空谈疗效，前30秒直给亚组证据”），输入 PiAgent 记忆中枢。
+                整理资深代表的拜访经验，帮助练习者选择回应顺序、补充证据，并识别需要改进的表达。
               </p>
             </div>
 

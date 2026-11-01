@@ -1,4 +1,4 @@
-import type { AsrTranscriptDelta, CandidateLifecyclePhase, ControllerDispatchEvent, FollowupCandidate, JevDecisionResponse, ServerMessage, System2Task, TrainingScenarioDef, VisitEndedPayload } from '@cuex/protocol';
+import type { AsrTranscriptDelta, CandidateLifecyclePhase, ControllerDispatchEvent, FollowupCandidate, JevDecisionResponse, ServerMessage, System2Task, TrainingScenarioDef, VisitEndedPayload, SystemTwoActivity } from '@cuex/protocol';
 import type { DriverStatus } from '../driver/IConversationDriver';
 
 export interface LiveSession {
@@ -18,6 +18,8 @@ export interface LiveSession {
   lineJobs?: Partial<Record<Exclude<System2Task, 'followup'>, CandidateLifecyclePhase>>;
   lineJob?: { task: Exclude<System2Task, 'followup'>; phase: CandidateLifecyclePhase };
   judgments: JevDecisionResponse[];
+  activities: SystemTwoActivity[];
+  groundedProgress: boolean;
   dispatch?: ControllerDispatchEvent;
   resolved: Record<string, string>;
   audioPlaying: boolean;
@@ -25,7 +27,7 @@ export interface LiveSession {
   nod: number;
 }
 export const emptySession: LiveSession = {
-  status: 'idle', transcripts: [], candidates: [], judgments: [], resolved: {}, audioPlaying: false, speakingPose: 'speaking', nod: 0,
+  status: 'idle', transcripts: [], candidates: [], judgments: [], activities: [], groundedProgress: false, resolved: {}, audioPlaying: false, speakingPose: 'speaking', nod: 0,
 };
 export type LiveAction =
   | { type: 'reset' }
@@ -50,7 +52,7 @@ export function liveSessionReducer(state: LiveSession, action: LiveAction): Live
       const previous = state.transcripts.find(item => item.transcriptId === transcript.transcriptId);
       const resolved = { ...state.resolved };
       // ASR can retract a tentative answer by revising the same transcript.
-      if (previous && !transcript.text.startsWith(previous.text)) {
+      if (!state.groundedProgress && previous && !transcript.text.startsWith(previous.text)) {
         for (const [point, source] of Object.entries(resolved)) if (source === transcript.transcriptId) delete resolved[point];
       }
       const transcripts = state.transcripts.filter(item => item.transcriptId !== transcript.transcriptId);
@@ -63,7 +65,7 @@ export function liveSessionReducer(state: LiveSession, action: LiveAction): Live
     case 'system1.verdict': {
       const resolved = { ...state.resolved };
       const rep = [...state.transcripts].reverse().find(item => item.speaker === 'rep');
-      for (const point of event.payload.resolvedPointIds) resolved[point] = rep?.transcriptId ?? event.payload.requestId;
+      if (!state.groundedProgress) for (const point of event.payload.resolvedPointIds) resolved[point] = rep?.transcriptId ?? event.payload.requestId;
       return { ...state, resolved, judgments: [...state.judgments, event.payload].slice(-100) };
     }
     case 'system2.candidate': {
@@ -79,15 +81,21 @@ export function liveSessionReducer(state: LiveSession, action: LiveAction): Live
       const dispatch = event.payload;
       const resolved = { ...state.resolved };
       const points = state.scenario?.concerns.find(item => item.id === dispatch.concernProgress.concernId)?.points ?? [];
-      if (dispatch.concernProgress.isFullyResolved) for (const point of points) resolved[point.id] ??= 'controller';
+      if (!state.groundedProgress && dispatch.concernProgress.isFullyResolved) for (const point of points) resolved[point.id] ??= 'controller';
       // A final ASR revision can retract all prior partial matches.
-      if (dispatch.concernProgress.resolvedCount === 0) for (const point of points) delete resolved[point.id];
+      if (!state.groundedProgress && dispatch.concernProgress.resolvedCount === 0) for (const point of points) delete resolved[point.id];
       const isLast = !state.scenario?.concerns.find(item => item.id === dispatch.concernProgress.concernId)?.nextConcernId;
       // A later ASR revision can reopen the last concern, so the marker follows the latest progress.
       const completedAt = !isLast ? state.completedAt : dispatch.concernProgress.isFullyResolved ? state.completedAt ?? dispatch.timestamp : undefined;
       return { ...state, dispatch, resolved, completedAt, nod: state.nod + (dispatch.nodAmp ? 1 : 0),
         speakingPose: dispatch.pose === 'asking' || dispatch.pose === 'speaking' ? dispatch.pose : state.speakingPose };
     }
+    case 'system2.activity': {
+      if (state.sessionId && event.payload.sessionId !== state.sessionId) return state;
+      const activities = state.activities.filter(item => item.taskId !== event.payload.taskId);
+      return { ...state, activities: [...activities, event.payload].slice(-12) };
+    }
+    case 'conversation.progress': return state.sessionId && event.payload.sessionId !== state.sessionId ? state : { ...state, groundedProgress: true, resolved: Object.fromEntries(event.payload.resolvedPointIds.map(id => [id, 'assessment'])) };
     case 'visit.ended': return { ...state, visitEnded: event.payload };
     case 'session.error': return { ...state, error: event.payload.message };
     case 'tts.stream_chunk': return state;

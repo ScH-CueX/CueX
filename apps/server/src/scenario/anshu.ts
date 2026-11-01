@@ -4,6 +4,12 @@ import { ANSHU_ASR_CORRECTIONS } from './asr-corrections';
 // Fictional demo pack. It matches apps/web/src/lib/scenario.ts so the live session and the replay tell the same story.
 export const ANSHU_PACK: ScenarioPack = {
   asrCorrections: ANSHU_ASR_CORRECTIONS,
+  pointRequirements: {
+    c1: ['75 岁以上患者在研究中的比例', '该亚组降压结果与总体的关系'],
+    c2: ['eGFR 30 到 60 亚组的人数', '该亚组降压结果与总体的关系'],
+    c3: ['研究对 eGFR 低于 30 患者的证据边界', '说明书对这类患者的使用建议'],
+    d1: ['75 岁以上患者的起始剂量', '后续调整的时间与依据'],
+  },
   scenario: {
     id: 'anshu-hypertension-01',
     productName: '安舒平',

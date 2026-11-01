@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import puppeteer from 'puppeteer-core';
 
-// One audience member, one rehearsal, typed speech, fake engines:
+// One audience member in the canonical light Live exercise, typed speech, fake engines:
 // start -> briefing -> keep pitching -> a ready follow-up is withdrawn on self-correction -> keep pitching -> the doctor interrupts
 // -> answer -> closing -> review card (with the unsaid follow-up) -> retry -> rephrased opening -> 下一位.
 const root = fileURLToPath(new URL('../../../', import.meta.url));
@@ -36,7 +36,8 @@ async function start(command, args, env, ready) {
 }
 async function button(page, label, timeout = 30000) {
   await page.waitForFunction(label => [...document.querySelectorAll('button')].some(button => button.textContent.trim() === label && !button.disabled), { timeout }, label);
-  await page.evaluate(label => [...document.querySelectorAll('button')].find(button => button.textContent.trim() === label).click(), label);
+  const handle = await page.evaluateHandle(label => [...document.querySelectorAll('button')].find(button => button.textContent.trim() === label && !button.disabled), label);
+  await handle.asElement().click(); await handle.dispose();
 }
 async function waitEvent(events, predicate, timeout = 30000) {
   const deadline = Date.now() + timeout;
@@ -98,35 +99,30 @@ test('one rehearsal closes the loop: pitch, interruption, answer, closing, revie
   cdp.on('Network.webSocketFrameReceived', frame => capture(received, frame));
   cdp.on('Network.webSocketFrameSent', frame => capture(sent, frame));
   try {
-    // The stage page is the default view and has no navbar.
     await page.goto(`${origin}/?view=stage`, { waitUntil: 'networkidle0' });
-    await page.waitForSelector('[data-testid="stage"][data-phase="start"]');
-    assert.equal(await page.$('header'), null, 'no navbar on the stage page');
-    assert(await page.$('[data-testid="fullscreen"]'), 'fullscreen button');
-    await shot(page, '01-start');
-    await button(page, '不用麦克风，改用文字');
-
-    await page.waitForSelector('[data-phase="briefing"]');
+    await page.waitForSelector('[data-testid="live-briefing"]');
+    await page.evaluate(() => document.fonts.ready);
+    assert.equal(await page.$eval('[data-testid="live-grid"]', el => getComputedStyle(el).display), 'grid');
+    assert.equal(new URL(page.url()).searchParams.get('view'), 'live');
     await page.waitForFunction(() => document.body.innerText.includes('安舒平') && document.body.innerText.includes('第 14 页'));
     await shot(page, '02-briefing');
     await button(page, '开始拜访');
 
     // The doctor opens; the opening is spoken, not canned in the page.
-    await page.waitForSelector('[data-phase="visit"]');
+    await page.waitForSelector('#rep-speech:not([disabled])');
     const opening = await waitEvent(received, event => event.type === 'asr.transcript' && event.payload.speaker === 'doctor' && event.payload.isFinal);
     await page.waitForFunction(text => document.body.innerText.includes(text.slice(0, 8)), {}, opening.payload.text);
     await shot(page, '03-visit-opening');
 
     // The stage text without struck-through spans: a withdrawn follow-up may only ever appear struck through.
     const unstruck = () => page.evaluate(() => {
-      const root = document.querySelector('[data-testid="stage"]').cloneNode(true);
+      const root = document.querySelector('[data-ui="training"]').cloneNode(true);
       root.querySelectorAll('del').forEach(node => node.remove());
       return root.textContent.replace(/\s+/g, '');
     });
 
     // Underlying on, then keep pitching results until a follow-up is ready.
-    await page.keyboard.press('u');
-    await page.waitForSelector('.visit-under, [data-underlying="true"]');
+    await page.waitForSelector('[data-capture="decisions"]');
     await say(page, pitch);
     await waitEvent(received, event => isFollowup(event) && event.payload.candidate.phase === 'ready');
 
@@ -166,14 +162,14 @@ test('one rehearsal closes the loop: pitch, interruption, answer, closing, revie
     await waitEvent(received, event => event.type === 'visit.ended', 60000);
 
     // The review shows what happened in this run: the doctor's question, what the rep said, the doctor's reaction.
-    await page.waitForSelector('[data-phase="review"]', { timeout: 15000 });
-    const review = await page.evaluate(() => document.querySelector('[data-testid="stage"]').innerText);
+    await page.waitForSelector('[data-testid="live-outcome"]', { timeout: 15000 });
+    const review = await page.evaluate(() => document.querySelector('[data-testid="live-outcome"]').innerText);
     assert(/收缩压|不良反应|安慰剂|真实世界|华东|两万/.test(review), `review shows what the rep said: ${review}`);
     assert(squash(review).includes(squash(spoken.payload.candidate.draftText).slice(0, 6)), `review shows the doctor's follow-up: ${review}`);
     // The signature moment: the follow-up that was ready and never said, struck through.
-    assert(review.includes('一句没说出口的追问'), `review shows the unsaid follow-up card: ${review}`);
-    assert(review.includes('已撤销'), 'review labels it 已撤销');
-    const struck = await page.$$eval('[data-testid="stage"] del', nodes => nodes.map(node => node.textContent.replace(/\s+/g, '')));
+    assert(review.includes('撤销追问'), `review shows the unsaid follow-up card: ${review}`);
+    assert(review.includes('撤销追问'), 'review labels it 撤销追问');
+    const struck = await page.$$eval('[data-testid="live-outcome"] del', nodes => nodes.map(node => node.textContent.replace(/\s+/g, '')));
     assert(struck.some(text => text.includes(squash(droppedText))), `the withdrawn follow-up is struck through in the review: ${struck}`);
     assert(!(await unstruck()).includes(squash(droppedText)), 'the withdrawn follow-up appears in the review only struck through');
     assert(!doctorLines(received).some(event => squash(event.payload.text).includes(squash(droppedText).slice(0, 8))), 'the withdrawn follow-up was never said by the doctor');
@@ -182,13 +178,13 @@ test('one rehearsal closes the loop: pitch, interruption, answer, closing, revie
     const readyCount = received.filter(event => event.type === 'session.ready').length;
 
     // Retry the concern: the doctor rephrases it.
-    await button(page, '从这里再试一次');
+    await button(page, '再练一次');
     const restart = await waitEvent(sent, event => event.type === 'session.start' && event.payload.retry);
     assert.equal(restart.payload.retry.concernId, 'concern-scope');
     await waitEvent(received, event => event.type === 'session.ready' && received.filter(item => item.type === 'session.ready').length > readyCount);
     const retryReady = received.filter(event => event.type === 'session.ready').at(-1);
     const rephrased = await waitEvent(received, event => event.type === 'asr.transcript' && event.payload.speaker === 'doctor' && event.observedAt >= retryReady.observedAt);
-    await page.waitForSelector('[data-phase="visit"]');
+    await page.waitForSelector('#rep-speech:not([disabled])');
     await page.waitForFunction(text => document.body.innerText.includes(text.slice(0, 6)), {}, rephrased.payload.text);
     assert.notEqual(rephrased.payload.text.slice(0, 20), firstOpening.slice(0, 20), 'the doctor rephrases instead of repeating the opening');
     await shot(page, '08-retry-opening');
@@ -199,17 +195,16 @@ test('one rehearsal closes the loop: pitch, interruption, answer, closing, revie
     await page.waitForFunction(() => { const box = document.querySelector('#rep-speech'); return box && !box.disabled; });
     await say(page, doseAnswer);
     await waitEvent(received, event => event.type === 'visit.ended' && event.observedAt >= retryReady.observedAt, 60000);
-    await page.waitForSelector('[data-phase="review"]', { timeout: 15000 });
+    await page.waitForSelector('[data-testid="live-outcome"]', { timeout: 15000 });
     await shot(page, '09-retry-review');
 
     // 下一位 clears everything for the next audience member.
     await button(page, '下一位');
-    await page.waitForSelector('[data-phase="start"]');
-    assert(!(await page.evaluate(() => document.querySelector('[data-testid="stage"]').innerText)).includes('降压幅度与总体一致'), 'nothing of the last visit stays on screen');
-    await button(page, '不用麦克风，改用文字');
-    await page.waitForSelector('[data-phase="briefing"]');
+    await page.waitForSelector('[data-testid="live-briefing"]');
+    assert.equal(await page.$('[data-testid="live-outcome"]'), null);
+    assert.equal(await page.$('[data-testid="candidate"]'), null);
     await button(page, '开始拜访');
-    await page.waitForSelector('[data-phase="visit"]');
+    await page.waitForSelector('#rep-speech:not([disabled])');
     assert.equal(await page.$('[data-phase="spoken"]'), null, 'no candidate carries over');
     assert.deepEqual(errors, []);
   } finally { await page.close(); }

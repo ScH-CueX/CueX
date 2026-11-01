@@ -21,6 +21,7 @@ export class LiveWSDriver implements IConversationDriver {
   private pingTimer?: number;
   private connectTimer?: number;
   private doctorPending = false;
+  private finishing = false;
   private retry?: { concernId: string };
   private readonly onOffline = () => this.fail('网络已断开，请恢复网络后重新连接。');
   private readonly player = new StreamAudioPlayer({
@@ -72,7 +73,14 @@ export class LiveWSDriver implements IConversationDriver {
     return { scenarioId: this.options.scenarioId ?? 'anshu-hypertension-01', mode: this.options.mode ?? 'performance', ...(this.retry ? { retry: this.retry } : {}) };
   }
 
-  /** Ends the visit but keeps the socket open. The server prepares the next doctor line while the audience reviews. */
+  /** Requests the doctor's closing and assessment without cutting off playback. */
+  finishVisit(): void {
+    if (this._status !== 'running' || this.finishing) return;
+    this.finishing = true;
+    this.sendMessage({ type: 'visit.end', payload: { sessionId: this.sessionId ?? 'current' } });
+  }
+
+  /** Abrupt visit reset retained for old internal stage consumers. */
   endVisit(): void {
     if (this._status !== 'running') return;
     this.player.abort();
@@ -88,6 +96,7 @@ export class LiveWSDriver implements IConversationDriver {
     this.player.abort();
     this.doctorPending = false;
     this.sessionId = undefined;
+    this.finishing = false;
     this.retry = retry;
     this.setStatus('connecting');
     window.clearTimeout(this.connectTimer);
@@ -111,6 +120,7 @@ export class LiveWSDriver implements IConversationDriver {
     ws?.close();
     this.sessionId = undefined;
     this.doctorPending = false;
+    this.finishing = false;
     this.setStatus('idle');
   }
 
@@ -128,12 +138,12 @@ export class LiveWSDriver implements IConversationDriver {
   }
 
   sendAudioChunk(base64Pcm: string, timestamp: number): void {
-    if (this._status !== 'running') return;
+    if (this._status !== 'running' || this.finishing) return;
     this.sendMessage({ type: 'audio.chunk', payload: { format: 'pcm16', sampleRate: 16000, channels: 1, data: base64Pcm, timestamp } });
   }
 
   sendSpeechDelta(text: string, isFinal: boolean): void {
-    if (this._status !== 'running') return;
+    if (this._status !== 'running' || this.finishing) return;
     this.interruptDoctor();
     this.sendMessage({ type: 'speech.delta', payload: { text, isFinal } });
   }
@@ -154,7 +164,13 @@ export class LiveWSDriver implements IConversationDriver {
         if (msg.payload.action.textToSpeak) this.doctorPending = true;
         this.callbacks.onDoctorDispatch?.(msg.payload);
         break;
-      case 'visit.ended': break; // The stage page reads it from onServerEvent.
+      case 'visit.ended':
+        this.finishing = true;
+        this.doctorPending = false;
+        this.setStatus('paused');
+        break;
+      case 'system2.activity':
+      case 'conversation.progress': break;
       case 'asr.transcript': this.callbacks.onTranscript?.(msg.payload); break;
       case 'system1.verdict': this.callbacks.onSystem1Verdict?.(msg.payload); break;
       case 'system2.candidate': this.callbacks.onSystem2Candidate?.(msg.payload.candidate); break;

@@ -16,6 +16,8 @@ export interface ScenarioPack {
   scenario: TrainingScenarioDef;
   /** Facts from the (fictional) clinical material. System 2 retrieves from these; nothing else is evidence. */
   facts: PackFact[];
+  /** Scenario-specific evidence needed to answer each point; assessed across the heard conversation. */
+  pointRequirements?: Record<string, string[]>;
   /** Few-shot examples for the doctor lines System 2 writes live. */
   lineExamples: DoctorLineExamples;
   /** Observed misrecognitions of this pack's terms by the deployed ASR. Applied to rep transcripts before System 1 and display. */
@@ -150,8 +152,46 @@ export interface DoctorLineRequest {
   signal: AbortSignal;
 }
 
+export interface DoctorTurnRequest {
+  sessionId: string;
+  pack: ScenarioPack;
+  concernId: string;
+  resolvedPointIds: string[];
+  history: DialogueTurn[];
+  repSpeech: string;
+  trigger: 'turn_end' | 'silence';
+  /** 0 for a normal reply; 1 or 2 for a quiet-visitor prompt; 3 closes an idle visit. */
+  silenceStage: number;
+  signal: AbortSignal;
+}
+
+export interface DoctorTurnDraft {
+  text: string;
+  action: 'reply' | 'end_visit';
+  /** Point answers supported by the material pack, not just mentioned by the rep. */
+  resolvedPointIds: string[];
+  /** Point claims contradicted by the material pack. These must stay open. */
+  contradictedPointIds: string[];
+  /** Previously supported claims explicitly withdrawn by the rep; ordinary uncertainty does not erase prior evidence. */
+  reopenedPointIds?: string[];
+  basis: string;
+  sourceEvidence?: string;
+}
+
+export interface DoctorOutcomeRequest {
+  sessionId: string;
+  pack: ScenarioPack;
+  history: DialogueTurn[];
+  resolvedPointIds: string[];
+  endReason: 'completed' | 'user_requested' | 'farewell' | 'silence';
+  signal: AbortSignal;
+}
+
 export interface SystemTwo {
   readonly backend: string;
+  /** Grounded normal conversation after a turn or a quiet interval; independent of interruption drafting. */
+  prepareTurn?(req: DoctorTurnRequest): Promise<DoctorTurnDraft>;
+  prepareOutcome?(req: DoctorOutcomeRequest): Promise<import('@cuex/protocol').VisitOutcome>;
   prepareFollowup(req: FollowupRequest, onPhase?: (phase: FollowupPhase, partialText?: string) => void): Promise<FollowupDraft>;
   /**
    * Writes one spoken doctor line live, guided by pack.lineExamples. It runs on its own agent, in parallel with follow-up

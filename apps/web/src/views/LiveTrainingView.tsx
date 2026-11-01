@@ -17,6 +17,8 @@ import { cn } from '@/lib/utils';
 import { useLiveSession } from '@/core/session/useLiveSession';
 import { replayFrame, liveFrame, phaseLabels, actionLabels } from '@/core/session/trainingFrame';
 import { LiveInputControls } from '@/components/LiveInputControls';
+import { LiveBriefing } from '@/components/LiveBriefing';
+import { LiveOutcome } from '@/components/LiveOutcome';
 
 const D = META.duration;
 const JUMP: Record<string, number> = { listen: 9.0, ask: 26.2, withdraw: 51.4 };
@@ -29,7 +31,7 @@ interface LiveTrainingViewProps {
 
 export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
   initialTime = 0,
-  initialJury = false,
+  initialJury = true,
   onNavigate,
 }) => {
   const [t, setT] = useState<number>(initialTime);
@@ -38,9 +40,9 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
     const value=new URLSearchParams(window.location.search).get('assist');
     return value === 'minimal' || value === 'faded' ? value : 'full';
   });
-  const [jury, setJury] = useState<boolean>(initialJury);
+  const [jury, setJury] = useState<boolean>(() => new URLSearchParams(window.location.search).get('mode') !== 'replay' || initialJury);
   const [nodTrigger, setNodTrigger] = useState<number>(0);
-  const [driverType, setDriverType] = useState<'replay' | 'live'>('replay');
+  const [driverType] = useState<'replay' | 'live'>(() => new URLSearchParams(window.location.search).get('mode') === 'replay' ? 'replay' : 'live');
 
   const live = useLiveSession(driverType === 'live');
   const [elapsed, setElapsed] = useState(0);
@@ -49,11 +51,12 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
 
   useEffect(() => {
     if (driverType !== 'live' || !live.session.startedAt) return;
+    if (live.session.visitEnded) { setElapsed(live.session.visitEnded.durationMs / 1000); return; }
     const tick = () => setElapsed((Date.now() - live.session.startedAt!) / 1000);
     tick();
     const timer = window.setInterval(tick, 250);
     return () => window.clearInterval(timer);
-  }, [driverType, live.session.startedAt]);
+  }, [driverType, live.session.startedAt, live.session.visitEnded]);
 
   // 2. 点头检测
   useEffect(() => {
@@ -105,7 +108,12 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
   const candidatesInView = driverType === 'live' ? frame.candidates : frame.candidates.slice(-1);
   const candidateInFocus = frame.candidates[frame.candidates.length - 1];
   const clock = driverType === 'live' ? elapsed : t;
-  const connected = live.session.status === 'running';
+  const connected = live.session.status === 'running' && !live.finishing && !live.session.visitEnded;
+  const ended = live.session.visitEnded && !live.session.audioPlaying ? live.session.visitEnded : undefined;
+  const waitingToStart = driverType === 'live' && !live.session.startedAt;
+  const activities = live.session.activities;
+  const activityKinds = { reply: '对话回应', silence_prompt: '停顿提示', assessment: '拜访评估' };
+  const activityPhases = { preparing: '正在准备', ready: '已准备', speaking: '医生在说', completed: '已完成', cancelled: '已取消', error: '请重试' };
 
   const seek = useCallback((targetTime: number) => {
     setT(Math.min(D, Math.max(0, targetTime)));
@@ -130,31 +138,13 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
           {driverType === 'live' && (
             <Badge variant={connected ? 'resolved' : 'secondary'} className="gap-1" role="status" data-testid="connection-status">
               <Radio className="w-3 h-3" />
-              <span>{connected ? '已连接' : live.session.status === 'connecting' ? '正在连接' : live.session.status === 'error' ? '连接失败' : '已断开'}</span>
+              <span>{ended ? '拜访结束' : live.finishing ? '正在收尾' : connected ? '已连接' : live.session.status === 'connecting' ? '正在连接' : live.session.status === 'error' ? '连接失败' : '待开始'}</span>
             </Badge>
           )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 max-w-full">
-          {/* Driver 模式快速切换 */}
-          <div className="seg" role="group" aria-label="驱动模式">
-            <button
-              type="button"
-              aria-pressed={driverType === 'replay'}
-              onClick={() => setDriverType('replay')}
-              title="68 秒高保真确定性预录演示"
-            >
-              演示回放
-            </button>
-            <button
-              type="button"
-              aria-pressed={driverType === 'live'}
-              onClick={() => { if (driverType !== 'live') { live.connect(); setDriverType('live'); } }}
-              title="连接真实 TypeScript WebSocket 后端"
-            >
-              实时连线
-            </button>
-          </div>
+          {driverType === 'replay' && <span className="text-ink-3">演示回放</span>}
 
           <Button
             variant="quiet"
@@ -164,22 +154,27 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
             aria-pressed={jury}
           >
             {jury ? <EyeOff className="w-3.5 h-3.5 text-held" /> : <Eye className="w-3.5 h-3.5" />}
-            <span>评审视界</span>
+            <span>{jury ? '收起决策' : '查看决策'}</span>
           </Button>
 
           <Button
             variant="default"
             size="sm"
-            onClick={() => { if (driverType === 'live') live.stop(); else onNavigate('review'); }}
+            onClick={() => { if (driverType === 'live') live.finishVisit(); else onNavigate('review'); }}
+            disabled={driverType === 'live' && (!connected || live.finishing)}
             className="h-8 text-xs"
           >
-            {driverType === 'live' ? '结束连线' : '结束并复盘'}
+            {driverType === 'live' ? live.finishing ? '医生正在收尾' : '结束并复盘' : '查看示例复盘'}
           </Button>
         </div>
       </div>
 
+      {waitingToStart && <><LiveBriefing onStart={live.connect} starting={live.session.status === 'connecting'} />{live.session.error && <p role="alert" className="max-w-[1440px] w-full mx-auto px-6 pt-3 text-sm text-held-ink">{live.session.error}</p>}</>}
+      {live.finishing && <p role="status" data-testid="visit-closing" className="max-w-[1440px] w-full mx-auto px-6 pt-4 text-sm text-ink-2">医生正在收尾，随后查看本次反馈。</p>}
+      {ended && <LiveOutcome ended={ended} onRetry={concernId => live.restartVisit({ concernId })} onNext={live.clear} />}
+
       {/* 主界面网格 */}
-      <div className="flex-1 max-w-[1440px] w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+      <div data-testid="live-grid" className={cn("flex-1 max-w-[1440px] w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch", ended && "hidden")}>
         
         {/* 左列：极简张力刻度与关切状态 */}
         <div className="lg:col-span-3 flex flex-col justify-between space-y-6">
@@ -338,11 +333,11 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
       </div>
 
       {/* 评审视界：脑电波脉冲与悬珠 */}
-      {jury && (
+      {jury && !waitingToStart && (
         <div data-capture="decisions" className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 mb-4">
           <div className="border border-line bg-surface/90 rounded-[2px] p-4 space-y-3 shadow-sm">
             <div className="flex items-center justify-between border-b border-line pb-1.5 text-xs">
-              <span className="font-bold text-ink">系统双层决策时序</span>
+              <span className="font-bold text-ink">对话决策</span>
               <span className="text-held-ink text-[11px]">朱砂色 = 处于悬置的追问</span>
             </div>
 
@@ -350,7 +345,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
               {/* System 1: 脉冲判定 */}
               <div className="bg-ground-2/40 border border-line p-3 rounded-[2px] space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-ink">System 1 · 快速判定 (Jev)</span>
+                  <span className="font-semibold text-ink">System 1 · 即时判断</span>
                   <span className="font-mono text-ink-3 text-[11px]">
                     {latestJudgment ? fmt(latestJudgment.t) : '0:00'}
                   </span>
@@ -366,15 +361,20 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
                     {latestJudgment ? latestJudgment.read : '倾听中'}
                   </span>
                 </div>
-                {driverType === 'live' && latestJudgment && <p className="text-ink-3">{actionLabels[latestJudgment.action ?? 'listen']} · {latestJudgment.latencyMs?.toFixed(0)} ms</p>}
+                {driverType === 'live' && latestJudgment && <p className="text-ink-3">{actionLabels[latestJudgment.action ?? 'listen'] ?? latestJudgment.action}</p>}
               </div>
 
 
               {/* System 2: 候选追问生命周期悬珠 */}
               <div className="bg-ground-2/40 border border-line p-3 rounded-[2px] space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-ink">System 2 · 候选追问 (PiAgent)</span>
+                  <span className="font-semibold text-ink">System 2 · 回应与追问</span>
                 </div>
+                {driverType === 'live' && <div className="space-y-2" data-testid="system2-activities">{activities.length ? activities.slice(-4).map(activity => <div key={activity.taskId} data-testid="system2-activity" data-kind={activity.kind} data-phase={activity.phase} className="border-t border-line pt-2 space-y-1">
+                  <p className="font-medium">{activityKinds[activity.kind]} · {activityPhases[activity.phase]}</p>
+                  {activity.reason && <p className="text-ink-2">{activity.reason}</p>}
+                  {activity.sourceEvidence && <p className="text-ink-3">{activity.sourceEvidence}</p>}
+                </div>) : <p className="text-ink-3">等待对话</p>}</div>}
                 {candidatesInView.length ? candidatesInView.map(candidate => (
                   <div key={candidate.id} className="space-y-2 border-t border-line pt-2" data-testid="candidate" data-phase={candidate.phase}>
                     <Badge variant={candidate.phase === 'withdrawn' ? 'resolved' : candidate.phase === 'ready' ? 'held' : 'secondary'}>
@@ -383,7 +383,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
                     {candidate.text && <p className="font-doctor text-sm text-ink-2 bg-surface p-2 rounded-[2px] border border-line">
                       <span data-capture="candidate-quote">{candidate.phase === 'withdrawn' ? <del className="text-ink-3">{candidate.text}</del> : candidate.text}</span>
                     </p>}
-                    {driverType === 'live' && <p className="text-ink-3 leading-relaxed">{candidate.basis}</p>}
+                    {driverType === 'live' && <><p className="text-ink-3 leading-relaxed">{candidate.basis}</p>{candidate.sourceEvidence && <p className="text-ink-3">{candidate.sourceEvidence}</p>}</>}
                   </div>
                 )) : <span className="text-ink-3 text-xs">暂无追问候选</span>}
               </div>
@@ -392,10 +392,9 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
         </div>
       )}
 
-      {driverType === 'live' ? (
-        <LiveInputControls
+      {driverType === 'live' ? (!ended && !waitingToStart && <LiveInputControls
           connected={connected}
-          connecting={live.session.status === 'connecting'}
+          connecting={live.session.status === 'connecting' || live.finishing}
           error={live.session.error}
           mic={live.mic}
           volume={live.volume}
@@ -404,7 +403,7 @@ export const LiveTrainingView: React.FC<LiveTrainingViewProps> = ({
           onToggleMic={live.toggleMic}
           onSendText={live.sendText}
           onFinishText={live.finishText}
-          onStop={live.stop}
+          onStop={live.finishVisit}
         />
       ) : <>
       {/* 底部控制台与时刻轴 */}

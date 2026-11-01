@@ -34,10 +34,10 @@ export function LiveInputControls(props: LiveInputControlsProps) {
           </Button>
           <span role="status" className="text-ink-2">{props.mic === 'on' ? '正在收音' : props.mic === 'starting' ? '等待麦克风权限' : '用麦克风或文字回应医生'}</span>
           {props.mic === 'on' && <meter min={0} max={1} value={props.volume} aria-label="麦克风音量" className="w-24" />}
-          <Button type="button" variant="quiet" size="sm" onClick={props.onReconnect} disabled={props.connecting} className="ml-auto gap-1">
+          {!props.connected && !props.connecting && <Button type="button" variant="quiet" size="sm" onClick={props.onReconnect} className="ml-auto gap-1">
             <RefreshCw className="w-3.5 h-3.5" />重新连接
-          </Button>
-          <Button type="button" variant="quiet" size="sm" onClick={props.onStop} disabled={!props.connected}>结束连线</Button>
+          </Button>}
+          <Button type="button" variant="quiet" size="sm" onClick={props.onStop} disabled={!props.connected}>结束并复盘</Button>
         </div>
         <form onSubmit={event => { event.preventDefault(); submit(); }} className="flex flex-col sm:flex-row gap-3 items-end">
           <div className="flex-1 w-full space-y-1">

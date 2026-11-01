@@ -96,7 +96,7 @@ export const ReviewView: React.FC<ReviewViewProps> = ({ onNavigate }) => {
         {/* Masthead */}
         <header className="border-b border-line pb-6 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-3">
-            <span className="font-medium text-ink">复盘与决策对谈稿</span>
+            <span className="font-medium text-ink">演示案例 · 复盘与决策对谈稿</span>
             <Button
               variant="quiet"
               size="sm"
